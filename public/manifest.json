@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "Plan / Actual / Revised",
+  "description": "A personal plan, actual, and revised day planner.",
+  "version": "0.1.0",
+  "action": {
+    "default_title": "Plan / Actual / Revised"
+  },
+  "background": {
+    "service_worker": "background/service-worker.js",
+    "type": "module"
+  },
+  "permissions": ["storage"]
+}
