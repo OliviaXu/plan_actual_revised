@@ -31,6 +31,20 @@ test("loads the extension app shell and receives background status", async () =>
     );
 
     expect(background).toEqual({ ok: true, value: { status: "online" } });
+
+    const launchedPagePromise = context.waitForEvent("page");
+    const launchResponse = await page.evaluate(() =>
+      chrome.runtime.sendMessage({ type: "app.open" }),
+    );
+    const launchedPage = await launchedPagePromise;
+
+    expect(launchResponse).toEqual({ ok: true, value: { opened: true } });
+    await expect(launchedPage).toHaveURL(
+      `chrome-extension://${extensionId}/index.html`,
+    );
+    await expect(
+      launchedPage.getByRole("heading", { name: "Plan / Actual / Revised" }),
+    ).toBeVisible();
   } finally {
     await context.close();
   }
