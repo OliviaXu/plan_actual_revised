@@ -10,5 +10,10 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-  "permissions": ["storage"]
+  "permissions": ["identity", "storage"],
+  "host_permissions": ["https://www.googleapis.com/*"],
+  "oauth2": {
+    "client_id": "589036082654-p8qrov7unuladm4ud0ufh3hkgajr6a43.apps.googleusercontent.com",
+    "scopes": ["https://www.googleapis.com/auth/calendar.events"]
+  }
 }

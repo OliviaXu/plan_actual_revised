@@ -1,12 +1,8 @@
-type AppHealthMessage = {
-  type: "app.health";
-};
+import { requestInteractiveToken } from "./auth";
+import { installRuntimeListeners } from "./service-worker-runtime";
+import { listPrimaryCalendarEvents } from "../calendar/google-calendar-client";
 
-type AppOpenMessage = {
-  type: "app.open";
-};
-
-type RuntimeMessage = AppHealthMessage | AppOpenMessage;
+let cachedToken: string | undefined;
 
 function openAppPage() {
   return chrome.tabs.create({
@@ -14,40 +10,18 @@ function openAppPage() {
   });
 }
 
-chrome.action.onClicked.addListener(() => {
-  void openAppPage();
-});
+installRuntimeListeners({
+  openAppPage,
+  getCachedToken: () => cachedToken,
+  requestInteractiveToken: async () => {
+    const result = await requestInteractiveToken();
 
-chrome.runtime.onMessage.addListener(
-  (
-    message: RuntimeMessage,
-    _sender,
-    sendResponse: (response: unknown) => void,
-  ) => {
-    if (message?.type === "app.health") {
-      sendResponse({ ok: true, value: { status: "online" } });
-      return false;
+    if (result.ok) {
+      cachedToken = result.value.token;
     }
 
-    if (message?.type === "app.open") {
-      openAppPage()
-        .then(() => {
-          sendResponse({ ok: true, value: { opened: true } });
-        })
-        .catch((error: unknown) => {
-          sendResponse({
-            ok: false,
-            error: {
-              code: "APP_OPEN_FAILED",
-              message:
-                error instanceof Error ? error.message : "Unable to open app page",
-              recoverable: true,
-            },
-          });
-        });
-      return true;
-    }
-
-    return false;
+    return result;
   },
-);
+  listPrimaryCalendarEvents: (token: string) =>
+    listPrimaryCalendarEvents({ token }),
+});

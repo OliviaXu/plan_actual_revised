@@ -12,11 +12,16 @@ export default defineConfig({
           __dirname,
           "src/background/service-worker.ts",
         ),
+        "background/service-worker-runtime": path.resolve(
+          __dirname,
+          "src/background/service-worker-runtime.ts",
+        ),
       },
       output: {
         entryFileNames: "[name].js",
         chunkFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash][extname]",
+        minifyInternalExports: false,
       },
     },
   },
