@@ -16,14 +16,16 @@ type CalendarState =
 const readSystemTime = () => new Date();
 
 export function App({ now = readSystemTime }: { now?: () => Date }) {
-  const [calendar, setCalendar] = useState<CalendarState>({ status: "loading" });
+  const [calendarState, setCalendarState] = useState<CalendarState>({
+    status: "loading",
+  });
 
   useEffect(() => {
-    void loadCalendarEvents(setCalendar);
+    void loadCalendarEvents(setCalendarState);
   }, []);
 
   async function connectCalendar() {
-    setCalendar({ status: "connecting" });
+    setCalendarState({ status: "connecting" });
 
     try {
       const authResponse = (await chrome.runtime.sendMessage({
@@ -31,28 +33,29 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       })) as Result<{ status: "connected" }>;
 
       if (!authResponse.ok) {
-        setCalendar({
+        setCalendarState({
           status: "disconnected",
           errorMessage: authResponse.error.message,
         });
         return;
       }
 
-      await loadCalendarEvents(setCalendar);
+      await loadCalendarEvents(setCalendarState);
     } catch {
-      setCalendar({
+      setCalendarState({
         status: "disconnected",
         errorMessage: "Unable to reach the background Calendar boundary.",
       });
     }
   }
 
-  const events = calendar.status === "connected" ? calendar.events : [];
+  const events =
+    calendarState.status === "connected" ? calendarState.events : [];
   const errorMessage =
-    calendar.status === "error"
-      ? calendar.message
-      : calendar.status === "disconnected"
-        ? calendar.errorMessage
+    calendarState.status === "error"
+      ? calendarState.message
+      : calendarState.status === "disconnected"
+        ? calendarState.errorMessage
         : undefined;
 
   return (
@@ -87,7 +90,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           </p>
         ) : null}
 
-        {calendar.status === "disconnected" ? (
+        {calendarState.status === "disconnected" ? (
           <section
             className="max-w-md rounded-md border border-border bg-white p-5 shadow-soft"
             aria-label="Calendar connection"
@@ -104,15 +107,17 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             </Button>
           </section>
         ) : (
-          <PlanDayGrid events={events} status={calendar.status} />
+          <PlanDayGrid events={events} status={calendarState.status} />
         )}
       </section>
     </main>
   );
 }
 
-async function loadCalendarEvents(setCalendar: (state: CalendarState) => void) {
-  setCalendar({ status: "loading" });
+async function loadCalendarEvents(
+  setCalendarState: (state: CalendarState) => void,
+) {
+  setCalendarState({ status: "loading" });
 
   try {
     const response = (await chrome.runtime.sendMessage({
@@ -120,18 +125,18 @@ async function loadCalendarEvents(setCalendar: (state: CalendarState) => void) {
     })) as Result<{ events: CalendarEvent[] }>;
 
     if (response.ok) {
-      setCalendar({ status: "connected", events: response.value.events });
+      setCalendarState({ status: "connected", events: response.value.events });
       return;
     }
 
     if (response.error.code === "AUTH_NOT_CONNECTED") {
-      setCalendar({ status: "disconnected" });
+      setCalendarState({ status: "disconnected" });
       return;
     }
 
-    setCalendar({ status: "error", message: response.error.message });
+    setCalendarState({ status: "error", message: response.error.message });
   } catch {
-    setCalendar({
+    setCalendarState({
       status: "error",
       message: "Unable to reach the background Calendar boundary.",
     });
