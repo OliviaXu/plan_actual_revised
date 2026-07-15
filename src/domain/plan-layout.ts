@@ -1,3 +1,0 @@
-export const MINUTES_PER_HOUR = 60;
-export const MILLISECONDS_PER_MINUTE = 60_000;
-export const MINIMUM_PLAN_BLOCK_HEIGHT_PX = 20;

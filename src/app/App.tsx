@@ -57,6 +57,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       : calendarState.status === "disconnected"
         ? calendarState.errorMessage
         : undefined;
+  const currentDate = now();
 
   return (
     <main className="min-h-screen bg-background text-foreground">
@@ -68,7 +69,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             </div>
             <div>
               <p className="text-sm text-muted-foreground">
-                {now().toLocaleDateString(undefined, {
+                {currentDate.toLocaleDateString(undefined, {
                   weekday: "long",
                   month: "long",
                   day: "numeric",
@@ -107,7 +108,11 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             </Button>
           </section>
         ) : (
-          <PlanDayGrid events={events} status={calendarState.status} />
+          <PlanDayGrid
+            events={events}
+            status={calendarState.status}
+            today={currentDate}
+          />
         )}
       </section>
     </main>

@@ -115,7 +115,8 @@ If measured latency later makes caching worthwhile:
 
 ### Behavior
 
-- Render the configured hour axis and horizontal grid lines.
+- Render the configured hour labels with short Time-axis ticks.
+- Keep the Plan column free of full-width horizontal grid lines.
 - Position blocks from absolute start time using `pixelsPerMinute`.
 - Derive block height from duration, with a named 20px minimum visual height.
 - Start with the configured 07:00-21:00 range.

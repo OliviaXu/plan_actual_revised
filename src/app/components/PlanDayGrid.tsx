@@ -1,9 +1,8 @@
 import type { CalendarEvent } from "../../calendar/calendar-event";
 import {
-  MILLISECONDS_PER_MINUTE,
-  MINIMUM_PLAN_BLOCK_HEIGHT_PX,
-  MINUTES_PER_HOUR,
-} from "../../domain/plan-layout";
+  calculatePlanDayGridLayout,
+  type PlanDayGridBlock,
+} from "./plan-day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
 
 type PlanLoadStatus =
@@ -15,15 +14,14 @@ type PlanLoadStatus =
 export function PlanDayGrid({
   events,
   status,
+  today,
 }: {
   events: CalendarEvent[];
   status: PlanLoadStatus;
+  today: Date;
 }) {
-  const timedEvents = events.filter((event) => event.kind === "timed");
-  const gridHeight =
-    (defaultSettings.dayEndHour - defaultSettings.dayStartHour) *
-    MINUTES_PER_HOUR *
-    defaultSettings.pixelsPerMinute;
+  const layout = calculatePlanDayGridLayout(events, today, defaultSettings);
+  const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
 
   return (
     <section
@@ -36,72 +34,76 @@ export function PlanDayGrid({
         </div>
         <h2 className="px-4 py-2 text-sm font-semibold">Plan</h2>
       </div>
-      <div className="grid grid-cols-[var(--plan-grid-columns)]">
-        <div className="relative border-r border-border" style={{ height: gridHeight }}>
-          <span className="absolute right-2 top-0 text-xs text-muted-foreground">
-            {formatHour(defaultSettings.dayStartHour)}
-          </span>
-          <span className="absolute bottom-0 right-2 text-xs text-muted-foreground">
-            {formatHour(defaultSettings.dayEndHour)}
-          </span>
-        </div>
-        <div className="relative" style={{ height: gridHeight }} data-testid="plan-column">
-          {status === "loading" ? (
-            <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
-              Loading today&apos;s plan
-            </p>
-          ) : null}
-          {status === "connecting" ? (
-            <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
-              Connecting Google Calendar
-            </p>
-          ) : null}
-          {status === "error" ? (
-            <p
-              className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
-              data-testid="plan-unavailable"
-            >
-              Unable to load today&apos;s plan
-            </p>
-          ) : null}
-          {status === "connected" && timedEvents.length === 0 ? (
-            <p
-              className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
-              data-testid="plan-empty"
-            >
-              No timed events today
-            </p>
-          ) : null}
-          {timedEvents.map((event) => {
-            const start = new Date(event.start);
-            const end = new Date(event.end);
-            const startMinutes =
-              start.getHours() * MINUTES_PER_HOUR + start.getMinutes();
-            const durationMinutes =
-              (end.getTime() - start.getTime()) / MILLISECONDS_PER_MINUTE;
+      <div
+        className="relative"
+        data-end-hour={layout.endHour}
+        data-start-hour={layout.startHour}
+        data-testid="plan-grid-body"
+        style={{ height: layout.heightPx }}
+      >
+        <div className="grid h-full grid-cols-[var(--plan-grid-columns)]">
+          <div className="relative border-r border-border">
+            {layout.hourBoundaries.map((hour) => {
+              const labelPosition =
+                hour === layout.startHour
+                  ? ""
+                  : hour === layout.endHour
+                    ? "-translate-y-full"
+                    : "-translate-y-1/2";
 
-            return (
-              <article
-                key={event.id}
-                className="absolute inset-x-3 overflow-hidden rounded-sm border border-border bg-accent px-3 py-2 text-sm shadow-soft"
-                data-calendar-event-id={event.id}
-                style={{
-                  top:
-                    (startMinutes -
-                      defaultSettings.dayStartHour * MINUTES_PER_HOUR) *
-                    defaultSettings.pixelsPerMinute,
-                  height: Math.max(
-                    MINIMUM_PLAN_BLOCK_HEIGHT_PX,
-                    durationMinutes * defaultSettings.pixelsPerMinute,
-                  ),
-                }}
+              return (
+                <div
+                  className="pointer-events-none absolute inset-x-0"
+                  data-testid={`plan-hour-marker-${hour}`}
+                  key={hour}
+                  style={{ top: (hour - layout.startHour) * hourHeightPx }}
+                >
+                  <span
+                    className={`absolute right-0 top-0 w-2 border-t border-border ${
+                      hour === layout.endHour ? "-translate-y-px" : ""
+                    }`}
+                    data-testid="plan-hour-tick"
+                  />
+                  <span
+                    className={`absolute right-3 text-xs text-muted-foreground ${labelPosition}`}
+                  >
+                    {formatHour(hour)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+          <div className="relative" data-testid="plan-column">
+            {status === "loading" ? (
+              <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
+                Loading today&apos;s plan
+              </p>
+            ) : null}
+            {status === "connecting" ? (
+              <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
+                Connecting Google Calendar
+              </p>
+            ) : null}
+            {status === "error" ? (
+              <p
+                className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
+                data-testid="plan-unavailable"
               >
-                <p className="truncate font-medium">
-                  {event.summary ?? "Untitled event"}
-                </p>
-              </article>
-            );
-          })}
+                Unable to load today&apos;s plan
+              </p>
+            ) : null}
+            {status === "connected" && layout.blocks.length === 0 ? (
+              <p
+                className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
+                data-testid="plan-empty"
+              >
+                No timed events today
+              </p>
+            ) : null}
+            {layout.blocks.map((block) => (
+              <PlanEventBlock block={block} key={block.event.id} />
+            ))}
+          </div>
         </div>
       </div>
     </section>
@@ -109,7 +111,58 @@ export function PlanDayGrid({
 }
 
 function formatHour(hour: number) {
+  const normalizedHour = hour % 24;
+  const suffix = normalizedHour >= 12 ? "PM" : "AM";
+  const clockHour = normalizedHour % 12 || 12;
+  return `${clockHour} ${suffix}`;
+}
+
+function PlanEventBlock({ block }: { block: PlanDayGridBlock }) {
+  return (
+    <article
+      className="absolute inset-x-3 overflow-hidden rounded-sm border border-border bg-accent px-2 py-px text-xs leading-4 shadow-soft"
+      data-calendar-event-id={block.event.id}
+      data-testid={`plan-event-${block.event.id}`}
+      style={{ top: block.topPx, height: block.heightPx }}
+    >
+      <div className="flex min-w-0 items-start justify-between gap-2">
+        <p className="min-w-0 truncate font-medium">
+          {block.event.summary ?? "Untitled event"}
+        </p>
+        <span className="shrink-0 text-muted-foreground">
+          {formatDuration(block.durationMinutes)}
+        </span>
+      </div>
+      {block.showTimeRange ? (
+        <p
+          className="truncate text-muted-foreground"
+          data-testid="plan-event-time-range"
+        >
+          {formatTime(block.clippedStart)} – {formatTime(block.clippedEnd)}
+        </p>
+      ) : null}
+    </article>
+  );
+}
+
+function formatDuration(durationMinutes: number) {
+  const roundedMinutes = Math.round(durationMinutes);
+  const hours = Math.floor(roundedMinutes / 60);
+  const minutes = roundedMinutes % 60;
+
+  if (hours === 0) {
+    return `${minutes}m`;
+  }
+  if (minutes === 0) {
+    return `${hours}h`;
+  }
+  return `${hours}h ${minutes}m`;
+}
+
+function formatTime(date: Date) {
+  const hour = date.getHours();
+  const minutes = date.getMinutes().toString().padStart(2, "0");
   const suffix = hour >= 12 ? "PM" : "AM";
   const clockHour = hour % 12 || 12;
-  return `${clockHour} ${suffix}`;
+  return `${clockHour}:${minutes} ${suffix}`;
 }
