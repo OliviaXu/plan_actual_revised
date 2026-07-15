@@ -1,6 +1,20 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+
+@theme inline {
+  --color-background: hsl(var(--background));
+  --color-foreground: hsl(var(--foreground));
+  --color-border: hsl(var(--border));
+  --color-muted: hsl(var(--muted));
+  --color-muted-foreground: hsl(var(--muted-foreground));
+  --color-primary: hsl(var(--primary));
+  --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-destructive: hsl(var(--destructive));
+  --color-accent: hsl(var(--accent));
+  --color-accent-foreground: hsl(var(--accent-foreground));
+  --radius-sm: var(--app-radius-sm);
+  --radius-md: var(--app-radius-md);
+  --shadow-soft: var(--app-shadow-soft);
+}
 
 @layer base {
   :root {
@@ -14,9 +28,9 @@
     --destructive: 2 68% 44%;
     --accent: 39 85% 86%;
     --accent-foreground: 220 18% 18%;
-    --radius-sm: 4px;
-    --radius-md: 6px;
-    --shadow-soft: 0 8px 24px rgb(38 31 24 / 8%);
+    --app-radius-sm: 4px;
+    --app-radius-md: 6px;
+    --app-shadow-soft: 0 8px 24px rgb(38 31 24 / 8%);
   }
 
   * {
