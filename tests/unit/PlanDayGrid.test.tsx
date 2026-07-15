@@ -120,4 +120,77 @@ describe("PlanDayGrid", () => {
       height: "20px",
     });
   });
+
+  it("filters ineligible events before layout and applies Calendar colors", () => {
+    render(
+      <PlanDayGrid
+        events={[
+          {
+            ...timedEvent(
+              "visible-color",
+              "2026-07-15T09:00:00-07:00",
+              "2026-07-15T10:00:00-07:00",
+            ),
+            colorId: "1",
+          },
+          {
+            ...timedEvent(
+              "hidden-early",
+              "2026-07-15T05:30:00-07:00",
+              "2026-07-15T06:00:00-07:00",
+            ),
+            colorId: "2",
+          },
+          {
+            ...timedEvent(
+              "hidden-late",
+              "2026-07-15T22:00:00-07:00",
+              "2026-07-15T22:30:00-07:00",
+            ),
+            colorId: "10",
+          },
+          {
+            kind: "allDay",
+            id: "daily-focus",
+            summary: "Daily focus",
+            colorId: "5",
+            startDate: "2026-07-15",
+            endDate: "2026-07-16",
+          },
+          {
+            ...timedEvent(
+              "untitled-neutral",
+              "2026-07-15T11:00:00-07:00",
+              "2026-07-15T11:30:00-07:00",
+            ),
+            summary: null,
+            colorId: null,
+          },
+        ]}
+        status="connected"
+        today={today}
+      />,
+    );
+
+    expect(screen.getByTestId("plan-grid-body")).toHaveAttribute(
+      "data-start-hour",
+      "7",
+    );
+    expect(screen.getByTestId("plan-grid-body")).toHaveAttribute(
+      "data-end-hour",
+      "21",
+    );
+    expect(screen.queryByTestId("plan-event-hidden-early")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plan-event-hidden-late")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plan-event-daily-focus")).not.toBeInTheDocument();
+    expect(screen.getByText("Untitled event")).toBeVisible();
+    expect(screen.getByTestId("plan-event-visible-color")).toHaveClass(
+      "border-[#7986cb]/50",
+      "bg-[#7986cb]/25",
+    );
+    expect(screen.getByTestId("plan-event-untitled-neutral")).toHaveClass(
+      "border-border",
+      "bg-muted",
+    );
+  });
 });

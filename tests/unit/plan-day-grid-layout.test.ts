@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { CalendarEvent } from "../../src/calendar/calendar-event";
+import type { TimedCalendarEvent } from "../../src/calendar/calendar-event";
 import { defaultSettings } from "../../src/domain/settings";
 import {
   calculatePlanDayGridLayout,
@@ -13,7 +13,7 @@ function timedEvent(
   id: string,
   start: string,
   end: string,
-): CalendarEvent {
+): TimedCalendarEvent {
   return {
     kind: "timed",
     id,

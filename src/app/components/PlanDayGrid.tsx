@@ -1,4 +1,8 @@
-import type { CalendarEvent } from "../../calendar/calendar-event";
+import type {
+  CalendarEvent,
+  TimedCalendarEvent,
+} from "../../calendar/calendar-event";
+import { planEventColorClassName } from "../../design/google-calendar-colors";
 import {
   calculatePlanDayGridLayout,
   type PlanDayGridBlock,
@@ -20,7 +24,16 @@ export function PlanDayGrid({
   status: PlanLoadStatus;
   today: Date;
 }) {
-  const layout = calculatePlanDayGridLayout(events, today, defaultSettings);
+  const eligibleTimedEvents = events.filter(
+    (event): event is TimedCalendarEvent =>
+      event.kind === "timed" &&
+      !defaultSettings.hiddenPlanColorIds.includes(event.colorId ?? ""),
+  );
+  const layout = calculatePlanDayGridLayout(
+    eligibleTimedEvents,
+    today,
+    defaultSettings,
+  );
   const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
 
   return (
@@ -120,7 +133,7 @@ function formatHour(hour: number) {
 function PlanEventBlock({ block }: { block: PlanDayGridBlock }) {
   return (
     <article
-      className="absolute inset-x-3 overflow-hidden rounded-sm border border-border bg-accent px-2 py-px text-xs leading-4 shadow-soft"
+      className={`absolute inset-x-3 overflow-hidden rounded-sm border px-2 py-px text-xs leading-4 shadow-soft ${planEventColorClassName(block.event.colorId)}`}
       data-calendar-event-id={block.event.id}
       data-testid={`plan-event-${block.event.id}`}
       style={{ top: block.topPx, height: block.heightPx }}

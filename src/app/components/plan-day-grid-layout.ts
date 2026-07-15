@@ -1,5 +1,4 @@
 import type {
-  CalendarEvent,
   TimedCalendarEvent,
 } from "../../calendar/calendar-event";
 import type { AppSettings } from "../../domain/settings";
@@ -34,7 +33,7 @@ export type PlanDayGridLayout = {
 };
 
 export function calculatePlanDayGridLayout(
-  events: CalendarEvent[],
+  events: TimedCalendarEvent[],
   today: Date,
   settings: PlanGridSettings,
 ): PlanDayGridLayout {
@@ -50,10 +49,6 @@ export function calculatePlanDayGridLayout(
   );
 
   const clippedEvents = events.flatMap((event) => {
-    if (event.kind !== "timed") {
-      return [];
-    }
-
     const eventStart = new Date(event.start);
     const eventEnd = new Date(event.end);
     if (

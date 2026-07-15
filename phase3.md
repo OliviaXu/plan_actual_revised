@@ -141,7 +141,7 @@ Fixtures use ordinary visible timed events so geometry does not depend on the la
 - Filter before calculating range boundaries or block geometry.
 - Use `Untitled event` when a summary is absent.
 - Centralize Google Calendar color IDs 1-11 as design tokens.
-- Preserve an absent Calendar color as `null` and use a neutral fallback token.
+- Preserve an absent event-specific color as `null` and use the product's neutral Plan fallback.
 - Keep settings read-only and sourced from existing defaults.
 
 ### Tracer
