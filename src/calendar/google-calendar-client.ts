@@ -1,4 +1,8 @@
 import type { Result } from "../shared/result";
+import type {
+  CalendarEvent,
+  CalendarEventRange,
+} from "./calendar-event";
 
 const CALENDAR_LIST_FAILED_CODE = "CALENDAR_LIST_FAILED";
 
@@ -9,19 +13,16 @@ type GoogleCalendarListResponse = {
 
 export async function listPrimaryCalendarEvents(
   token: string,
+  range: CalendarEventRange,
   fetchCalendar: typeof fetch = fetch,
-): Promise<Result<{ eventCount: number }>> {
+): Promise<Result<{ events: CalendarEvent[] }>> {
   const url = new URL(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
   );
-  const now = new Date();
-  const tomorrow = new Date(now);
-  tomorrow.setDate(now.getDate() + 1);
-
   url.searchParams.set("singleEvents", "true");
   url.searchParams.set("orderBy", "startTime");
-  url.searchParams.set("timeMin", now.toISOString());
-  url.searchParams.set("timeMax", tomorrow.toISOString());
+  url.searchParams.set("timeMin", range.timeMin);
+  url.searchParams.set("timeMax", range.timeMax);
 
   try {
     const response = await fetchCalendar(url.toString(), {
@@ -57,7 +58,9 @@ export async function listPrimaryCalendarEvents(
 
     return {
       ok: true,
-      value: { eventCount: body.items?.length ?? 0 },
+      value: {
+        events: (body.items ?? []).flatMap(normalizeCalendarEvent),
+      },
     };
   } catch (error) {
     return {
@@ -71,4 +74,58 @@ export async function listPrimaryCalendarEvents(
       },
     };
   }
+}
+
+function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
+  if (!isRecord(value) || typeof value.id !== "string") {
+    return [];
+  }
+
+  const summary = typeof value.summary === "string" ? value.summary : null;
+  const colorId = typeof value.colorId === "string" ? value.colorId : null;
+  const start = isRecord(value.start) ? value.start : null;
+  const end = isRecord(value.end) ? value.end : null;
+
+  if (
+    start &&
+    end &&
+    typeof start.dateTime === "string" &&
+    typeof end.dateTime === "string"
+  ) {
+    return [
+      {
+        kind: "timed",
+        id: value.id,
+        summary,
+        colorId,
+        start: start.dateTime,
+        end: end.dateTime,
+        timeZone: typeof start.timeZone === "string" ? start.timeZone : null,
+      },
+    ];
+  }
+
+  if (
+    start &&
+    end &&
+    typeof start.date === "string" &&
+    typeof end.date === "string"
+  ) {
+    return [
+      {
+        kind: "allDay",
+        id: value.id,
+        summary,
+        colorId,
+        startDate: start.date,
+        endDate: end.date,
+      },
+    ];
+  }
+
+  return [];
+}
+
+function isRecord(value: unknown): value is Record<string, unknown> {
+  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

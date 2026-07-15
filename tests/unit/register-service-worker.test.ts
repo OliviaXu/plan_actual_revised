@@ -2,6 +2,13 @@ import { describe, expect, it, vi } from "vitest";
 
 import registerServiceWorker from "../../src/background/register-service-worker";
 
+const fixedNow = new Date(2026, 6, 15, 12);
+const range = {
+  timeMin: new Date(2026, 6, 15).toISOString(),
+  timeMax: new Date(2026, 6, 16).toISOString(),
+};
+const now = () => new Date(fixedNow);
+
 type MessageListener = (
   message: { type?: string },
   sender: unknown,
@@ -41,12 +48,12 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
     })),
     listPrimaryCalendarEvents: vi.fn(async () => ({
       ok: true as const,
-      value: { eventCount: 3 },
+      value: { events: [] },
     })),
     ...overrides,
   };
 
-  registerServiceWorker(dependencies);
+  registerServiceWorker(dependencies, now);
 
   if (!actionListener || !messageListener) {
     throw new Error("Service-worker listeners were not installed.");
@@ -104,17 +111,18 @@ describe("registerServiceWorker", () => {
     });
   });
 
-  it("lists Calendar events with a silently cached token", async () => {
+  it("lists today's Calendar events with a silently cached token", async () => {
     const { dependencies, messageListener } = installServiceWorker();
 
     await expect(
       sendMessage(messageListener, "calendar.listEvents"),
     ).resolves.toEqual({
       keepsChannelOpen: true,
-      response: { ok: true, value: { eventCount: 3 } },
+      response: { ok: true, value: { events: [] } },
     });
     expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledWith(
       "token-123",
+      range,
     );
   });
 

@@ -45,7 +45,17 @@ registerServiceWorker({
   },
   listPrimaryCalendarEvents: async () => ({
     ok: true,
-    value: { eventCount: 2 },
+    value: {
+      events: [{
+        kind: "timed",
+        id: "phase-two-event",
+        summary: "Phase 2 boundary event",
+        colorId: null,
+        start: "2026-07-15T09:00:00-07:00",
+        end: "2026-07-15T10:00:00-07:00",
+        timeZone: "America/Los_Angeles",
+      }],
+    },
   }),
 });
 `,
@@ -71,18 +81,13 @@ test("connects through the real UI and service-worker router", async () => {
   const { context, page } = await openExtension(extensionPath);
 
   try {
-    await expect(page.getByTestId("calendar-status")).toHaveText(
-      "Calendar disconnected",
-    );
+    await expect(
+      page.getByText("Connect Google Calendar to show today's plan"),
+    ).toBeVisible();
 
     await page.getByRole("button", { name: "Connect Calendar" }).click();
 
-    await expect(page.getByTestId("calendar-status")).toHaveText(
-      "Calendar connected",
-    );
-    await expect(page.getByTestId("calendar-result")).toHaveText(
-      "Calendar returned 2 events",
-    );
+    await expect(page.getByText("Phase 2 boundary event")).toBeVisible();
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });

@@ -2,18 +2,66 @@ import { describe, expect, it, vi } from "vitest";
 
 import { listPrimaryCalendarEvents } from "../../src/calendar/google-calendar-client";
 
+const range = {
+  timeMin: "2026-07-15T07:00:00.000Z",
+  timeMax: "2026-07-16T07:00:00.000Z",
+};
+
 describe("listPrimaryCalendarEvents", () => {
-  it("returns the raw event count from a successful Calendar response", async () => {
+  it("normalizes timed and all-day events from a dated Calendar response", async () => {
     const fetchCalendar = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
-        Response.json({ items: [{ id: "one" }, { id: "two" }] }),
+        Response.json({
+          items: [
+            {
+              id: "timed",
+              summary: "Design review",
+              colorId: "9",
+              start: {
+                dateTime: "2026-07-15T09:00:00-07:00",
+                timeZone: "America/Los_Angeles",
+              },
+              end: { dateTime: "2026-07-15T10:00:00-07:00" },
+            },
+            {
+              id: "all-day",
+              summary: "Focus",
+              start: { date: "2026-07-15" },
+              end: { date: "2026-07-16" },
+            },
+          ],
+        }),
     );
 
     await expect(
-      listPrimaryCalendarEvents("token-123", fetchCalendar),
+      listPrimaryCalendarEvents(
+        "token-123",
+        range,
+        fetchCalendar,
+      ),
     ).resolves.toEqual({
       ok: true,
-      value: { eventCount: 2 },
+      value: {
+        events: [
+          {
+            kind: "timed",
+            id: "timed",
+            summary: "Design review",
+            colorId: "9",
+            start: "2026-07-15T09:00:00-07:00",
+            end: "2026-07-15T10:00:00-07:00",
+            timeZone: "America/Los_Angeles",
+          },
+          {
+            kind: "allDay",
+            id: "all-day",
+            summary: "Focus",
+            colorId: null,
+            startDate: "2026-07-15",
+            endDate: "2026-07-16",
+          },
+        ],
+      },
     });
 
     expect(fetchCalendar).toHaveBeenCalledWith(
@@ -30,8 +78,50 @@ describe("listPrimaryCalendarEvents", () => {
     );
     expect(requestUrl.searchParams.get("singleEvents")).toBe("true");
     expect(requestUrl.searchParams.get("orderBy")).toBe("startTime");
-    expect(requestUrl.searchParams.get("timeMin")).toBeTruthy();
-    expect(requestUrl.searchParams.get("timeMax")).toBeTruthy();
+    expect(requestUrl.searchParams.get("timeMin")).toBe(
+      "2026-07-15T07:00:00.000Z",
+    );
+    expect(requestUrl.searchParams.get("timeMax")).toBe(
+      "2026-07-16T07:00:00.000Z",
+    );
+  });
+
+  it("omits malformed individual events", async () => {
+    const fetchCalendar = vi.fn(async () =>
+      Response.json({
+        items: [
+          { id: "missing-times", summary: "Broken" },
+          {
+            id: "valid",
+            start: { dateTime: "2026-07-15T11:00:00-07:00" },
+            end: { dateTime: "2026-07-15T11:30:00-07:00" },
+          },
+        ],
+      }),
+    );
+
+    await expect(
+      listPrimaryCalendarEvents(
+        "token-123",
+        range,
+        fetchCalendar,
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      value: {
+        events: [
+          {
+            kind: "timed",
+            id: "valid",
+            summary: null,
+            colorId: null,
+            start: "2026-07-15T11:00:00-07:00",
+            end: "2026-07-15T11:30:00-07:00",
+            timeZone: null,
+          },
+        ],
+      },
+    });
   });
 
   it("normalizes Calendar HTTP failures", async () => {
@@ -43,7 +133,7 @@ describe("listPrimaryCalendarEvents", () => {
     );
 
     await expect(
-      listPrimaryCalendarEvents("token-123", fetchCalendar),
+      listPrimaryCalendarEvents("token-123", range, fetchCalendar),
     ).resolves.toEqual({
       ok: false,
       error: {
@@ -59,7 +149,7 @@ describe("listPrimaryCalendarEvents", () => {
     });
 
     await expect(
-      listPrimaryCalendarEvents("token-123", fetchCalendar),
+      listPrimaryCalendarEvents("token-123", range, fetchCalendar),
     ).resolves.toEqual({
       ok: false,
       error: {
@@ -75,7 +165,7 @@ describe("listPrimaryCalendarEvents", () => {
     );
 
     await expect(
-      listPrimaryCalendarEvents("token-123", fetchCalendar),
+      listPrimaryCalendarEvents("token-123", range, fetchCalendar),
     ).resolves.toEqual({
       ok: false,
       error: {
@@ -89,7 +179,7 @@ describe("listPrimaryCalendarEvents", () => {
     const fetchCalendar = vi.fn(async () => new Response(null));
 
     await expect(
-      listPrimaryCalendarEvents("token-123", fetchCalendar),
+      listPrimaryCalendarEvents("token-123", range, fetchCalendar),
     ).resolves.toEqual({
       ok: false,
       error: {

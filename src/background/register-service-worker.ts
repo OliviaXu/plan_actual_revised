@@ -1,4 +1,8 @@
 import type { Result } from "../shared/result";
+import type {
+  CalendarEvent,
+  CalendarEventRange,
+} from "../calendar/calendar-event";
 
 type ServiceWorkerDependencies = {
   openAppPage: () => Promise<unknown>;
@@ -6,11 +10,13 @@ type ServiceWorkerDependencies = {
   requestInteractiveToken: () => Promise<Result<string>>;
   listPrimaryCalendarEvents: (
     token: string,
-  ) => Promise<Result<{ eventCount: number }>>;
+    range: CalendarEventRange,
+  ) => Promise<Result<{ events: CalendarEvent[] }>>;
 };
 
 export default function registerServiceWorker(
   dependencies: ServiceWorkerDependencies,
+  now: () => Date = () => new Date(),
 ) {
   chrome.action.onClicked.addListener(() => {
     void dependencies.openAppPage();
@@ -29,6 +35,8 @@ export default function registerServiceWorker(
     }
 
     if (message?.type === "calendar.listEvents") {
+      const range = getLocalDayRange(now());
+
       void dependencies.requestCachedToken().then(async (authResult) => {
         if (!authResult.ok) {
           sendResponse({
@@ -42,7 +50,7 @@ export default function registerServiceWorker(
         }
 
         sendResponse(
-          await dependencies.listPrimaryCalendarEvents(authResult.value),
+          await dependencies.listPrimaryCalendarEvents(authResult.value, range),
         );
       });
       return true;
@@ -50,4 +58,14 @@ export default function registerServiceWorker(
 
     return false;
   });
+}
+
+function getLocalDayRange(now: Date): CalendarEventRange {
+  const timeMin = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const timeMax = new Date(
+    now.getFullYear(),
+    now.getMonth(),
+    now.getDate() + 1,
+  );
+  return { timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString() };
 }
