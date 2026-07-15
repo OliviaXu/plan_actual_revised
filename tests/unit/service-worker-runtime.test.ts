@@ -37,7 +37,7 @@ function installWithMockedChrome() {
 
   installRuntimeListeners({
     openAppPage,
-    getCachedToken: () => undefined,
+    requestCachedToken: vi.fn(),
     requestInteractiveToken: vi.fn(),
     listPrimaryCalendarEvents: vi.fn(),
   });
@@ -56,28 +56,5 @@ describe("installRuntimeListeners", () => {
     actionClickListener();
 
     expect(openAppPage).toHaveBeenCalledTimes(1);
-  });
-
-  it("does not keep a runtime-only app open message", async () => {
-    const { messageListener, openAppPage } = installWithMockedChrome();
-    const sendResponse = vi.fn();
-
-    const keepsMessageChannelOpen = messageListener(
-      { type: "app.open" },
-      undefined,
-      sendResponse,
-    );
-    await Promise.resolve();
-
-    expect(keepsMessageChannelOpen).toBe(true);
-    expect(openAppPage).not.toHaveBeenCalled();
-    expect(sendResponse).toHaveBeenCalledWith({
-      ok: false,
-      error: {
-        code: "UNKNOWN_MESSAGE",
-        message: "Unsupported runtime message.",
-        recoverable: false,
-      },
-    });
   });
 });

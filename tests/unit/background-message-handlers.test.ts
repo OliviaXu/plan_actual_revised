@@ -8,6 +8,10 @@ describe("handleRuntimeMessage", () => {
       ok: true as const,
       value: { status: "connected" as const, token: "token-123" },
     }));
+    const requestCachedToken = vi.fn(async () => ({
+      ok: true as const,
+      value: { status: "connected" as const, token: "token-123" },
+    }));
     const listPrimaryCalendarEvents = vi.fn(async () => ({
       ok: true as const,
       value: { eventCount: 3 },
@@ -17,7 +21,7 @@ describe("handleRuntimeMessage", () => {
       handleRuntimeMessage(
         { type: "auth.requestInteractiveToken" },
         {
-          getCachedToken: () => undefined,
+          requestCachedToken,
           requestInteractiveToken,
           listPrimaryCalendarEvents,
         },
@@ -31,7 +35,7 @@ describe("handleRuntimeMessage", () => {
       handleRuntimeMessage(
         { type: "calendar.listEvents" },
         {
-          getCachedToken: () => "token-123",
+          requestCachedToken,
           requestInteractiveToken,
           listPrimaryCalendarEvents,
         },
@@ -43,6 +47,26 @@ describe("handleRuntimeMessage", () => {
 
     expect(listPrimaryCalendarEvents).toHaveBeenCalledWith("token-123");
     expect(requestInteractiveToken).toHaveBeenCalledTimes(1);
+    expect(requestCachedToken).toHaveBeenCalledTimes(1);
+  });
+
+  it("reports connected status from Chrome's silent token cache", async () => {
+    await expect(
+      handleRuntimeMessage(
+        { type: "auth.getStatus" },
+        {
+          requestCachedToken: vi.fn(async () => ({
+            ok: true as const,
+            value: { status: "connected" as const, token: "token-123" },
+          })),
+          requestInteractiveToken: vi.fn(),
+          listPrimaryCalendarEvents: vi.fn(),
+        },
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      value: { status: "connected" },
+    });
   });
 
   it("requires explicit auth before Calendar list requests", async () => {
@@ -50,7 +74,14 @@ describe("handleRuntimeMessage", () => {
       handleRuntimeMessage(
         { type: "calendar.listEvents" },
         {
-          getCachedToken: () => undefined,
+          requestCachedToken: vi.fn(async () => ({
+            ok: false as const,
+            error: {
+              code: "AUTH_TOKEN_UNAVAILABLE",
+              message: "OAuth2 not granted or revoked.",
+              recoverable: true,
+            },
+          })),
           requestInteractiveToken: vi.fn(),
           listPrimaryCalendarEvents: vi.fn(),
         },
@@ -70,7 +101,7 @@ describe("handleRuntimeMessage", () => {
       handleRuntimeMessage(
         { type: "nope" },
         {
-          getCachedToken: () => undefined,
+          requestCachedToken: vi.fn(),
           requestInteractiveToken: vi.fn(),
           listPrimaryCalendarEvents: vi.fn(),
         },

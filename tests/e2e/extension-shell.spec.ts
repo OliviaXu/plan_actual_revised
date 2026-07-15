@@ -28,7 +28,16 @@ installRuntimeListeners({
   openAppPage: () => chrome.tabs.create({
     url: chrome.runtime.getURL("index.html"),
   }),
-  getCachedToken: () => cachedToken,
+  requestCachedToken: async () => cachedToken
+    ? { ok: true, value: { status: "connected", token: cachedToken } }
+    : {
+        ok: false,
+        error: {
+          code: "AUTH_TOKEN_UNAVAILABLE",
+          message: "No cached token.",
+          recoverable: true,
+        },
+      },
   requestInteractiveToken: async () => {
     const mock = await readMock();
 

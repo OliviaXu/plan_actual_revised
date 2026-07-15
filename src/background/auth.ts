@@ -1,5 +1,7 @@
 import type { Result } from "../shared/result";
 
+const AUTH_TOKEN_REQUEST_TIMEOUT_MS = 60_000;
+
 export type ConnectedAuth = {
   status: "connected";
   token: string;
@@ -13,18 +15,24 @@ export type ChromeIdentityBoundary = {
   getLastError?: () => chrome.runtime.LastError | undefined;
 };
 
-export function getAuthStatus(cachedToken?: string): Result<{
-  status: "connected" | "disconnected";
-}> {
-  return {
-    ok: true,
-    value: { status: cachedToken ? "connected" : "disconnected" },
-  };
-}
-
 export function requestInteractiveToken(
   identity: ChromeIdentityBoundary = chrome.identity,
-  timeoutMs = 60_000,
+  timeoutMs = AUTH_TOKEN_REQUEST_TIMEOUT_MS,
+): Promise<Result<ConnectedAuth>> {
+  return requestToken(true, identity, timeoutMs);
+}
+
+export function requestCachedToken(
+  identity: ChromeIdentityBoundary = chrome.identity,
+  timeoutMs = AUTH_TOKEN_REQUEST_TIMEOUT_MS,
+): Promise<Result<ConnectedAuth>> {
+  return requestToken(false, identity, timeoutMs);
+}
+
+function requestToken(
+  interactive: boolean,
+  identity: ChromeIdentityBoundary,
+  timeoutMs: number,
 ): Promise<Result<ConnectedAuth>> {
   return new Promise((resolve) => {
     let settled = false;
@@ -41,7 +49,7 @@ export function requestInteractiveToken(
       });
     }, timeoutMs);
 
-    identity.getAuthToken({ interactive: true }, (token?: string) => {
+    identity.getAuthToken({ interactive }, (token?: string) => {
       if (settled) {
         return;
       }

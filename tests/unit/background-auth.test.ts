@@ -1,6 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { requestInteractiveToken } from "../../src/background/auth";
+import {
+  requestCachedToken,
+  requestInteractiveToken,
+} from "../../src/background/auth";
 
 describe("requestInteractiveToken", () => {
   it("returns a connected auth result when Chrome identity provides a token", async () => {
@@ -10,6 +13,23 @@ describe("requestInteractiveToken", () => {
       ok: true,
       value: { status: "connected", token: "token-123" },
     });
+    expect(getAuthToken).toHaveBeenCalledWith(
+      { interactive: true },
+      expect.any(Function),
+    );
+  });
+
+  it("requests Chrome's cached token without allowing auth UI", async () => {
+    const getAuthToken = vi.fn((_details, callback) => callback("token-123"));
+
+    await expect(requestCachedToken({ getAuthToken })).resolves.toEqual({
+      ok: true,
+      value: { status: "connected", token: "token-123" },
+    });
+    expect(getAuthToken).toHaveBeenCalledWith(
+      { interactive: false },
+      expect.any(Function),
+    );
   });
 
   it("normalizes Chrome identity failures", async () => {

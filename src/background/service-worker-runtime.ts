@@ -5,7 +5,7 @@ import type { CalendarListEventsResponse, RuntimeMessage } from "./messages";
 
 export type ServiceWorkerRuntimeDependencies = {
   openAppPage: () => Promise<unknown>;
-  getCachedToken: () => string | undefined;
+  requestCachedToken: () => Promise<Result<ConnectedAuth>>;
   requestInteractiveToken: () => Promise<Result<ConnectedAuth>>;
   listPrimaryCalendarEvents: (token: string) => Promise<CalendarListEventsResponse>;
 };
@@ -29,7 +29,7 @@ export function installRuntimeListeners(
       }
 
       void handleRuntimeMessage(message, {
-        getCachedToken: dependencies.getCachedToken,
+        requestCachedToken: dependencies.requestCachedToken,
         requestInteractiveToken: dependencies.requestInteractiveToken,
         listPrimaryCalendarEvents: dependencies.listPrimaryCalendarEvents,
       }).then(sendResponse);

@@ -1,5 +1,5 @@
 import type { Result } from "../shared/result";
-import { getAuthStatus, type ConnectedAuth } from "./auth";
+import type { ConnectedAuth } from "./auth";
 import {
   unknownMessageResult,
   type AuthStatusResponse,
@@ -13,8 +13,8 @@ type RuntimeMessageLike = {
 
 export type RuntimeDependencies = {
   requestInteractiveToken: () => Promise<Result<ConnectedAuth>>;
+  requestCachedToken: () => Promise<Result<ConnectedAuth>>;
   listPrimaryCalendarEvents: (token: string) => Promise<CalendarListEventsResponse>;
-  getCachedToken: () => string | undefined;
 };
 
 export async function handleRuntimeMessage(
@@ -24,7 +24,12 @@ export async function handleRuntimeMessage(
   AuthStatusResponse | AuthTokenResponse | CalendarListEventsResponse | Result<never>
 > {
   if (message.type === "auth.getStatus") {
-    return getAuthStatus(dependencies.getCachedToken());
+    const authResult = await dependencies.requestCachedToken();
+
+    return {
+      ok: true,
+      value: { status: authResult.ok ? "connected" : "disconnected" },
+    };
   }
 
   if (message.type === "auth.requestInteractiveToken") {
@@ -41,9 +46,9 @@ export async function handleRuntimeMessage(
   }
 
   if (message.type === "calendar.listEvents") {
-    const token = dependencies.getCachedToken();
+    const authResult = await dependencies.requestCachedToken();
 
-    if (!token) {
+    if (!authResult.ok) {
       return {
         ok: false,
         error: {
@@ -54,7 +59,7 @@ export async function handleRuntimeMessage(
       };
     }
 
-    return dependencies.listPrimaryCalendarEvents(token);
+    return dependencies.listPrimaryCalendarEvents(authResult.value.token);
   }
 
   return unknownMessageResult();
