@@ -6,16 +6,18 @@ import type {
 
 const CALENDAR_LIST_FAILED_CODE = "CALENDAR_LIST_FAILED";
 
-type GoogleCalendarListResponse = {
-  items?: unknown[];
-  error?: { message?: string };
+export type CalendarLoadStats = {
+  pageCount: number;
+  rawEventCount: number;
+  calendarHttpAndJsonDurationMs: number;
+  normalizationDurationMs: number;
 };
 
 export async function listPrimaryCalendarEvents(
   token: string,
   range: CalendarEventRange,
   fetchCalendar: typeof fetch = fetch,
-): Promise<Result<{ events: CalendarEvent[] }>> {
+): Promise<Result<{ events: CalendarEvent[]; stats: CalendarLoadStats }>> {
   const url = new URL(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
   );
@@ -25,41 +27,65 @@ export async function listPrimaryCalendarEvents(
   url.searchParams.set("timeMax", range.timeMax);
 
   try {
-    const response = await fetchCalendar(url.toString(), {
-      headers: { Authorization: `Bearer ${token}` },
-    });
-    const parsedBody: unknown = await response.json().catch(() => null);
-    const body =
-      typeof parsedBody === "object" &&
-      parsedBody !== null &&
-      !Array.isArray(parsedBody)
-        ? (parsedBody as GoogleCalendarListResponse)
-        : null;
+    const startedAt = performance.now();
+    const items: unknown[] = [];
+    let pageCount = 0;
+    let pageToken: string | undefined;
 
-    if (!response.ok) {
-      return {
-        ok: false,
-        error: {
-          code: CALENDAR_LIST_FAILED_CODE,
-          message: body?.error?.message ?? "Unable to list Calendar events.",
-        },
-      };
-    }
+    do {
+      if (pageToken) url.searchParams.set("pageToken", pageToken);
+      const response = await fetchCalendar(url.toString(), {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      const parsedBody: unknown = await response.json().catch(() => null);
+      const body = isRecord(parsedBody) ? parsedBody : null;
 
-    if (!body) {
-      return {
-        ok: false,
-        error: {
-          code: CALENDAR_LIST_FAILED_CODE,
-          message: "Unable to read the Calendar response.",
-        },
-      };
-    }
+      if (!response.ok) {
+        const error = body && isRecord(body.error) ? body.error : null;
+        return {
+          ok: false,
+          error: {
+            code: CALENDAR_LIST_FAILED_CODE,
+            message:
+              error && typeof error.message === "string"
+                ? error.message
+                : "Unable to list Calendar events.",
+          },
+        };
+      }
+
+      if (!body) {
+        return {
+          ok: false,
+          error: {
+            code: CALENDAR_LIST_FAILED_CODE,
+            message: "Unable to read the Calendar response.",
+          },
+        };
+      }
+
+      pageCount += 1;
+      items.push(...(Array.isArray(body.items) ? body.items : []));
+      pageToken =
+        typeof body.nextPageToken === "string"
+          ? body.nextPageToken
+          : undefined;
+    } while (pageToken);
+
+    const calendarHttpAndJsonDurationMs = performance.now() - startedAt;
+    const normalizationStartedAt = performance.now();
+    const events = items.flatMap(normalizeCalendarEvent);
 
     return {
       ok: true,
       value: {
-        events: (body.items ?? []).flatMap(normalizeCalendarEvent),
+        events,
+        stats: {
+          pageCount,
+          rawEventCount: items.length,
+          calendarHttpAndJsonDurationMs,
+          normalizationDurationMs: performance.now() - normalizationStartedAt,
+        },
       },
     };
   } catch (error) {

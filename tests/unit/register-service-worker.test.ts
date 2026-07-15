@@ -15,7 +15,10 @@ type MessageListener = (
   sendResponse: (response: unknown) => void,
 ) => boolean;
 
-function installServiceWorker(overrides: Record<string, unknown> = {}) {
+function installServiceWorker(
+  overrides: Record<string, unknown> = {},
+  clock: () => Date = now,
+) {
   let actionListener: (() => void) | undefined;
   let messageListener: MessageListener | undefined;
 
@@ -53,7 +56,7 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
     ...overrides,
   };
 
-  registerServiceWorker(dependencies, now);
+  registerServiceWorker(dependencies, clock);
 
   if (!actionListener || !messageListener) {
     throw new Error("Service-worker listeners were not installed.");
@@ -87,7 +90,7 @@ describe("registerServiceWorker", () => {
 
     await expect(
       sendMessage(messageListener, "auth.requestInteractiveToken"),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: { ok: true, value: { status: "connected" } },
     });
@@ -105,7 +108,7 @@ describe("registerServiceWorker", () => {
 
     await expect(
       sendMessage(messageListener, "auth.requestInteractiveToken"),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: authFailure,
     });
@@ -116,7 +119,7 @@ describe("registerServiceWorker", () => {
 
     await expect(
       sendMessage(messageListener, "calendar.listEvents"),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: { ok: true, value: { events: [] } },
     });
@@ -124,6 +127,43 @@ describe("registerServiceWorker", () => {
       "token-123",
       range,
     );
+  });
+
+  it("reads the clock once when deriving a Calendar request range", async () => {
+    const clock = vi.fn(now);
+    const { messageListener } = installServiceWorker({}, clock);
+
+    await sendMessage(messageListener, "calendar.listEvents");
+
+    expect(clock).toHaveBeenCalledOnce();
+  });
+
+  it("logs Calendar load stats without a constant request reason", async () => {
+    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+    const { messageListener } = installServiceWorker();
+
+    await sendMessage(messageListener, "calendar.listEvents");
+
+    expect(log.mock.calls[0]?.[1]).not.toHaveProperty("reason");
+    log.mockRestore();
+  });
+
+  it("coalesces simultaneous reads for the same local day", async () => {
+    let resolveCalendar: ((value: unknown) => void) | undefined;
+    const listPrimaryCalendarEvents = vi.fn(
+      () => new Promise((resolve) => { resolveCalendar = resolve; }),
+    );
+    const { messageListener } = installServiceWorker({ listPrimaryCalendarEvents });
+    const first = sendMessage(messageListener, "calendar.listEvents");
+    const second = sendMessage(messageListener, "calendar.listEvents");
+
+    await vi.waitFor(() => expect(listPrimaryCalendarEvents).toHaveBeenCalledOnce());
+    resolveCalendar?.({ ok: true, value: { events: [] } });
+
+    await expect(Promise.all([first, second])).resolves.toEqual([
+      expect.objectContaining({ response: expect.objectContaining({ ok: true, value: expect.objectContaining({ events: [] }) }) }),
+      expect.objectContaining({ response: expect.objectContaining({ ok: true, value: expect.objectContaining({ events: [] }) }) }),
+    ]);
   });
 
   it("forwards a Calendar API failure", async () => {
@@ -137,7 +177,7 @@ describe("registerServiceWorker", () => {
 
     await expect(
       sendMessage(messageListener, "calendar.listEvents"),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: calendarFailure,
     });
@@ -154,7 +194,7 @@ describe("registerServiceWorker", () => {
 
     await expect(
       sendMessage(messageListener, "calendar.listEvents"),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: {
         ok: false,

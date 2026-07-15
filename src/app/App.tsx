@@ -111,9 +111,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   );
 }
 
-async function loadCalendarEvents(
-  setCalendar: (state: CalendarState) => void,
-) {
+async function loadCalendarEvents(setCalendar: (state: CalendarState) => void) {
   setCalendar({ status: "loading" });
 
   try {

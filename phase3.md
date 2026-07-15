@@ -57,10 +57,8 @@ Goal: guarantee that Plan represents the current local day without introducing c
 - Do not add a manual refresh button initially.
 - Treat a user opening the extension as an explicit freshness request, not as background polling.
 - Calculate the local day in the service worker for every request so a new page can never reuse the previous day's range.
-- Keep the loaded local-date key in the app while the page remains open.
-- Schedule a refresh for the next local midnight while the page is active.
-- On window focus or visibility restoration, compare the current local-date key with the loaded key and refresh immediately if the date changed. This is the fallback when browser sleep or timer throttling delayed the midnight refresh.
-- Do not refetch for ordinary React renders or same-day focus changes.
+- Keep the mounted page stable: users refresh or reopen the extension to request newer Calendar data.
+- Do not refetch for ordinary React renders, timers, focus changes, or visibility restoration.
 - Coalesce only simultaneous in-flight requests for the same calendar, local date, and timezone. A later page open still starts a fresh request.
 - Follow `nextPageToken` until the complete bounded-day result is loaded; do not assume the default first page contains every event.
 
@@ -71,14 +69,12 @@ Goal: guarantee that Plan represents the current local day without introducing c
 - Opening a new extension page performs a fresh Calendar request.
 - React state changes do not trigger duplicate requests.
 - Simultaneous requests for the same day share one in-flight fetch.
-- Advancing the clock across local midnight causes a request with the new day's boundaries.
-- Restoring visibility after a missed midnight timer detects the new day and refetches.
-- Same-day focus restoration does not refetch.
+- Refreshing or reopening after local midnight requests the new day's boundaries.
 - Paginated Calendar responses are combined before Plan renders.
 
-### Load Timing and Diagnostics
+### Calendar Load Stats
 
-Measure the complete open-to-usable path with monotonic `performance.now()` timings rather than wall-clock timestamps.
+Measure successful background Calendar loads with monotonic `performance.now()` timings rather than wall-clock timestamps.
 
 Record these stages:
 
@@ -86,28 +82,23 @@ Record these stages:
 - Calendar HTTP and response-JSON duration across all pages.
 - Event normalization duration across all pages.
 - Background total from request receipt to normalized response.
-- App message round-trip duration.
-- Plan processing and React commit duration after the response arrives.
-- End-to-end duration from the app's initial load request until Plan is visibly ready.
 
-Emit one structured background summary and one structured app summary per Plan load. Include the request reason (`open`, `local-date-change`, or `visibility-date-change`), page count, raw event count, rendered timed-event count, and the measured durations. Do not log OAuth tokens, Calendar event IDs, summaries, descriptions, attendees, or raw response bodies.
+Emit one structured background summary per Plan load. Include the page count, raw event count, rendered timed-event count, and the measured durations. Do not log OAuth tokens, Calendar event IDs, summaries, descriptions, attendees, or raw response bodies.
 
-Return background timing metadata with the normalized Calendar result so the app summary can correlate network, normalization, and render work without parsing service-worker console output. Keep diagnostics separate from canonical Calendar events and future persisted `planSnapshot` data.
+Keep load stats inside the service-worker boundary and separate from canonical Calendar events and future persisted `planSnapshot` data. React render cost is paid on every app open regardless of Calendar freshness policy, so it is not part of the cache decision measurement.
 
 Tests will verify that:
 
 - Successful and empty responses produce one complete timing summary.
 - Paginated responses report the combined page and event counts.
-- Auth and Calendar failures report completed stages without inventing later-stage durations.
 - Timing values are finite and non-negative; tests do not assert real elapsed-time thresholds.
-- Re-renders do not emit duplicate load summaries.
 - Logs contain no event content or credentials.
 
-Use the opt-in real Calendar smoke to collect representative open-to-ready samples before choosing a TTL, stale-while-revalidate cache, refresh action, or latency target. Document the measured environment and sample distribution rather than deciding from a single run.
+Use the opt-in real Calendar smoke to collect representative successful background-load samples before choosing a TTL, stale-while-revalidate cache, refresh action, or latency target. Document the measured environment and sample distribution rather than deciding from a single run.
 
 ### Deferred Cache Decision
 
-Measure real OAuth, network, pagination, normalization, and render latency before adding a Calendar event cache.
+Measure real OAuth, network, pagination, and normalization latency before adding a Calendar event cache.
 
 If measured latency later makes caching worthwhile:
 

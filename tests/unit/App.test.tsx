@@ -56,6 +56,24 @@ describe("App Plan loading", () => {
     });
   });
 
+  it("loads only once while the mounted page remains open", async () => {
+    let currentTime = new Date("2026-07-15T23:59:00-07:00");
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [timedEvent] } };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={() => currentTime} />);
+    await screen.findByText("Design review");
+    currentTime = new Date("2026-07-16T00:01:00-07:00");
+    fireEvent.focus(window);
+    fireEvent(document, new Event("visibilitychange"));
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
+  });
+
   it("shows Connect without an error when cached auth is unavailable", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {

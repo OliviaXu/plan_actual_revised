@@ -8,6 +8,36 @@ const range = {
 };
 
 describe("listPrimaryCalendarEvents", () => {
+  it("combines every Calendar response page before returning normalized events", async () => {
+    const fetchCalendar = vi
+      .fn()
+      .mockResolvedValueOnce(
+        new Response(
+          JSON.stringify({
+            items: [{ id: "timed-event", start: { dateTime: "2026-07-15T09:00:00-07:00" }, end: { dateTime: "2026-07-15T10:00:00-07:00" } }],
+            nextPageToken: "page-2",
+          }),
+          { status: 200 },
+        ),
+      )
+      .mockResolvedValueOnce(
+        new Response(JSON.stringify({ items: [{ id: "all-day-event", start: { date: "2026-07-15" }, end: { date: "2026-07-16" } }] }), { status: 200 }),
+      );
+
+    await expect(
+      listPrimaryCalendarEvents("token-123", range, fetchCalendar),
+    ).resolves.toMatchObject({
+      ok: true,
+      value: {
+        events: [
+          expect.objectContaining({ id: "timed-event" }),
+          expect.objectContaining({ id: "all-day-event" }),
+        ],
+        stats: expect.objectContaining({ pageCount: 2, rawEventCount: 2 }),
+      },
+    });
+    expect(fetchCalendar.mock.calls[1]?.[0]).toContain("pageToken=page-2");
+  });
   it("normalizes timed and all-day events from a dated Calendar response", async () => {
     const fetchCalendar = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
@@ -39,7 +69,7 @@ describe("listPrimaryCalendarEvents", () => {
         range,
         fetchCalendar,
       ),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       ok: true,
       value: {
         events: [
@@ -106,7 +136,7 @@ describe("listPrimaryCalendarEvents", () => {
         range,
         fetchCalendar,
       ),
-    ).resolves.toEqual({
+    ).resolves.toMatchObject({
       ok: true,
       value: {
         events: [
