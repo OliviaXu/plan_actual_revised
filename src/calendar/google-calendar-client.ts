@@ -1,26 +1,16 @@
 import type { Result } from "../shared/result";
-import { unexpectedError } from "../shared/result";
 
-export type CalendarListSummary = {
-  eventCount: number;
-};
+const CALENDAR_LIST_FAILED_CODE = "CALENDAR_LIST_FAILED";
 
 type GoogleCalendarListResponse = {
   items?: unknown[];
-  error?: {
-    message?: string;
-  };
+  error?: { message?: string };
 };
 
-type ListPrimaryCalendarEventsOptions = {
-  token: string;
-  fetchCalendar?: typeof fetch;
-};
-
-export async function listPrimaryCalendarEvents({
-  token,
-  fetchCalendar = fetch,
-}: ListPrimaryCalendarEventsOptions): Promise<Result<CalendarListSummary>> {
+export async function listPrimaryCalendarEvents(
+  token: string,
+  fetchCalendar: typeof fetch = fetch,
+): Promise<Result<{ eventCount: number }>> {
   const url = new URL(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
   );
@@ -37,16 +27,30 @@ export async function listPrimaryCalendarEvents({
     const response = await fetchCalendar(url.toString(), {
       headers: { Authorization: `Bearer ${token}` },
     });
-    const body = (await response.json()) as GoogleCalendarListResponse;
+    const parsedBody: unknown = await response.json().catch(() => null);
+    const body =
+      typeof parsedBody === "object" &&
+      parsedBody !== null &&
+      !Array.isArray(parsedBody)
+        ? (parsedBody as GoogleCalendarListResponse)
+        : null;
 
     if (!response.ok) {
       return {
         ok: false,
         error: {
-          code: "CALENDAR_LIST_FAILED",
-          message: body.error?.message ?? "Unable to list Calendar events.",
-          recoverable: true,
-          httpStatus: response.status,
+          code: CALENDAR_LIST_FAILED_CODE,
+          message: body?.error?.message ?? "Unable to list Calendar events.",
+        },
+      };
+    }
+
+    if (!body) {
+      return {
+        ok: false,
+        error: {
+          code: CALENDAR_LIST_FAILED_CODE,
+          message: "Unable to read the Calendar response.",
         },
       };
     }
@@ -56,10 +60,15 @@ export async function listPrimaryCalendarEvents({
       value: { eventCount: body.items?.length ?? 0 },
     };
   } catch (error) {
-    return unexpectedError(
-      "CALENDAR_LIST_FAILED",
-      "Unable to list Calendar events.",
-      error,
-    );
+    return {
+      ok: false,
+      error: {
+        code: CALENDAR_LIST_FAILED_CODE,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to list Calendar events.",
+      },
+    };
   }
 }

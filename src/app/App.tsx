@@ -1,91 +1,72 @@
 import { CalendarDays } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { defaultSettings } from "../domain/settings";
+import type { Result } from "../shared/result";
 
-type BackgroundStatus = "checking" | "online" | "offline";
-type CalendarStatus =
-  | "checking"
-  | "disconnected"
-  | "connecting"
-  | "connected"
-  | "error";
-
-type RuntimeResult<T> =
-  | { ok: true; value: T }
-  | { ok: false; error: { message: string } };
+type CalendarState =
+  | { status: "disconnected" }
+  | { status: "connecting" }
+  | { status: "connected"; eventCount: number | null }
+  | { status: "error"; message: string };
 
 export function App() {
-  const [backgroundStatus, setBackgroundStatus] =
-    useState<BackgroundStatus>("checking");
-  const [calendarStatus, setCalendarStatus] =
-    useState<CalendarStatus>("checking");
-  const [calendarEventCount, setCalendarEventCount] = useState<number | null>(
-    null,
-  );
-  const [calendarError, setCalendarError] = useState<string | null>(null);
-
-  useEffect(() => {
-    chrome.runtime
-      .sendMessage({ type: "app.health" })
-      .then((response) => {
-        setBackgroundStatus(response?.ok ? "online" : "offline");
-      })
-      .catch(() => {
-        setBackgroundStatus("offline");
-      });
-
-    chrome.runtime
-      .sendMessage({ type: "auth.getStatus" })
-      .then(
-        (
-          response: RuntimeResult<{
-            status: "connected" | "disconnected";
-          }>,
-        ) => {
-          setCalendarStatus(response.ok ? response.value.status : "error");
-          setCalendarError(response.ok ? null : response.error.message);
-        },
-      )
-      .catch(() => {
-        setCalendarStatus("error");
-        setCalendarError("Unable to reach the background auth boundary.");
-      });
-  }, []);
+  const [calendar, setCalendar] = useState<CalendarState>({
+    status: "disconnected",
+  });
 
   async function connectCalendar() {
-    setCalendarStatus("connecting");
-    setCalendarEventCount(null);
-    setCalendarError(null);
+    setCalendar({ status: "connecting" });
 
     try {
       const authResponse = (await chrome.runtime.sendMessage({
         type: "auth.requestInteractiveToken",
-      })) as RuntimeResult<{ status: "connected" }>;
+      })) as Result<{ status: "connected" }>;
 
       if (!authResponse.ok) {
-        setCalendarStatus("error");
-        setCalendarError(authResponse.error.message);
+        setCalendar({ status: "error", message: authResponse.error.message });
         return;
       }
 
       const calendarResponse = (await chrome.runtime.sendMessage({
         type: "calendar.listEvents",
-      })) as RuntimeResult<{ eventCount: number }>;
+      })) as Result<{ eventCount: number }>;
 
       if (!calendarResponse.ok) {
-        setCalendarStatus("error");
-        setCalendarError(calendarResponse.error.message);
+        setCalendar({
+          status: "error",
+          message: calendarResponse.error.message,
+        });
         return;
       }
 
-      setCalendarStatus("connected");
-      setCalendarEventCount(calendarResponse.value.eventCount);
+      setCalendar({
+        status: "connected",
+        eventCount: calendarResponse.value.eventCount,
+      });
     } catch {
-      setCalendarStatus("error");
-      setCalendarError("Unable to reach the background Calendar boundary.");
+      setCalendar({
+        status: "error",
+        message: "Unable to reach the background Calendar boundary.",
+      });
     }
+  }
+
+  let calendarStatusText: string;
+  switch (calendar.status) {
+    case "disconnected":
+      calendarStatusText = "Calendar disconnected";
+      break;
+    case "connecting":
+      calendarStatusText = "Connecting Calendar";
+      break;
+    case "connected":
+      calendarStatusText = "Calendar connected";
+      break;
+    case "error":
+      calendarStatusText = "Calendar error";
+      break;
   }
 
   return (
@@ -106,18 +87,7 @@ export function App() {
           <Button type="button">Phase 1</Button>
         </header>
 
-        <div className="grid gap-4 md:grid-cols-3">
-          <StatusCard
-            label="Background"
-            value={
-              backgroundStatus === "online"
-                ? "Background online"
-                : backgroundStatus === "checking"
-                  ? "Checking background"
-                  : "Background offline"
-            }
-            testId="background-status"
-          />
+        <div className="grid gap-4 md:grid-cols-2">
           <StatusCard
             label="Default day range"
             value={`${defaultSettings.dayStartHour}:00-${defaultSettings.dayEndHour}:00`}
@@ -137,37 +107,29 @@ export function App() {
                 Calendar boundary
               </p>
               <p className="mt-2 text-base font-semibold" data-testid="calendar-status">
-                {calendarStatus === "connected"
-                  ? "Calendar connected"
-                  : calendarStatus === "connecting"
-                    ? "Connecting Calendar"
-                    : calendarStatus === "checking"
-                      ? "Checking Calendar"
-                      : calendarStatus === "error"
-                        ? "Calendar error"
-                        : "Calendar disconnected"}
+                {calendarStatusText}
               </p>
             </div>
             <Button
               type="button"
               onClick={() => void connectCalendar()}
-              disabled={calendarStatus === "connecting"}
+              disabled={calendar.status === "connecting"}
             >
-              {calendarStatus === "connecting"
+              {calendar.status === "connecting"
                 ? "Connecting"
                 : "Connect Calendar"}
             </Button>
           </div>
 
-          {calendarEventCount !== null ? (
+          {calendar.status === "connected" && calendar.eventCount !== null ? (
             <p className="mt-4 text-sm text-muted-foreground" data-testid="calendar-result">
-              Calendar returned {calendarEventCount} events
+              Calendar returned {calendar.eventCount} events
             </p>
           ) : null}
 
-          {calendarError ? (
+          {calendar.status === "error" ? (
             <p className="mt-4 text-sm font-medium text-destructive" data-testid="calendar-error">
-              {calendarError}
+              {calendar.message}
             </p>
           ) : null}
         </section>

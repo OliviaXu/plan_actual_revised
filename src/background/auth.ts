@@ -1,81 +1,72 @@
 import type { Result } from "../shared/result";
 
 const AUTH_TOKEN_REQUEST_TIMEOUT_MS = 60_000;
+const AUTH_TOKEN_UNAVAILABLE_CODE = "AUTH_TOKEN_UNAVAILABLE";
 
-export type ConnectedAuth = {
-  status: "connected";
-  token: string;
-};
+type GetAuthToken = (
+  details: chrome.identity.TokenDetails,
+) => Promise<chrome.identity.GetAuthTokenResult>;
 
-export type ChromeIdentityBoundary = {
-  getAuthToken: (
-    details: chrome.identity.TokenDetails,
-    callback: (token?: string) => void,
-  ) => void;
-  getLastError?: () => chrome.runtime.LastError | undefined;
-};
+const getChromeAuthToken: GetAuthToken = (details) =>
+  chrome.identity.getAuthToken(details);
 
-export function requestInteractiveToken(
-  identity: ChromeIdentityBoundary = chrome.identity,
-  timeoutMs = AUTH_TOKEN_REQUEST_TIMEOUT_MS,
-): Promise<Result<ConnectedAuth>> {
-  return requestToken(true, identity, timeoutMs);
-}
-
-export function requestCachedToken(
-  identity: ChromeIdentityBoundary = chrome.identity,
-  timeoutMs = AUTH_TOKEN_REQUEST_TIMEOUT_MS,
-): Promise<Result<ConnectedAuth>> {
-  return requestToken(false, identity, timeoutMs);
-}
-
-function requestToken(
-  interactive: boolean,
-  identity: ChromeIdentityBoundary,
-  timeoutMs: number,
-): Promise<Result<ConnectedAuth>> {
-  return new Promise((resolve) => {
-    let settled = false;
-    const timeoutId = setTimeout(() => {
-      settled = true;
+export async function requestInteractiveToken(
+  getAuthToken: GetAuthToken = getChromeAuthToken,
+): Promise<Result<string>> {
+  let timeoutId: ReturnType<typeof setTimeout>;
+  const timeout = new Promise<Result<string>>((resolve) => {
+    timeoutId = setTimeout(() => {
       resolve({
         ok: false,
         error: {
           code: "AUTH_REQUEST_TIMED_OUT",
           message:
             "Google sign-in did not finish. Close the sign-in window and try again.",
-          recoverable: true,
         },
       });
-    }, timeoutMs);
+    }, AUTH_TOKEN_REQUEST_TIMEOUT_MS);
+  });
 
-    identity.getAuthToken({ interactive }, (token?: string) => {
-      if (settled) {
-        return;
-      }
+  const result = await Promise.race([
+    requestToken(true, getAuthToken),
+    timeout,
+  ]);
+  clearTimeout(timeoutId!);
+  return result;
+}
 
-      settled = true;
-      clearTimeout(timeoutId);
-      const lastError =
-        identity.getLastError?.() ??
-        (typeof chrome === "undefined" ? undefined : chrome.runtime.lastError);
+export function requestCachedToken(
+  getAuthToken: GetAuthToken = getChromeAuthToken,
+): Promise<Result<string>> {
+  return requestToken(false, getAuthToken);
+}
 
-      if (lastError || !token) {
-        resolve({
+async function requestToken(
+  interactive: boolean,
+  getAuthToken: GetAuthToken,
+): Promise<Result<string>> {
+  try {
+    const { token } = await getAuthToken({ interactive });
+
+    return token
+      ? { ok: true, value: token }
+      : {
           ok: false,
           error: {
-            code: "AUTH_TOKEN_UNAVAILABLE",
-            message: lastError?.message ?? "Unable to get Google auth token.",
-            recoverable: true,
+            code: AUTH_TOKEN_UNAVAILABLE_CODE,
+            message: "Unable to get Google auth token.",
           },
-        });
-        return;
-      }
-
-      resolve({
-        ok: true,
-        value: { status: "connected", token },
-      });
-    });
-  });
+        };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: AUTH_TOKEN_UNAVAILABLE_CODE,
+        message:
+          error instanceof Error
+            ? error.message
+            : "Unable to get Google auth token.",
+      },
+    };
+  }
 }

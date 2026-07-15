@@ -1,17 +1,11 @@
 import { requestCachedToken, requestInteractiveToken } from "./auth";
-import { installRuntimeListeners } from "./service-worker-runtime";
+import registerServiceWorker from "./register-service-worker";
 import { listPrimaryCalendarEvents } from "../calendar/google-calendar-client";
 
-function openAppPage() {
-  return chrome.tabs.create({
-    url: chrome.runtime.getURL("index.html"),
-  });
-}
-
-installRuntimeListeners({
-  openAppPage,
+registerServiceWorker({
+  openAppPage: () =>
+    chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
   requestCachedToken,
   requestInteractiveToken,
-  listPrimaryCalendarEvents: (token: string) =>
-    listPrimaryCalendarEvents({ token }),
+  listPrimaryCalendarEvents,
 });

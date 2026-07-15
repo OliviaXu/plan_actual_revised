@@ -43,6 +43,8 @@ Exit criteria:
 
 ## Phase 2 - Auth and Calendar Boundary Tracer
 
+[Phase 2 cleanup plan](./phase2-cleanup.md)
+
 Goal: prove the risky OAuth and Calendar API boundary before building the calendar UI.
 
 Build:

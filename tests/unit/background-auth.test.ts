@@ -5,66 +5,65 @@ import {
   requestInteractiveToken,
 } from "../../src/background/auth";
 
-describe("requestInteractiveToken", () => {
+describe("Calendar auth", () => {
   it("returns a connected auth result when Chrome identity provides a token", async () => {
-    const getAuthToken = vi.fn((_details, callback) => callback("token-123"));
+    const getAuthToken = vi.fn(async () => ({ token: "token-123" }));
 
-    await expect(requestInteractiveToken({ getAuthToken })).resolves.toEqual({
+    await expect(requestInteractiveToken(getAuthToken)).resolves.toEqual({
       ok: true,
-      value: { status: "connected", token: "token-123" },
+      value: "token-123",
     });
-    expect(getAuthToken).toHaveBeenCalledWith(
-      { interactive: true },
-      expect.any(Function),
-    );
+    expect(getAuthToken).toHaveBeenCalledWith({ interactive: true });
   });
 
   it("requests Chrome's cached token without allowing auth UI", async () => {
-    const getAuthToken = vi.fn((_details, callback) => callback("token-123"));
+    const getAuthToken = vi.fn(async () => ({ token: "token-123" }));
 
-    await expect(requestCachedToken({ getAuthToken })).resolves.toEqual({
+    await expect(requestCachedToken(getAuthToken)).resolves.toEqual({
       ok: true,
-      value: { status: "connected", token: "token-123" },
+      value: "token-123",
     });
-    expect(getAuthToken).toHaveBeenCalledWith(
-      { interactive: false },
-      expect.any(Function),
-    );
+    expect(getAuthToken).toHaveBeenCalledWith({ interactive: false });
   });
 
   it("normalizes Chrome identity failures", async () => {
-    const getAuthToken = vi.fn((_details, callback) => callback(undefined));
+    const getAuthToken = vi.fn(async () => {
+      throw new Error("The user did not approve access.");
+    });
 
-    await expect(
-      requestInteractiveToken({
-        getAuthToken,
-        getLastError: () => ({
-          message: "The user did not approve access.",
-        }),
-      }),
-    ).resolves.toEqual({
+    await expect(requestInteractiveToken(getAuthToken)).resolves.toEqual({
       ok: false,
       error: {
         code: "AUTH_TOKEN_UNAVAILABLE",
         message: "The user did not approve access.",
-        recoverable: true,
       },
     });
   });
 
-  it("returns a recoverable error when Chrome leaves the auth request pending", async () => {
-    vi.useFakeTimers();
-    const getAuthToken = vi.fn(() => undefined);
+  it("normalizes a cancelled request that returns no token", async () => {
+    const getAuthToken = vi.fn(async () => ({}));
 
-    const result = requestInteractiveToken({ getAuthToken }, 1_000);
-    await vi.advanceTimersByTimeAsync(1_000);
+    await expect(requestInteractiveToken(getAuthToken)).resolves.toEqual({
+      ok: false,
+      error: {
+        code: "AUTH_TOKEN_UNAVAILABLE",
+        message: "Unable to get Google auth token.",
+      },
+    });
+  });
+
+  it("times out when Chrome leaves interactive auth pending", async () => {
+    vi.useFakeTimers();
+    const getAuthToken = vi.fn(() => new Promise<never>(() => undefined));
+
+    const result = requestInteractiveToken(getAuthToken);
+    await vi.advanceTimersByTimeAsync(60_000);
 
     await expect(result).resolves.toEqual({
       ok: false,
       error: {
         code: "AUTH_REQUEST_TIMED_OUT",
         message: "Google sign-in did not finish. Close the sign-in window and try again.",
-        recoverable: true,
       },
     });
     vi.useRealTimers();

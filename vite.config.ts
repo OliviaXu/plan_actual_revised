@@ -6,22 +6,22 @@ export default defineConfig({
   plugins: [react()],
   build: {
     rollupOptions: {
+      preserveEntrySignatures: "strict",
       input: {
         index: path.resolve(__dirname, "index.html"),
         "background/service-worker": path.resolve(
           __dirname,
           "src/background/service-worker.ts",
         ),
-        "background/service-worker-runtime": path.resolve(
+        "background/register-service-worker": path.resolve(
           __dirname,
-          "src/background/service-worker-runtime.ts",
+          "src/background/register-service-worker.ts",
         ),
       },
       output: {
         entryFileNames: "[name].js",
         chunkFileNames: "assets/[name]-[hash].js",
         assetFileNames: "assets/[name]-[hash][extname]",
-        minifyInternalExports: false,
       },
     },
   },
