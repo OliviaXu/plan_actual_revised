@@ -157,18 +157,20 @@ test("renders only eligible Plan events with Calendar color tokens", async () =>
     );
     await expect(inheritedColor).toContainText("Untitled event");
 
-    const backgrounds = await Promise.all(
-      [lavender, grape, inheritedColor].map((event) =>
-        event.evaluate((element) => getComputedStyle(element).backgroundColor),
-      ),
+    await expect(lavender).toHaveCSS(
+      "background-color",
+      "rgba(121, 134, 203, 0.25)",
     );
-    expect(new Set(backgrounds).size).toBe(3);
-    expect(
-      backgrounds.every(
-        (background) =>
-          !background.startsWith("rgba") && !background.includes(" / "),
-      ),
-    ).toBe(true);
+    await expect(lavender).toHaveCSS(
+      "border-color",
+      "rgba(121, 134, 203, 0.5)",
+    );
+    await expect(grape).toHaveCSS(
+      "background-color",
+      "rgba(142, 36, 170, 0.25)",
+    );
+    await expect(inheritedColor).toHaveClass(/border-border/);
+    await expect(inheritedColor).toHaveClass(/bg-muted/);
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });

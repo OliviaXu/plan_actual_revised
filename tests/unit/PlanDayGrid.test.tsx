@@ -194,10 +194,10 @@ describe("PlanDayGrid", () => {
     expect(screen.queryByTestId("plan-event-hidden-late")).not.toBeInTheDocument();
     expect(screen.queryByTestId("plan-event-daily-focus")).not.toBeInTheDocument();
     expect(screen.getByText("Untitled event")).toBeVisible();
-    expect(screen.getByTestId("plan-event-visible-color")).toHaveClass(
-      "border-[#7986cb]/50",
-      "bg-[#dee1f2]",
-    );
+    expect(screen.getByTestId("plan-event-visible-color")).toHaveStyle({
+      backgroundColor: "#7986cb40",
+      borderColor: "#7986cb80",
+    });
     expect(screen.getByTestId("plan-event-untitled-neutral")).toHaveClass(
       "border-border",
       "bg-muted",
