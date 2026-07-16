@@ -2,8 +2,8 @@ import type {
   CalendarEvent,
   TimedCalendarEvent,
 } from "../../calendar/calendar-event";
+import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import { useState } from "react";
-import { planEventColorClassName } from "../../design/google-calendar-colors";
 import {
   calculatePlanDayGridLayout,
   PLAN_EVENT_COLUMN_INSET_PX,
@@ -159,9 +159,13 @@ function PlanEventBlock({
   isFront: boolean;
   onBringToFront: () => void;
 }) {
+  const eventColor = resolveGoogleCalendarEventColor(block.event.colorId);
+
   return (
     <button
-      className={`absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${planEventColorClassName(block.event.colorId)}`}
+      className={`absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${
+        eventColor ? "" : "border-border bg-muted"
+      }`}
       data-calendar-event-id={block.event.id}
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
@@ -175,6 +179,12 @@ function PlanEventBlock({
           block.overlapLayerIndex * PLAN_EVENT_LAYER_OFFSET_PX,
         right: PLAN_EVENT_COLUMN_INSET_PX,
         zIndex: isFront ? frontZIndex : block.overlapLayerIndex,
+        ...(eventColor
+          ? {
+              backgroundColor: `${eventColor}40`,
+              borderColor: `${eventColor}80`,
+            }
+          : {}),
       }}
       type="button"
     >
