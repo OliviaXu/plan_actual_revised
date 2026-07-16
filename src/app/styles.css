@@ -31,8 +31,6 @@
     --app-radius-sm: 4px;
     --app-radius-md: 6px;
     --app-shadow-soft: 0 8px 24px rgb(38 31 24 / 8%);
-    --plan-time-axis-width: 4.5rem;
-    --plan-grid-columns: var(--plan-time-axis-width) minmax(0, 1fr);
   }
 
   * {

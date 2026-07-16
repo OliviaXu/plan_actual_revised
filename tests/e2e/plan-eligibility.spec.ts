@@ -163,6 +163,12 @@ test("renders only eligible Plan events with Calendar color tokens", async () =>
       ),
     );
     expect(new Set(backgrounds).size).toBe(3);
+    expect(
+      backgrounds.every(
+        (background) =>
+          !background.startsWith("rgba") && !background.includes(" / "),
+      ),
+    ).toBe(true);
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });

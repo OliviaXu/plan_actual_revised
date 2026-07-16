@@ -8,6 +8,8 @@ const MILLISECONDS_PER_MINUTE = 60_000;
 
 export const MINIMUM_PLAN_BLOCK_HEIGHT_PX = 20;
 export const PLAN_BLOCK_TIME_RANGE_MINIMUM_HEIGHT_PX = 40;
+export const PLAN_EVENT_COLUMN_INSET_PX = 12;
+export const PLAN_EVENT_LAYER_OFFSET_PX = 12;
 
 type PlanGridSettings = Pick<
   AppSettings,
@@ -22,6 +24,8 @@ export type PlanDayGridBlock = {
   topPx: number;
   heightPx: number;
   showTimeRange: boolean;
+  overlapGroupIndex: number;
+  overlapLayerIndex: number;
 };
 
 export type PlanDayGridLayout = {
@@ -98,7 +102,7 @@ export function calculatePlanDayGridLayout(
     { length: endHour - startHour + 1 },
     (_, index) => startHour + index,
   );
-  const blocks = clippedEvents.map(
+  const positionedBlocks = clippedEvents.map(
     ({ event, clippedStart, clippedEnd, clippedStartMinuteOfDay }) => {
       const durationMinutes =
         (clippedEnd.getTime() - clippedStart.getTime()) /
@@ -125,6 +129,7 @@ export function calculatePlanDayGridLayout(
       };
     },
   );
+  const blocks = assignOverlapLayers(positionedBlocks);
   const heightPx = Math.max(
     rangeHeightPx,
     ...blocks.map(({ topPx, heightPx }) => topPx + heightPx),
@@ -137,6 +142,46 @@ export function calculatePlanDayGridLayout(
     hourBoundaries,
     blocks,
   };
+}
+
+function assignOverlapLayers(
+  blocks: Omit<PlanDayGridBlock, "overlapGroupIndex" | "overlapLayerIndex">[],
+): PlanDayGridBlock[] {
+  const sortedBlocks = [...blocks].sort(
+    (left, right) =>
+      left.clippedStart.getTime() - right.clippedStart.getTime() ||
+      right.clippedEnd.getTime() - left.clippedEnd.getTime() ||
+      left.event.id.localeCompare(right.event.id),
+  );
+  let overlapGroupIndex = -1;
+  let overlapGroupEnd = Number.NEGATIVE_INFINITY;
+  let layerOccupiedUntil: number[] = [];
+
+  return sortedBlocks.map((block) => {
+    const start = block.clippedStart.getTime();
+    const end = block.clippedEnd.getTime();
+
+    if (start >= overlapGroupEnd) {
+      overlapGroupIndex += 1;
+      overlapGroupEnd = end;
+      layerOccupiedUntil = [];
+    } else {
+      overlapGroupEnd = Math.max(overlapGroupEnd, end);
+    }
+
+    // A 9–10, B 9:30–10:30, C 10–11: C reuses A's layer.
+    // D 10–11 then overlaps B and C, so it adds a third layer.
+    const availableLayerIndex = layerOccupiedUntil.findIndex(
+      (occupiedUntil) => occupiedUntil <= start,
+    );
+    const overlapLayerIndex =
+      availableLayerIndex === -1
+        ? layerOccupiedUntil.length
+        : availableLayerIndex;
+    layerOccupiedUntil[overlapLayerIndex] = end;
+
+    return { ...block, overlapGroupIndex, overlapLayerIndex };
+  });
 }
 
 function roundPixel(value: number) {

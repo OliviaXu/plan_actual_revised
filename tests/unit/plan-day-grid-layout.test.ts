@@ -219,4 +219,79 @@ describe("calculatePlanDayGridLayout", () => {
       },
     ]);
   });
+
+  it("assigns deterministic layers within transitive overlap groups", () => {
+    const layout = calculatePlanDayGridLayout(
+      [
+        timedEvent(
+          "chain-end",
+          "2026-07-15T10:00:00-07:00",
+          "2026-07-15T11:00:00-07:00",
+        ),
+        timedEvent(
+          "chain-middle",
+          "2026-07-15T09:30:00-07:00",
+          "2026-07-15T10:30:00-07:00",
+        ),
+        timedEvent(
+          "chain-start",
+          "2026-07-15T09:00:00-07:00",
+          "2026-07-15T10:00:00-07:00",
+        ),
+        timedEvent(
+          "separate",
+          "2026-07-15T13:00:00-07:00",
+          "2026-07-15T14:00:00-07:00",
+        ),
+      ],
+      today,
+      defaultSettings,
+    );
+
+    expect(
+      layout.blocks.map(({ event, overlapGroupIndex, overlapLayerIndex }) => ({
+        id: event.id,
+        overlapGroupIndex,
+        overlapLayerIndex,
+      })),
+    ).toEqual([
+      { id: "chain-start", overlapGroupIndex: 0, overlapLayerIndex: 0 },
+      { id: "chain-middle", overlapGroupIndex: 0, overlapLayerIndex: 1 },
+      { id: "chain-end", overlapGroupIndex: 0, overlapLayerIndex: 0 },
+      { id: "separate", overlapGroupIndex: 1, overlapLayerIndex: 0 },
+    ]);
+  });
+
+  it("orders same-start nested events deterministically and reuses touching layers", () => {
+    const layout = calculatePlanDayGridLayout(
+      [
+        timedEvent(
+          "shorter",
+          "2026-07-15T09:00:00-07:00",
+          "2026-07-15T10:00:00-07:00",
+        ),
+        timedEvent(
+          "longer",
+          "2026-07-15T09:00:00-07:00",
+          "2026-07-15T11:00:00-07:00",
+        ),
+        timedEvent(
+          "touching-shorter",
+          "2026-07-15T10:00:00-07:00",
+          "2026-07-15T10:30:00-07:00",
+        ),
+      ],
+      today,
+      defaultSettings,
+    );
+
+    expect(layout.blocks.map(({ event, overlapLayerIndex }) => ({
+      id: event.id,
+      overlapLayerIndex,
+    }))).toEqual([
+      { id: "longer", overlapLayerIndex: 0 },
+      { id: "shorter", overlapLayerIndex: 1 },
+      { id: "touching-shorter", overlapLayerIndex: 1 },
+    ]);
+  });
 });

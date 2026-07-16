@@ -2,12 +2,17 @@ import type {
   CalendarEvent,
   TimedCalendarEvent,
 } from "../../calendar/calendar-event";
+import { useState } from "react";
 import { planEventColorClassName } from "../../design/google-calendar-colors";
 import {
   calculatePlanDayGridLayout,
+  PLAN_EVENT_COLUMN_INSET_PX,
+  PLAN_EVENT_LAYER_OFFSET_PX,
   type PlanDayGridBlock,
 } from "./plan-day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
+
+const PLAN_GRID_TEMPLATE_COLUMNS = "4.5rem minmax(0, 1fr)";
 
 type PlanLoadStatus =
   | "loading"
@@ -24,6 +29,7 @@ export function PlanDayGrid({
   status: PlanLoadStatus;
   today: Date;
 }) {
+  const [frontEventId, setFrontEventId] = useState<string | null>(null);
   const eligibleTimedEvents = events.filter(
     (event): event is TimedCalendarEvent =>
       event.kind === "timed" &&
@@ -41,7 +47,10 @@ export function PlanDayGrid({
       className="overflow-hidden rounded-md border border-border bg-white shadow-soft"
       aria-label="Plan day grid"
     >
-      <div className="grid grid-cols-[var(--plan-grid-columns)] border-b border-border bg-muted">
+      <div
+        className="grid border-b border-border bg-muted"
+        style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
+      >
         <div className="border-r border-border px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
           Time
         </div>
@@ -54,7 +63,10 @@ export function PlanDayGrid({
         data-testid="plan-grid-body"
         style={{ height: layout.heightPx }}
       >
-        <div className="grid h-full grid-cols-[var(--plan-grid-columns)]">
+        <div
+          className="grid h-full"
+          style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
+        >
           <div className="relative border-r border-border">
             {layout.hourBoundaries.map((hour) => {
               const labelPosition =
@@ -114,7 +126,13 @@ export function PlanDayGrid({
               </p>
             ) : null}
             {layout.blocks.map((block) => (
-              <PlanEventBlock block={block} key={block.event.id} />
+              <PlanEventBlock
+                block={block}
+                frontZIndex={layout.blocks.length}
+                isFront={frontEventId === block.event.id}
+                key={block.event.id}
+                onBringToFront={() => setFrontEventId(block.event.id)}
+              />
             ))}
           </div>
         </div>
@@ -130,31 +148,56 @@ function formatHour(hour: number) {
   return `${clockHour} ${suffix}`;
 }
 
-function PlanEventBlock({ block }: { block: PlanDayGridBlock }) {
+function PlanEventBlock({
+  block,
+  frontZIndex,
+  isFront,
+  onBringToFront,
+}: {
+  block: PlanDayGridBlock;
+  frontZIndex: number;
+  isFront: boolean;
+  onBringToFront: () => void;
+}) {
   return (
-    <article
-      className={`absolute inset-x-3 overflow-hidden rounded-sm border px-2 py-px text-xs leading-4 shadow-soft ${planEventColorClassName(block.event.colorId)}`}
+    <button
+      className={`absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${planEventColorClassName(block.event.colorId)}`}
       data-calendar-event-id={block.event.id}
+      data-overlap-group-index={block.overlapGroupIndex}
+      data-overlap-layer-index={block.overlapLayerIndex}
       data-testid={`plan-event-${block.event.id}`}
-      style={{ top: block.topPx, height: block.heightPx }}
+      onClick={onBringToFront}
+      style={{
+        top: block.topPx,
+        height: block.heightPx,
+        left:
+          PLAN_EVENT_COLUMN_INSET_PX +
+          block.overlapLayerIndex * PLAN_EVENT_LAYER_OFFSET_PX,
+        right: PLAN_EVENT_COLUMN_INSET_PX,
+        zIndex: isFront ? frontZIndex : block.overlapLayerIndex,
+      }}
+      type="button"
     >
-      <div className="flex min-w-0 items-start justify-between gap-2">
-        <p className="min-w-0 truncate font-medium">
+      <span className="flex min-w-0 items-start justify-between gap-2">
+        <span
+          className="min-w-0 truncate font-medium"
+          data-testid="plan-event-title"
+        >
           {block.event.summary ?? "Untitled event"}
-        </p>
+        </span>
         <span className="shrink-0 text-muted-foreground">
           {formatDuration(block.durationMinutes)}
         </span>
-      </div>
+      </span>
       {block.showTimeRange ? (
-        <p
-          className="truncate text-muted-foreground"
+        <span
+          className="block truncate text-muted-foreground"
           data-testid="plan-event-time-range"
         >
           {formatTime(block.clippedStart)} – {formatTime(block.clippedEnd)}
-        </p>
+        </span>
       ) : null}
-    </article>
+    </button>
   );
 }
 

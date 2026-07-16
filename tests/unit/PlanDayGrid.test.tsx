@@ -1,4 +1,10 @@
-import { cleanup, render, screen, within } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  within,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it } from "vitest";
 
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
@@ -186,11 +192,63 @@ describe("PlanDayGrid", () => {
     expect(screen.getByText("Untitled event")).toBeVisible();
     expect(screen.getByTestId("plan-event-visible-color")).toHaveClass(
       "border-[#7986cb]/50",
-      "bg-[#7986cb]/25",
+      "bg-[#dee1f2]",
     );
     expect(screen.getByTestId("plan-event-untitled-neutral")).toHaveClass(
       "border-border",
       "bg-muted",
     );
+  });
+
+  it("cascades overlapping blocks and brings a clicked block to the front", () => {
+    render(
+      <PlanDayGrid
+        events={[
+          timedEvent(
+            "base",
+            "2026-07-15T09:00:00-07:00",
+            "2026-07-15T11:00:00-07:00",
+          ),
+          timedEvent(
+            "nested",
+            "2026-07-15T09:30:00-07:00",
+            "2026-07-15T10:30:00-07:00",
+          ),
+        ]}
+        status="connected"
+        today={today}
+      />,
+    );
+
+    const base = screen.getByTestId("plan-event-base");
+    const nested = screen.getByTestId("plan-event-nested");
+    expect(base).toHaveAttribute("data-overlap-group-index", "0");
+    expect(base).toHaveAttribute("data-overlap-layer-index", "0");
+    expect(base).toHaveClass(
+      "flex",
+      "flex-col",
+      "items-stretch",
+      "justify-start",
+    );
+    expect(base).toHaveStyle({
+      left: "12px",
+      right: "12px",
+      top: "168px",
+      zIndex: "0",
+    });
+    expect(nested).toHaveAttribute("data-overlap-group-index", "0");
+    expect(nested).toHaveAttribute("data-overlap-layer-index", "1");
+    expect(nested).toHaveStyle({
+      left: "24px",
+      right: "12px",
+      top: "210px",
+      zIndex: "1",
+    });
+
+    fireEvent.click(base);
+    expect(base).toHaveStyle({ zIndex: "2" });
+    fireEvent.click(nested);
+    expect(base).toHaveStyle({ zIndex: "0" });
+    expect(nested).toHaveStyle({ zIndex: "2" });
   });
 });
