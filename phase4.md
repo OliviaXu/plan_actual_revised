@@ -6,7 +6,7 @@ Store one versioned `DayRecord` per local date in `chrome.storage.local`. The ap
 
 ## Slice 4B - Calendar Save Reliability Tracer
 
-Manual save refreshes the day's Plan once, permanently classifies exact matches as `planMatched`, and inserts the remaining unsaved Actuals using deterministic Calendar event IDs. `saving` is UI-only; failures remain `unsaved` with normalized attempt details. Calendar-saved and Plan-matched blocks remain in the local working record until Phase 7 cleanup.
+Manual save refreshes the day's Plan once, permanently classifies exact matches as `planMatched`, and inserts the remaining unsaved Actuals using deterministic Calendar event IDs. A duplicate/409 is accepted as proof of an earlier successful insert without a follow-up lookup. `saving` is UI-only; failures remain `unsaved` with normalized attempt details. Calendar-saved and Plan-matched blocks remain in the local working record until Phase 7 cleanup.
 
 ## Real Calendar Write Smoke
 

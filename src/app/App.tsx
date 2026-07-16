@@ -7,7 +7,11 @@ import type { CalendarEvent, TimedCalendarEvent } from "../calendar/calendar-eve
 import type { DayRecord } from "../domain/day-record";
 import { defaultSettings } from "../domain/settings";
 import { isExactPlanMatch } from "../domain/actual-save";
-import type { CalendarActualInput } from "../calendar/google-calendar-actual";
+import {
+  mapActualToCalendarEvent,
+  type CalendarActualInput,
+} from "../calendar/actual-calendar-event";
+import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { Result } from "../shared/result";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
 import { loadDayRecord, saveDayRecord } from "../storage/day-record-storage";
@@ -147,7 +151,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
 
       const timedPlanEvents = planResponse.value.events.filter(
         (event): event is TimedCalendarEvent =>
-          event.kind === "timed" && event.appKind !== "actual",
+          event.kind === "timed" && !event.isExtensionActual,
       );
 
       for (const actual of unsaved) {
@@ -175,7 +179,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           summaryPrefix: defaultSettings.actualEventPrefix,
           defaultColorId: defaultSettings.defaultActualColorId,
         };
-        const response = await insertCalendarActual(input);
+        const response = await insertCalendarEvent(mapActualToCalendarEvent(input));
 
         if (response.ok) {
           workingRecord = updateActual(workingRecord, actual.id, {
@@ -319,11 +323,11 @@ async function requestFreshCalendarEvents(): Promise<
   }
 }
 
-async function insertCalendarActual(
-  input: CalendarActualInput,
+async function insertCalendarEvent(
+  event: CalendarInsertEvent,
 ): Promise<Result<{ eventId: string }>> {
   try {
-    return await sendRuntimeMessage({ type: "calendar.insertActual", input });
+    return await sendRuntimeMessage({ type: "calendar.insertEvent", event });
   } catch {
     return calendarBoundaryUnavailable();
   }

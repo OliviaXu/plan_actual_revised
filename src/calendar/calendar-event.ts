@@ -8,7 +8,7 @@ export type TimedCalendarEvent = {
   start: string;
   end: string;
   timeZone: string | null;
-  appKind?: "actual";
+  isExtensionActual?: boolean;
 };
 
 export type AllDayCalendarEvent = {
@@ -18,10 +18,20 @@ export type AllDayCalendarEvent = {
   colorId: string | null;
   startDate: string;
   endDate: string;
-  appKind?: "actual";
 };
 
 export type CalendarEventRange = {
   timeMin: string;
   timeMax: string;
+};
+
+export type CalendarInsertEvent = {
+  id: string;
+  summary: string;
+  start: { dateTime: string; timeZone: string } | { date: string };
+  end: { dateTime: string; timeZone: string } | { date: string };
+  colorId?: string;
+  attendees?: [];
+  reminders?: { useDefault: boolean };
+  extendedProperties?: { private: Record<string, string> };
 };

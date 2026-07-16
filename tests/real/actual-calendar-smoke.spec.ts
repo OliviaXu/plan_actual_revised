@@ -72,9 +72,7 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
       return response.json();
     }, EVENT_ID);
     expect(event.extendedProperties?.private).toMatchObject({
-      planActualRevised: "true",
-      kind: "actual",
-      sourceBlockId: BLOCK_ID,
+      planActualRevisedActual: "true",
     });
   } finally {
     await page.evaluate(async ({ key, original, eventId }) => {

@@ -32,19 +32,18 @@ registerServiceWorker({
       timeZone: "America/Los_Angeles",
     }]` : "[]"} },
   }),
-  insertPrimaryCalendarActual: async (_token, input) => {
-    const alreadyCreated = createdBlockIds.has(input.block.id);
-    createdBlockIds.add(input.block.id);
+  insertPrimaryCalendarEvent: async (_token, event) => {
+    createdBlockIds.add(event.id);
     await chrome.storage.local.set({
-      "test:lastInsert": input,
+      "test:lastInsert": event,
       "test:uniqueInsertCount": createdBlockIds.size,
       "test:insertAttemptCount": ((await chrome.storage.local.get("test:insertAttemptCount"))["test:insertAttemptCount"] || 0) + 1,
     });
     if (${scenario === "ambiguous" ? "true" : "false"} && !ambiguousReturned) {
       ambiguousReturned = true;
-      return { ok: false, error: { code: "CALENDAR_ACTUAL_INSERT_FAILED", message: "Response lost." } };
+      return { ok: false, error: { code: "CALENDAR_EVENT_INSERT_FAILED", message: "Response lost." } };
     }
-    return { ok: true, value: { eventId: "par" + input.block.id.replaceAll("-", "") } };
+    return { ok: true, value: { eventId: event.id } };
   },
 });
 `,
@@ -98,15 +97,18 @@ test("a nonmatching Actual sends the complete save input and persists success", 
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
     await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
-      date: "2026-07-15",
-      timezone: "America/Los_Angeles",
-      summaryPrefix: "[Actual]",
-      defaultColorId: "8",
-      block: {
-        summary: "Actual",
-        startMinutes: 720,
-        durationMinutes: 30,
-        colorId: "8",
+      summary: "[Actual] Actual",
+      start: {
+        dateTime: "2026-07-15T12:00:00",
+        timeZone: "America/Los_Angeles",
+      },
+      end: {
+        dateTime: "2026-07-15T12:30:00",
+        timeZone: "America/Los_Angeles",
+      },
+      colorId: "8",
+      extendedProperties: {
+        private: { planActualRevisedActual: "true" },
       },
     });
     await page.reload();

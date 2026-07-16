@@ -64,6 +64,9 @@ describe("listPrimaryCalendarEvents", () => {
                 timeZone: "America/Los_Angeles",
               },
               end: { dateTime: "2026-07-15T10:00:00-07:00" },
+              extendedProperties: {
+                private: { planActualRevisedActual: "true" },
+              },
             },
             {
               id: "all-day",
@@ -93,6 +96,7 @@ describe("listPrimaryCalendarEvents", () => {
             start: "2026-07-15T09:00:00-07:00",
             end: "2026-07-15T10:00:00-07:00",
             timeZone: "America/Los_Angeles",
+            isExtensionActual: true,
           },
           {
             kind: "allDay",

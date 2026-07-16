@@ -10,7 +10,7 @@ const range = {
 const now = () => new Date(fixedNow);
 
 type MessageListener = (
-  message: { type?: string; input?: unknown },
+  message: { type?: string; event?: unknown },
   sender: unknown,
   sendResponse: (response: unknown) => void,
 ) => boolean;
@@ -53,7 +53,7 @@ function installServiceWorker(
       ok: true as const,
       value: { events: [] },
     })),
-    insertPrimaryCalendarActual: vi.fn(async () => ({
+    insertPrimaryCalendarEvent: vi.fn(async () => ({
       ok: true as const,
       value: { eventId: "calendar-actual-id" },
     })),
@@ -80,13 +80,13 @@ async function sendMessage(listener: MessageListener, type: string) {
   return { keepsChannelOpen, response: sendResponse.mock.calls[0]?.[0] };
 }
 
-async function sendMessageWithInput(
+async function sendMessageWithEvent(
   listener: MessageListener,
   type: string,
-  input: unknown,
+  event: unknown,
 ) {
   const sendResponse = vi.fn();
-  const keepsChannelOpen = listener({ type, input }, undefined, sendResponse);
+  const keepsChannelOpen = listener({ type, event }, undefined, sendResponse);
   if (keepsChannelOpen) {
     await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
   }
@@ -320,23 +320,23 @@ describe("registerServiceWorker", () => {
     expect(dependencies.listPrimaryCalendarEvents).not.toHaveBeenCalled();
   });
 
-  it("inserts an Actual through cached auth", async () => {
-    const input = { block: { id: "actual-1" } };
+  it("inserts a Calendar event through cached auth", async () => {
+    const event = { id: "calendar-event-id" };
     const { dependencies, messageListener } = installServiceWorker();
 
     await expect(
-      sendMessageWithInput(messageListener, "calendar.insertActual", input),
+      sendMessageWithEvent(messageListener, "calendar.insertEvent", event),
     ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: { ok: true, value: { eventId: "calendar-actual-id" } },
     });
-    expect(dependencies.insertPrimaryCalendarActual).toHaveBeenCalledWith(
+    expect(dependencies.insertPrimaryCalendarEvent).toHaveBeenCalledWith(
       "token-123",
-      input,
+      event,
     );
   });
 
-  it("does not insert an Actual without cached auth", async () => {
+  it("does not insert a Calendar event without cached auth", async () => {
     const { dependencies, messageListener } = installServiceWorker({
       requestCachedToken: vi.fn(async () => ({
         ok: false as const,
@@ -345,11 +345,11 @@ describe("registerServiceWorker", () => {
     });
 
     await expect(
-      sendMessageWithInput(messageListener, "calendar.insertActual", {}),
+      sendMessageWithEvent(messageListener, "calendar.insertEvent", {}),
     ).resolves.toMatchObject({
       response: { ok: false, error: { code: "AUTH_NOT_CONNECTED" } },
     });
-    expect(dependencies.insertPrimaryCalendarActual).not.toHaveBeenCalled();
+    expect(dependencies.insertPrimaryCalendarEvent).not.toHaveBeenCalled();
   });
 
   it("ignores messages outside its contract", async () => {

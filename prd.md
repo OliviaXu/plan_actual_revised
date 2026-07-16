@@ -512,9 +512,7 @@ Each saved block becomes a new event on the user's primary calendar:
 - Reminders: disabled or default-free where Calendar API permits.
 - Attendees: none.
 - Extended private properties:
-  - `planActualRevised: "true"`
-  - `sourceBlockId: <block.id>`
-  - `kind: "actual"`
+  - `planActualRevisedActual: "true"`
 
 ### 12.4 Idempotency
 
@@ -523,8 +521,8 @@ The Calendar adapter derives a valid deterministic Google Calendar event ID from
 Rules:
 
 - If insert succeeds, mark the block `calendarSaved` and store the returned event ID.
-- If insert returns duplicate/409, fetch that deterministic event ID and verify the ownership marker and `sourceBlockId` before marking it `calendarSaved`.
-- If verification detects a collision, or insert fails or is ambiguous, keep the block local as `unsaved` with normalized failure details.
+- If insert returns duplicate/409, the deterministic ID proves an earlier attempt created the event, so mark it `calendarSaved` without another request.
+- If insert fails or is ambiguous, keep the block local as `unsaved` with normalized failure details.
 - Phase 4 retains `calendarSaved` and `planMatched` blocks locally so the active Actual column has one source.
 
 This prevents duplicate events when a network response is lost after Google Calendar successfully created the event.

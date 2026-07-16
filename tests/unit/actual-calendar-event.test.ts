@@ -2,8 +2,9 @@ import { describe, expect, it, vi } from "vitest";
 
 import {
   calendarEventIdForActual,
-  insertPrimaryCalendarActual,
-} from "../../src/calendar/google-calendar-actual";
+  mapActualToCalendarEvent,
+} from "../../src/calendar/actual-calendar-event";
+import { insertPrimaryCalendarEvent } from "../../src/calendar/google-calendar-client";
 
 const input = {
   block: {
@@ -34,7 +35,7 @@ describe("Calendar Actual insertion", () => {
     );
 
     await expect(
-      insertPrimaryCalendarActual("token", input, fetchCalendar),
+      insertPrimaryCalendarEvent("token", mapActualToCalendarEvent(input), fetchCalendar),
     ).resolves.toEqual({
       ok: true,
       value: { eventId: "par123e4567e89b12d3a456426614174000" },
@@ -51,7 +52,8 @@ describe("Calendar Actual insertion", () => {
         "Content-Type": "application/json",
       },
     });
-    expect(JSON.parse(String(init?.body))).toEqual({
+    expect(JSON.parse(String(init?.body))).toEqual(mapActualToCalendarEvent(input));
+    expect(mapActualToCalendarEvent(input)).toEqual({
       id: "par123e4567e89b12d3a456426614174000",
       summary: "[Actual] Design review",
       start: { dateTime: "2026-07-15T09:00:00", timeZone: "America/Los_Angeles" },
@@ -61,73 +63,47 @@ describe("Calendar Actual insertion", () => {
       reminders: { useDefault: false },
       extendedProperties: {
         private: {
-          planActualRevised: "true",
-          kind: "actual",
-          sourceBlockId: input.block.id,
+          planActualRevisedActual: "true",
         },
       },
     });
   });
 
-  it("verifies ownership after a duplicate response", async () => {
-    const fetchCalendar = vi
-      .fn()
-      .mockResolvedValueOnce(Response.json({ error: {} }, { status: 409 }))
-      .mockResolvedValueOnce(Response.json({
-        id: "par123e4567e89b12d3a456426614174000",
-        extendedProperties: { private: {
-          planActualRevised: "true",
-          kind: "actual",
-          sourceBlockId: input.block.id,
-        } },
-      }));
+  it("treats a duplicate response as proof of the deterministic event", async () => {
+    const fetchCalendar = vi.fn(async () =>
+      Response.json({ error: {} }, { status: 409 }),
+    );
 
     await expect(
-      insertPrimaryCalendarActual("token", input, fetchCalendar),
+      insertPrimaryCalendarEvent("token", mapActualToCalendarEvent(input), fetchCalendar),
     ).resolves.toEqual({
       ok: true,
       value: { eventId: "par123e4567e89b12d3a456426614174000" },
     });
-    expect(fetchCalendar.mock.calls[1][0]).toContain(
-      "/events/par123e4567e89b12d3a456426614174000",
-    );
+    expect(fetchCalendar).toHaveBeenCalledOnce();
   });
 
-  it("rejects a deterministic ID collision owned by another block", async () => {
-    const fetchCalendar = vi
-      .fn()
-      .mockResolvedValueOnce(Response.json({ error: {} }, { status: 409 }))
-      .mockResolvedValueOnce(Response.json({
-        id: "par123e4567e89b12d3a456426614174000",
-        extendedProperties: { private: {
-          planActualRevised: "true",
-          sourceBlockId: "another-block",
-        } },
-      }));
-
+  it("normalizes an ambiguous insert failure", async () => {
     await expect(
-      insertPrimaryCalendarActual("token", input, fetchCalendar),
-    ).resolves.toMatchObject({
-      ok: false,
-      error: { code: "CALENDAR_ACTUAL_ID_COLLISION" },
-    });
-  });
-
-  it("normalizes ambiguous and malformed insert results", async () => {
-    await expect(
-      insertPrimaryCalendarActual("token", input, vi.fn(async () => {
+      insertPrimaryCalendarEvent("token", mapActualToCalendarEvent(input), vi.fn(async () => {
         throw new Error("response lost");
       })),
     ).resolves.toEqual({
       ok: false,
-      error: { code: "CALENDAR_ACTUAL_INSERT_FAILED", message: "response lost" },
+      error: { code: "CALENDAR_EVENT_INSERT_FAILED", message: "response lost" },
     });
+  });
 
+  it("trusts a successful Calendar status without requiring a response body", async () => {
     await expect(
-      insertPrimaryCalendarActual("token", input, vi.fn(async () => Response.json({}))),
-    ).resolves.toMatchObject({
-      ok: false,
-      error: { code: "CALENDAR_ACTUAL_INSERT_FAILED" },
+      insertPrimaryCalendarEvent(
+        "token",
+        mapActualToCalendarEvent(input),
+        vi.fn(async () => new Response(null, { status: 200 })),
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      value: { eventId: "par123e4567e89b12d3a456426614174000" },
     });
   });
 });

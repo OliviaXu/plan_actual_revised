@@ -111,7 +111,7 @@ Build:
 - Minimal Actual block creation path for a single block.
 - Manual save path for Actual blocks.
 - Calendar insert payload mapping with private extended metadata.
-- Deterministic Calendar event ID derived from the local block ID, with duplicate ownership verification.
+- Deterministic Calendar event ID derived from the local block ID; a duplicate/409 proves an earlier insert succeeded.
 - Persisted save dispositions: unsaved, Calendar-saved, and permanently Plan-matched; saving remains UI-only.
 
 Deterministic E2E tracer:

@@ -1,5 +1,4 @@
-import type { CalendarEvent } from "../calendar/calendar-event";
-import type { CalendarActualInput } from "../calendar/google-calendar-actual";
+import type { CalendarEvent, CalendarInsertEvent } from "../calendar/calendar-event";
 import type { Result } from "./result";
 
 type RuntimeMessageMap = {
@@ -11,8 +10,8 @@ type RuntimeMessageMap = {
     request: { type: "calendar.listEvents" };
     response: Result<{ events: CalendarEvent[] }>;
   };
-  "calendar.insertActual": {
-    request: { type: "calendar.insertActual"; input: CalendarActualInput };
+  "calendar.insertEvent": {
+    request: { type: "calendar.insertEvent"; event: CalendarInsertEvent };
     response: Result<{ eventId: string }>;
   };
 };
@@ -26,8 +25,8 @@ export function sendRuntimeMessage(
   message: RuntimeMessageMap["calendar.listEvents"]["request"],
 ): Promise<RuntimeMessageMap["calendar.listEvents"]["response"]>;
 export function sendRuntimeMessage(
-  message: RuntimeMessageMap["calendar.insertActual"]["request"],
-): Promise<RuntimeMessageMap["calendar.insertActual"]["response"]>;
+  message: RuntimeMessageMap["calendar.insertEvent"]["request"],
+): Promise<RuntimeMessageMap["calendar.insertEvent"]["response"]>;
 export function sendRuntimeMessage(message: RuntimeMessage) {
   return chrome.runtime.sendMessage(message);
 }

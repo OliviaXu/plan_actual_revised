@@ -1,3 +1,5 @@
+import { isRecord } from "../shared/is-record";
+
 export type ActualBlock = {
   id: string;
   summary: string;
@@ -85,8 +87,4 @@ function isTimeZone(value: unknown): value is string {
   } catch {
     return false;
   }
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

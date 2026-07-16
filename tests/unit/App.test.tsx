@@ -392,11 +392,11 @@ describe("App Actual Calendar saving", () => {
       actual: [{ saveDisposition: "planMatched" }],
     });
     expect(handler).not.toHaveBeenCalledWith(
-      expect.objectContaining({ type: "calendar.insertActual" }),
+      expect.objectContaining({ type: "calendar.insertEvent" }),
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Save Actual to calendar" }));
-    expect(handler.mock.calls.filter(([message]) => message.type === "calendar.insertActual")).toHaveLength(0);
+    expect(handler.mock.calls.filter(([message]) => message.type === "calendar.insertEvent")).toHaveLength(0);
   });
 
   it("saves a nonmatching Actual and persists its Calendar disposition", async () => {
@@ -404,7 +404,7 @@ describe("App Actual Calendar saving", () => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [] } };
       }
-      if (message.type === "calendar.insertActual") {
+      if (message.type === "calendar.insertEvent") {
         return { ok: true, value: { eventId: "calendar-actual-id" } };
       }
       return unexpectedMessage(message);
@@ -426,11 +426,10 @@ describe("App Actual Calendar saving", () => {
       }],
     });
     expect(handler).toHaveBeenCalledWith({
-      type: "calendar.insertActual",
-      input: expect.objectContaining({
-        date: "2026-07-15",
-        timezone: "America/Los_Angeles",
-        block: expect.objectContaining({ id: "actual-to-save" }),
+      type: "calendar.insertEvent",
+      event: expect.objectContaining({
+        id: "paractualtosave",
+        summary: "[Actual] Design review",
       }),
     });
   });
@@ -440,9 +439,9 @@ describe("App Actual Calendar saving", () => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [] } };
       }
-      if (message.type === "calendar.insertActual") {
+      if (message.type === "calendar.insertEvent") {
         return { ok: false, error: {
-          code: "CALENDAR_ACTUAL_INSERT_FAILED",
+          code: "CALENDAR_EVENT_INSERT_FAILED",
           message: "Response lost.",
         } };
       }
@@ -463,7 +462,7 @@ describe("App Actual Calendar saving", () => {
         saveDisposition: "unsaved",
         lastSaveAttemptAt: expect.any(String),
         lastSaveError: {
-          code: "CALENDAR_ACTUAL_INSERT_FAILED",
+          code: "CALENDAR_EVENT_INSERT_FAILED",
           message: "Response lost.",
         },
       }],
@@ -475,7 +474,7 @@ describe("App Actual Calendar saving", () => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [] } };
       }
-      if (message.type === "calendar.insertActual") {
+      if (message.type === "calendar.insertEvent") {
         throw new Error("The message port closed.");
       }
       return unexpectedMessage(message);

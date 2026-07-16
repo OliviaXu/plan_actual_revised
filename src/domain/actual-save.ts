@@ -6,7 +6,7 @@ export function isExactPlanMatch(
   record: DayRecord,
   event: TimedCalendarEvent,
 ) {
-  if (event.appKind === "actual") return false;
+  if (event.isExtensionActual) return false;
   const startTime = Date.parse(event.start);
   const endTime = Date.parse(event.end);
   if (!Number.isFinite(startTime) || !Number.isFinite(endTime)) return false;

@@ -4,7 +4,7 @@ import type {
   CalendarEventRange,
 } from "../calendar/calendar-event";
 import type { CalendarLoadStats } from "../calendar/google-calendar-client";
-import type { CalendarActualInput } from "../calendar/google-calendar-actual";
+import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { RuntimeMessage } from "../shared/runtime-messages";
 
 type ServiceWorkerDependencies = {
@@ -15,9 +15,9 @@ type ServiceWorkerDependencies = {
     token: string,
     range: CalendarEventRange,
   ) => Promise<Result<{ events: CalendarEvent[]; stats?: CalendarLoadStats }>>;
-  insertPrimaryCalendarActual: (
+  insertPrimaryCalendarEvent: (
     token: string,
-    input: CalendarActualInput,
+    event: CalendarInsertEvent,
   ) => Promise<Result<{ eventId: string }>>;
 };
 
@@ -57,8 +57,8 @@ export default function registerServiceWorker(
       return true;
     }
 
-    if (message?.type === "calendar.insertActual") {
-      void saveActual(dependencies, message.input).then(sendResponse);
+    if (message?.type === "calendar.insertEvent") {
+      void insertEvent(dependencies, message.event).then(sendResponse);
       return true;
     }
 
@@ -66,9 +66,9 @@ export default function registerServiceWorker(
   });
 }
 
-async function saveActual(
+async function insertEvent(
   dependencies: ServiceWorkerDependencies,
-  input: CalendarActualInput,
+  event: CalendarInsertEvent,
 ) {
   const authResult = await dependencies.requestCachedToken();
   if (!authResult.ok) {
@@ -80,7 +80,7 @@ async function saveActual(
       },
     };
   }
-  return dependencies.insertPrimaryCalendarActual(authResult.value, input);
+  return dependencies.insertPrimaryCalendarEvent(authResult.value, event);
 }
 
 async function loadCalendarEvents(

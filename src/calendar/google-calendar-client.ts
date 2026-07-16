@@ -1,10 +1,13 @@
+import { isRecord } from "../shared/is-record";
 import type { Result } from "../shared/result";
 import type {
   CalendarEvent,
   CalendarEventRange,
+  CalendarInsertEvent,
 } from "./calendar-event";
 
 const CALENDAR_LIST_FAILED_CODE = "CALENDAR_LIST_FAILED";
+const CALENDAR_INSERT_FAILED_CODE = "CALENDAR_EVENT_INSERT_FAILED";
 
 export type CalendarLoadStats = {
   pageCount: number;
@@ -12,6 +15,52 @@ export type CalendarLoadStats = {
   calendarHttpAndJsonDurationMs: number;
   normalizationDurationMs: number;
 };
+
+export async function insertPrimaryCalendarEvent(
+  token: string,
+  event: CalendarInsertEvent,
+  fetchCalendar: typeof fetch = fetch,
+): Promise<Result<{ eventId: string }>> {
+  try {
+    const response = await fetchCalendar(
+      "https://www.googleapis.com/calendar/v3/calendars/primary/events",
+      {
+        method: "POST",
+        headers: {
+          Authorization: `Bearer ${token}`,
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(event),
+      },
+    );
+
+    if (response.ok || response.status === 409) {
+      return { ok: true, value: { eventId: event.id } };
+    }
+
+    const body: unknown = await response.json().catch(() => null);
+    return {
+      ok: false,
+      error: {
+        code: CALENDAR_INSERT_FAILED_CODE,
+        message:
+          isRecord(body) && isRecord(body.error) &&
+          typeof body.error.message === "string"
+            ? body.error.message
+            : "Unable to insert Calendar event.",
+      },
+    };
+  } catch (error) {
+    return {
+      ok: false,
+      error: {
+        code: CALENDAR_INSERT_FAILED_CODE,
+        message:
+          error instanceof Error ? error.message : "Unable to insert Calendar event.",
+      },
+    };
+  }
+}
 
 export async function listPrimaryCalendarEvents(
   token: string,
@@ -116,11 +165,8 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
     isRecord(value.extendedProperties.private)
       ? value.extendedProperties.private
       : null;
-  const appKind =
-    privateProperties?.planActualRevised === "true" &&
-    privateProperties.kind === "actual"
-      ? ("actual" as const)
-      : undefined;
+  const isExtensionActual =
+    privateProperties?.planActualRevisedActual === "true";
 
   if (
     start &&
@@ -137,7 +183,7 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
         start: start.dateTime,
         end: end.dateTime,
         timeZone: typeof start.timeZone === "string" ? start.timeZone : null,
-        ...(appKind ? { appKind } : {}),
+        ...(isExtensionActual ? { isExtensionActual } : {}),
       },
     ];
   }
@@ -156,14 +202,9 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
         colorId,
         startDate: start.date,
         endDate: end.date,
-        ...(appKind ? { appKind } : {}),
       },
     ];
   }
 
   return [];
-}
-
-function isRecord(value: unknown): value is Record<string, unknown> {
-  return typeof value === "object" && value !== null && !Array.isArray(value);
 }

@@ -46,7 +46,9 @@ describe("isExactPlanMatch", () => {
   });
 
   it("does not treat an extension-owned Actual as a Plan match", () => {
-    expect(isExactPlanMatch(actual, record, { ...plan, appKind: "actual" })).toBe(false);
+    expect(
+      isExactPlanMatch(actual, record, { ...plan, isExtensionActual: true }),
+    ).toBe(false);
   });
 
   it("ignores a malformed Calendar timestamp", () => {

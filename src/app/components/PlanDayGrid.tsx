@@ -49,7 +49,7 @@ export function PlanDayGrid({
   const eligibleTimedEvents = events.filter(
     (event): event is TimedCalendarEvent =>
       event.kind === "timed" &&
-      event.appKind !== "actual" &&
+      !event.isExtensionActual &&
       !defaultSettings.hiddenPlanColorIds.includes(event.colorId ?? ""),
   );
   const layout = calculatePlanDayGridLayout(
