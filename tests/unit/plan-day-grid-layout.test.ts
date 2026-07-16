@@ -4,6 +4,7 @@ import type { TimedCalendarEvent } from "../../src/calendar/calendar-event";
 import { defaultSettings } from "../../src/domain/settings";
 import {
   calculatePlanDayGridLayout,
+  calculatePlanNowIndicatorTopPx,
   MINIMUM_PLAN_BLOCK_HEIGHT_PX,
 } from "../../src/app/components/plan-day-grid-layout";
 
@@ -293,5 +294,37 @@ describe("calculatePlanDayGridLayout", () => {
       { id: "shorter", overlapLayerIndex: 1 },
       { id: "touching-shorter", overlapLayerIndex: 1 },
     ]);
+  });
+});
+
+describe("calculatePlanNowIndicatorTopPx", () => {
+  it("positions local time on the grid scale and excludes other days or hours", () => {
+    expect(
+      calculatePlanNowIndicatorTopPx(
+        new Date(2026, 6, 15, 12, 30),
+        today,
+        7,
+        21,
+        1.4,
+      ),
+    ).toBe(462);
+    expect(
+      calculatePlanNowIndicatorTopPx(
+        new Date(2026, 6, 15, 6, 59),
+        today,
+        7,
+        21,
+        1.4,
+      ),
+    ).toBeNull();
+    expect(
+      calculatePlanNowIndicatorTopPx(
+        new Date(2026, 6, 16, 12, 30),
+        today,
+        7,
+        21,
+        1.4,
+      ),
+    ).toBeNull();
   });
 });

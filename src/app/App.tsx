@@ -110,6 +110,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         ) : (
           <PlanDayGrid
             events={events}
+            now={now}
             status={calendarState.status}
             today={currentDate}
           />

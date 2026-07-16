@@ -1,11 +1,12 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
   screen,
   within,
 } from "@testing-library/react";
-import { afterEach, describe, expect, it } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import { PlanDayGrid } from "../../src/app/components/PlanDayGrid";
@@ -28,7 +29,10 @@ function timedEvent(
   };
 }
 
-afterEach(cleanup);
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 describe("PlanDayGrid", () => {
   it("renders the complete default hour axis without full-width grid lines", () => {
@@ -250,5 +254,62 @@ describe("PlanDayGrid", () => {
     fireEvent.click(nested);
     expect(base).toHaveStyle({ zIndex: "0" });
     expect(nested).toHaveStyle({ zIndex: "2" });
+  });
+
+  it("updates the visible now indicator once per minute", () => {
+    vi.useFakeTimers();
+    let currentTime = new Date(2026, 6, 15, 12, 34);
+    render(
+      <PlanDayGrid
+        events={[]}
+        now={() => currentTime}
+        status="connected"
+        today={today}
+      />,
+    );
+
+    const indicator = screen.getByTestId("plan-now-indicator");
+    expect(indicator.parentElement).toBe(screen.getByTestId("plan-grid-body"));
+    expect(indicator).toHaveStyle({ top: "467.6px" });
+    expect(within(indicator).getByText("12:34 PM")).toBeVisible();
+
+    currentTime = new Date(2026, 6, 15, 12, 35);
+    act(() => vi.advanceTimersByTime(60_000));
+
+    expect(indicator).toHaveStyle({ top: "469px" });
+    expect(within(indicator).getByText("12:35 PM")).toBeVisible();
+  });
+
+  it("auto-scrolls once after connected content renders", () => {
+    const now = () => new Date(2026, 6, 15, 12);
+    const { rerender } = render(
+      <PlanDayGrid events={[]} now={now} status="loading" today={today} />,
+    );
+    const viewport = screen.getByTestId("plan-scroll-viewport");
+    const header = screen.getByTestId("plan-grid-header");
+    Object.defineProperty(viewport, "clientHeight", { value: 500 });
+    Object.defineProperty(header, "offsetHeight", { value: 35 });
+
+    rerender(
+      <PlanDayGrid events={[]} now={now} status="connected" today={today} />,
+    );
+    expect(viewport.scrollTop).toBe(305);
+
+    viewport.scrollTop = 700;
+    rerender(
+      <PlanDayGrid
+        events={[
+          timedEvent(
+            "Later event",
+            "2026-07-15T14:00:00-07:00",
+            "2026-07-15T15:00:00-07:00",
+          ),
+        ]}
+        now={now}
+        status="connected"
+        today={today}
+      />,
+    );
+    expect(viewport.scrollTop).toBe(700);
   });
 });

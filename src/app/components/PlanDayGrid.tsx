@@ -2,17 +2,20 @@ import type {
   CalendarEvent,
   TimedCalendarEvent,
 } from "../../calendar/calendar-event";
-import { useState } from "react";
+import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import { planEventColorClassName } from "../../design/google-calendar-colors";
 import {
   calculatePlanDayGridLayout,
+  calculatePlanNowIndicatorTopPx,
   PLAN_EVENT_COLUMN_INSET_PX,
   PLAN_EVENT_LAYER_OFFSET_PX,
   type PlanDayGridBlock,
 } from "./plan-day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
 
-const PLAN_GRID_TEMPLATE_COLUMNS = "4.5rem minmax(0, 1fr)";
+const PLAN_TIME_AXIS_WIDTH = "4.5rem";
+const PLAN_GRID_TEMPLATE_COLUMNS = `${PLAN_TIME_AXIS_WIDTH} minmax(0, 1fr)`;
+const readSystemTime = () => new Date();
 
 type PlanLoadStatus =
   | "loading"
@@ -22,14 +25,20 @@ type PlanLoadStatus =
 
 export function PlanDayGrid({
   events,
+  now = readSystemTime,
   status,
   today,
 }: {
   events: CalendarEvent[];
+  now?: () => Date;
   status: PlanLoadStatus;
   today: Date;
 }) {
   const [frontEventId, setFrontEventId] = useState<string | null>(null);
+  const [currentTime, setCurrentTime] = useState(now);
+  const scrollViewportRef = useRef<HTMLDivElement>(null);
+  const gridHeaderRef = useRef<HTMLDivElement>(null);
+  const didAutoScrollRef = useRef(false);
   const eligibleTimedEvents = events.filter(
     (event): event is TimedCalendarEvent =>
       event.kind === "timed" &&
@@ -41,6 +50,39 @@ export function PlanDayGrid({
     defaultSettings,
   );
   const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
+  const nowIndicatorTopPx = calculatePlanNowIndicatorTopPx(
+    currentTime,
+    today,
+    layout.startHour,
+    layout.endHour,
+    defaultSettings.pixelsPerMinute,
+  );
+
+  useEffect(() => {
+    const intervalId = window.setInterval(() => setCurrentTime(now()), 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [now]);
+
+  useLayoutEffect(() => {
+    const viewport = scrollViewportRef.current;
+    const header = gridHeaderRef.current;
+    if (
+      status !== "connected" ||
+      didAutoScrollRef.current ||
+      nowIndicatorTopPx === null ||
+      viewport === null ||
+      header === null ||
+      viewport.clientHeight === 0
+    ) {
+      return;
+    }
+
+    viewport.scrollTop = Math.max(
+      0,
+      header.offsetHeight + nowIndicatorTopPx - viewport.clientHeight * 0.3,
+    );
+    didAutoScrollRef.current = true;
+  }, [nowIndicatorTopPx, status]);
 
   return (
     <section
@@ -48,27 +90,56 @@ export function PlanDayGrid({
       aria-label="Plan day grid"
     >
       <div
-        className="grid border-b border-border bg-muted"
-        style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
-      >
-        <div className="border-r border-border px-3 py-2 text-xs font-medium uppercase text-muted-foreground">
-          Time
-        </div>
-        <h2 className="px-4 py-2 text-sm font-semibold">Plan</h2>
-      </div>
-      <div
-        className="relative"
-        data-end-hour={layout.endHour}
-        data-start-hour={layout.startHour}
-        data-testid="plan-grid-body"
-        style={{ height: layout.heightPx }}
+        className="relative h-[calc(100vh-10rem)] min-h-80 overflow-y-auto [scrollbar-gutter:stable]"
+        data-testid="plan-scroll-viewport"
+        ref={scrollViewportRef}
       >
         <div
-          className="grid h-full"
+          className="sticky top-0 z-20 grid border-b border-border bg-muted"
+          data-testid="plan-grid-header"
+          ref={gridHeaderRef}
           style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
         >
-          <div className="relative border-r border-border">
-            {layout.hourBoundaries.map((hour) => {
+          <div
+            className="border-r border-border px-3 py-2 text-xs font-medium uppercase text-muted-foreground"
+            data-testid="plan-grid-header-axis"
+          >
+            Time
+          </div>
+          <h2 className="px-4 py-2 text-sm font-semibold">Plan</h2>
+        </div>
+        <div
+          className="relative"
+          data-end-hour={layout.endHour}
+          data-start-hour={layout.startHour}
+          data-testid="plan-grid-body"
+          style={{ height: layout.heightPx }}
+        >
+          {nowIndicatorTopPx !== null ? (
+            <div
+              className="pointer-events-none absolute right-0 border-t border-now"
+              data-testid="plan-now-indicator"
+              style={{
+                left: PLAN_TIME_AXIS_WIDTH,
+                top: nowIndicatorTopPx,
+                zIndex: layout.blocks.length + 1,
+              }}
+            >
+              <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-now" />
+              <span className="absolute right-2 top-0 -translate-y-full bg-white px-1 text-xs font-medium text-now">
+                {formatTime(currentTime)}
+              </span>
+            </div>
+          ) : null}
+          <div
+            className="grid h-full"
+            style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
+          >
+            <div
+              className="relative border-r border-border"
+              data-testid="plan-grid-axis"
+            >
+              {layout.hourBoundaries.map((hour) => {
               const labelPosition =
                 hour === layout.startHour
                   ? ""
@@ -96,44 +167,45 @@ export function PlanDayGrid({
                   </span>
                 </div>
               );
-            })}
-          </div>
-          <div className="relative" data-testid="plan-column">
-            {status === "loading" ? (
-              <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
-                Loading today&apos;s plan
-              </p>
-            ) : null}
-            {status === "connecting" ? (
-              <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
-                Connecting Google Calendar
-              </p>
-            ) : null}
-            {status === "error" ? (
-              <p
-                className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
-                data-testid="plan-unavailable"
-              >
-                Unable to load today&apos;s plan
-              </p>
-            ) : null}
-            {status === "connected" && layout.blocks.length === 0 ? (
-              <p
-                className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
-                data-testid="plan-empty"
-              >
-                No timed events today
-              </p>
-            ) : null}
-            {layout.blocks.map((block) => (
-              <PlanEventBlock
-                block={block}
-                frontZIndex={layout.blocks.length}
-                isFront={frontEventId === block.event.id}
-                key={block.event.id}
-                onBringToFront={() => setFrontEventId(block.event.id)}
-              />
-            ))}
+              })}
+            </div>
+            <div className="relative" data-testid="plan-column">
+              {status === "loading" ? (
+                <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
+                  Loading today&apos;s plan
+                </p>
+              ) : null}
+              {status === "connecting" ? (
+                <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
+                  Connecting Google Calendar
+                </p>
+              ) : null}
+              {status === "error" ? (
+                <p
+                  className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
+                  data-testid="plan-unavailable"
+                >
+                  Unable to load today&apos;s plan
+                </p>
+              ) : null}
+              {status === "connected" && layout.blocks.length === 0 ? (
+                <p
+                  className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
+                  data-testid="plan-empty"
+                >
+                  No timed events today
+                </p>
+              ) : null}
+              {layout.blocks.map((block) => (
+                <PlanEventBlock
+                  block={block}
+                  frontZIndex={layout.blocks.length}
+                  isFront={frontEventId === block.event.id}
+                  key={block.event.id}
+                  onBringToFront={() => setFrontEventId(block.event.id)}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>

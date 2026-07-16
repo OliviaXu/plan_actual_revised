@@ -144,6 +144,36 @@ export function calculatePlanDayGridLayout(
   };
 }
 
+export function calculatePlanNowIndicatorTopPx(
+  currentTime: Date,
+  today: Date,
+  startHour: number,
+  endHour: number,
+  pixelsPerMinute: number,
+) {
+  if (
+    currentTime.getFullYear() !== today.getFullYear() ||
+    currentTime.getMonth() !== today.getMonth() ||
+    currentTime.getDate() !== today.getDate()
+  ) {
+    return null;
+  }
+
+  const currentMinuteOfDay =
+    currentTime.getHours() * MINUTES_PER_HOUR +
+    currentTime.getMinutes();
+  if (
+    currentMinuteOfDay < startHour * MINUTES_PER_HOUR ||
+    currentMinuteOfDay > endHour * MINUTES_PER_HOUR
+  ) {
+    return null;
+  }
+
+  return roundPixel(
+    (currentMinuteOfDay - startHour * MINUTES_PER_HOUR) * pixelsPerMinute,
+  );
+}
+
 function assignOverlapLayers(
   blocks: Omit<PlanDayGridBlock, "overlapGroupIndex" | "overlapLayerIndex">[],
 ): PlanDayGridBlock[] {

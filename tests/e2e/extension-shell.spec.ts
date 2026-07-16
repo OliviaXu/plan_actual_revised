@@ -15,6 +15,7 @@ async function openExtension(extensionPath: string) {
     context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
   const extensionId = serviceWorker.url().split("/")[2];
   const page = await context.newPage();
+  await page.clock.setFixedTime(new Date("2026-07-15T12:00:00-07:00"));
   await page.goto(`chrome-extension://${extensionId}/index.html`);
 
   return { context, page };
