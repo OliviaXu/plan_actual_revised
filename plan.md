@@ -106,20 +106,20 @@ Goal: prove the core durability promise before building complex editing and drag
 
 Build:
 
-- Chrome extension storage wrapper for canonical daily records and settings defaults.
+- Chrome extension storage wrapper for canonical daily records; settings remain code-derived.
 - Versioned `DayRecord` shape with one local date key per day.
 - Minimal Actual block creation path for a single block.
 - Manual save path for Actual blocks.
 - Calendar insert payload mapping with private extended metadata.
-- Idempotency check before insert using the local block ID.
-- Save status states: unsaved, saving, saved, failed.
+- Deterministic Calendar event ID derived from the local block ID, with duplicate ownership verification.
+- Persisted save dispositions: unsaved, Calendar-saved, and permanently Plan-matched; saving remains UI-only.
 
 Deterministic E2E tracer:
 
 - Create one minimal Actual block and verify it persists across reload.
 - Save the block and verify the mocked Calendar insert payload includes title, time, color, timezone, and private metadata.
-- Simulate existing matching Calendar event and verify the block becomes saved without duplicate insert.
-- Simulate failed and ambiguous insert outcomes and verify the local block survives reload as pending/failed.
+- Simulate an exact Plan match and verify it becomes permanently Plan-matched without insert.
+- Simulate failed and ambiguous insert outcomes and verify the local block survives reload as unsaved with failure details.
 
 Real smoke:
 
@@ -196,18 +196,20 @@ Goal: prove historical auto-save and cleanup semantics independently from today'
 Build:
 
 - Catch-up runner that scans past-day records.
-- Save filtering for unsaved/failed Actual blocks.
+- Save filtering for unsaved Actual blocks.
 - Per-block persistence after each save attempt.
-- Day-record cleanup only after all work is proven saved or skipped.
-- Catch-up summary toast.
+- Active window of today plus the two most recent nonempty prior day records.
+- One final retry followed by deletion when a record leaves the active window, regardless of outcome.
+- Catch-up summary with saved, matched, failed, and discarded counts.
 
 Deterministic E2E tracer:
 
 - Seed yesterday's unsaved Actual block.
 - Load today's extension page.
 - Verify catch-up saves the block and removes yesterday's record only after proven success.
-- Simulate partial failure and all-failure outcomes and verify pending records survive reload.
-- Verify exact Plan copies are skipped.
+- Simulate retained-record failure and verify it remains unsaved for the next app-open retry.
+- Verify Plan-matched and Calendar-saved blocks are never retried.
+- Verify an expired record gets one final attempt and is deleted with explicit discarded counts.
 
 Real smoke:
 
@@ -217,8 +219,8 @@ Real smoke:
 
 Exit criteria:
 
-- Past-day data cannot be silently lost during catch-up.
-- Cleanup is tied to proven Calendar state, not attempted writes.
+- Retained past-day records retry on every app open.
+- Cleanup is bounded and any discarded unsaved work is reported explicitly.
 
 ## Phase 8 - Daily Focus Tracer
 

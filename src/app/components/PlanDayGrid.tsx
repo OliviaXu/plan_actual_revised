@@ -12,9 +12,10 @@ import {
   type PlanDayGridBlock,
 } from "./plan-day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
+import type { ActualBlock } from "../../domain/day-record";
 
 const PLAN_TIME_AXIS_WIDTH = "4.5rem";
-const PLAN_GRID_TEMPLATE_COLUMNS = `${PLAN_TIME_AXIS_WIDTH} minmax(0, 1fr)`;
+const PLAN_GRID_TEMPLATE_COLUMNS = `${PLAN_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
 const readSystemTime = () => new Date();
 
 type PlanLoadStatus =
@@ -24,13 +25,19 @@ type PlanLoadStatus =
   | "error";
 
 export function PlanDayGrid({
+  actuals,
+  canAddActual,
   events,
   now = readSystemTime,
+  onAddActual,
   status,
   today,
 }: {
+  actuals?: ActualBlock[];
+  canAddActual?: boolean;
   events: CalendarEvent[];
   now?: () => Date;
+  onAddActual?: () => void;
   status: PlanLoadStatus;
   today: Date;
 }) {
@@ -42,6 +49,7 @@ export function PlanDayGrid({
   const eligibleTimedEvents = events.filter(
     (event): event is TimedCalendarEvent =>
       event.kind === "timed" &&
+      event.appKind !== "actual" &&
       !defaultSettings.hiddenPlanColorIds.includes(event.colorId ?? ""),
   );
   const layout = calculatePlanDayGridLayout(
@@ -107,6 +115,17 @@ export function PlanDayGrid({
             Time
           </div>
           <h2 className="px-4 py-2 text-sm font-semibold">Plan</h2>
+          <div className="flex items-center justify-between border-l border-border px-4 py-2">
+            <h2 className="text-sm font-semibold">Actual</h2>
+            <button
+              className="rounded-sm border border-border bg-white px-2 py-0.5 text-xs font-medium disabled:opacity-50"
+              disabled={!canAddActual}
+              onClick={onAddActual}
+              type="button"
+            >
+              Add Actual
+            </button>
+          </div>
         </div>
         <div
           className="relative"
@@ -206,10 +225,48 @@ export function PlanDayGrid({
                 />
               ))}
             </div>
+            <div className="relative border-l border-border" data-testid="actual-column">
+              {(actuals ?? []).map((actual) => (
+                <ActualEventBlock
+                  actual={actual}
+                  key={actual.id}
+                  startHour={layout.startHour}
+                />
+              ))}
+            </div>
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function ActualEventBlock({
+  actual,
+  startHour,
+}: {
+  actual: ActualBlock;
+  startHour: number;
+}) {
+  const color = resolveGoogleCalendarEventColor(actual.colorId);
+  return (
+    <div
+      className="absolute inset-x-2 overflow-hidden rounded-sm border px-2 py-1 text-xs shadow-soft"
+      data-actual-id={actual.id}
+      data-testid="actual-block"
+      style={{
+        top: (actual.startMinutes - startHour * 60) * defaultSettings.pixelsPerMinute,
+        height: Math.max(20, actual.durationMinutes * defaultSettings.pixelsPerMinute),
+        ...(color
+          ? { backgroundColor: `${color}40`, borderColor: `${color}80` }
+          : {}),
+      }}
+    >
+      <span className="font-medium">{actual.summary}</span>
+      <span className="ml-2 text-muted-foreground">
+        {formatDuration(actual.durationMinutes)}
+      </span>
+    </div>
   );
 }
 

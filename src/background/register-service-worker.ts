@@ -4,6 +4,8 @@ import type {
   CalendarEventRange,
 } from "../calendar/calendar-event";
 import type { CalendarLoadStats } from "../calendar/google-calendar-client";
+import type { CalendarActualInput } from "../calendar/google-calendar-actual";
+import type { RuntimeMessage } from "../shared/runtime-messages";
 
 type ServiceWorkerDependencies = {
   openAppPage: () => Promise<unknown>;
@@ -13,6 +15,10 @@ type ServiceWorkerDependencies = {
     token: string,
     range: CalendarEventRange,
   ) => Promise<Result<{ events: CalendarEvent[]; stats?: CalendarLoadStats }>>;
+  insertPrimaryCalendarActual: (
+    token: string,
+    input: CalendarActualInput,
+  ) => Promise<Result<{ eventId: string }>>;
 };
 
 type CalendarResult = Result<{ events: CalendarEvent[] }>;
@@ -26,7 +32,7 @@ export default function registerServiceWorker(
     void dependencies.openAppPage();
   });
 
-  chrome.runtime.onMessage.addListener((message, _sender, sendResponse) => {
+  chrome.runtime.onMessage.addListener((message: RuntimeMessage, _sender, sendResponse) => {
     if (message?.type === "auth.requestInteractiveToken") {
       void dependencies.requestInteractiveToken().then((result) => {
         sendResponse(
@@ -51,8 +57,30 @@ export default function registerServiceWorker(
       return true;
     }
 
+    if (message?.type === "calendar.insertActual") {
+      void saveActual(dependencies, message.input).then(sendResponse);
+      return true;
+    }
+
     return false;
   });
+}
+
+async function saveActual(
+  dependencies: ServiceWorkerDependencies,
+  input: CalendarActualInput,
+) {
+  const authResult = await dependencies.requestCachedToken();
+  if (!authResult.ok) {
+    return {
+      ok: false as const,
+      error: {
+        code: "AUTH_NOT_CONNECTED",
+        message: "Connect Calendar before saving Actuals.",
+      },
+    };
+  }
+  return dependencies.insertPrimaryCalendarActual(authResult.value, input);
 }
 
 async function loadCalendarEvents(

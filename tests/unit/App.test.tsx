@@ -5,6 +5,7 @@ import { App } from "../../src/app/App";
 
 type RuntimeMessage = {
   type: string;
+  input?: unknown;
 };
 type RuntimeHandler = (message: RuntimeMessage) => Promise<unknown>;
 
@@ -20,9 +21,20 @@ const timedEvent = {
 const now = () => new Date("2026-07-15T12:00:00-07:00");
 
 function mockRuntime(handler: RuntimeHandler) {
+  const stored: Record<string, unknown> = {};
   vi.stubGlobal("chrome", {
     runtime: { sendMessage: vi.fn(handler) },
+    storage: {
+      local: {
+        get: vi.fn(async (key: string) => ({ [key]: stored[key] })),
+        set: vi.fn(async (items: Record<string, unknown>) => {
+          Object.assign(stored, items);
+        }),
+      },
+    },
   });
+
+  return stored;
 }
 
 function unexpectedMessage(message: RuntimeMessage): Promise<never> {
@@ -115,9 +127,7 @@ describe("App Plan loading", () => {
     expect(
       screen.getByRole("button", { name: "Connect Calendar" }),
     ).toBeVisible();
-    expect(
-      screen.queryByRole("region", { name: "Plan day grid" }),
-    ).not.toBeInTheDocument();
+    expect(screen.getByRole("region", { name: "Plan day grid" })).toBeVisible();
     expect(
       screen.queryByText(
         "Sign in to load today's events into this read-only column.",
@@ -246,5 +256,251 @@ describe("App Plan loading", () => {
       "Unable to load today's plan",
     );
     expect(screen.queryByTestId("plan-empty")).not.toBeInTheDocument();
+  });
+});
+
+describe("App Actual persistence", () => {
+  it("hydrates an existing Actual before allowing creation", async () => {
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [] } };
+      }
+      return unexpectedMessage(message);
+    });
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual: [{
+        id: "restored-actual",
+        summary: "Restored Actual",
+        startMinutes: 600,
+        durationMinutes: 30,
+        colorId: "8",
+      }],
+      updatedAt: "2026-07-15T17:00:00.000Z",
+    };
+
+    render(<App now={now} />);
+
+    expect(await screen.findByText("Restored Actual")).toBeVisible();
+    expect(screen.getByRole("button", { name: "Add Actual" })).toBeDisabled();
+  });
+
+  it("persists a new Actual before rendering it", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [] } };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.stubGlobal("crypto", { randomUUID: () => "new-actual-id" });
+
+    render(<App now={now} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    fireEvent.click(add);
+
+    expect(await screen.findByText("Actual")).toBeVisible();
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        schemaVersion: 1,
+        date: "2026-07-15",
+        timezone: "America/Los_Angeles",
+        actual: [expect.objectContaining({
+          id: "new-actual-id",
+          startMinutes: 720,
+          durationMinutes: 30,
+          colorId: "8",
+        })],
+      }),
+    });
+  });
+
+  it("does not render a new Actual when persistence fails", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [] } };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(
+      new Error("quota exceeded"),
+    );
+
+    render(<App now={now} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Add Actual" }));
+
+    expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
+      "Unable to save Actual locally.",
+    );
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+  });
+
+  it("keeps Actual available while Calendar is disconnected", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: false,
+          error: { code: "AUTH_NOT_CONNECTED", message: "Not connected." },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+
+    expect(await screen.findByRole("button", { name: "Add Actual" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
+  });
+});
+
+describe("App Actual Calendar saving", () => {
+  function seedUnsavedActual(stored: Record<string, unknown>) {
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual: [{
+        id: "actual-to-save",
+        summary: "Design review",
+        startMinutes: 540,
+        durationMinutes: 60,
+        colorId: "9",
+        saveDisposition: "unsaved",
+      }],
+      updatedAt: "2026-07-15T17:00:00.000Z",
+    };
+  }
+
+  it("permanently classifies an exact Plan match without inserting", async () => {
+    const handler = vi.fn(async (message: RuntimeMessage) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [timedEvent] } };
+      }
+      return unexpectedMessage(message);
+    });
+    const stored = mockRuntime(handler);
+    seedUnsavedActual(stored);
+
+    render(<App now={now} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Save Actual to calendar" }));
+
+    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
+      "1 matched Plan",
+    );
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{ saveDisposition: "planMatched" }],
+    });
+    expect(handler).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "calendar.insertActual" }),
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Save Actual to calendar" }));
+    expect(handler.mock.calls.filter(([message]) => message.type === "calendar.insertActual")).toHaveLength(0);
+  });
+
+  it("saves a nonmatching Actual and persists its Calendar disposition", async () => {
+    const handler = vi.fn(async (message: RuntimeMessage) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [] } };
+      }
+      if (message.type === "calendar.insertActual") {
+        return { ok: true, value: { eventId: "calendar-actual-id" } };
+      }
+      return unexpectedMessage(message);
+    });
+    const stored = mockRuntime(handler);
+    seedUnsavedActual(stored);
+
+    render(<App now={now} />);
+    fireEvent.click(await screen.findByRole("button", { name: "Save Actual to calendar" }));
+
+    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
+      "Saved 1",
+    );
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{
+        saveDisposition: "calendarSaved",
+        calendarEventId: "calendar-actual-id",
+        lastSaveError: undefined,
+      }],
+    });
+    expect(handler).toHaveBeenCalledWith({
+      type: "calendar.insertActual",
+      input: expect.objectContaining({
+        date: "2026-07-15",
+        timezone: "America/Los_Angeles",
+        block: expect.objectContaining({ id: "actual-to-save" }),
+      }),
+    });
+  });
+
+  it("keeps a failed Actual unsaved with a durable normalized error", async () => {
+    const handler = vi.fn(async (message: RuntimeMessage) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [] } };
+      }
+      if (message.type === "calendar.insertActual") {
+        return { ok: false, error: {
+          code: "CALENDAR_ACTUAL_INSERT_FAILED",
+          message: "Response lost.",
+        } };
+      }
+      return unexpectedMessage(message);
+    });
+    const stored = mockRuntime(handler);
+    seedUnsavedActual(stored);
+
+    render(<App now={now} />);
+    const save = await screen.findByRole("button", { name: "Save Actual to calendar" });
+    fireEvent.click(save);
+
+    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
+      "Failed 1",
+    );
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{
+        saveDisposition: "unsaved",
+        lastSaveAttemptAt: expect.any(String),
+        lastSaveError: {
+          code: "CALENDAR_ACTUAL_INSERT_FAILED",
+          message: "Response lost.",
+        },
+      }],
+    });
+  });
+
+  it("persists a runtime transport failure as a failed Calendar attempt", async () => {
+    const handler = vi.fn(async (message: RuntimeMessage) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [] } };
+      }
+      if (message.type === "calendar.insertActual") {
+        throw new Error("The message port closed.");
+      }
+      return unexpectedMessage(message);
+    });
+    const stored = mockRuntime(handler);
+    seedUnsavedActual(stored);
+
+    render(<App now={now} />);
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Save Actual to calendar" }),
+    );
+
+    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
+      "Failed 1",
+    );
+    expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument();
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{
+        saveDisposition: "unsaved",
+        lastSaveAttemptAt: expect.any(String),
+        lastSaveError: {
+          code: "CALENDAR_BOUNDARY_UNAVAILABLE",
+          message: "Unable to reach the background Calendar boundary.",
+        },
+      }],
+    });
   });
 });

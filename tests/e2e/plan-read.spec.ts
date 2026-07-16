@@ -93,9 +93,14 @@ test("a disconnected user can connect and populate Plan", async () => {
     await expect(
       page.getByText("Connect Google Calendar to show today's plan"),
     ).toBeVisible();
-    await expect(page.getByRole("region", { name: "Plan day grid" })).toHaveCount(
-      0,
-    );
+    await expect(
+      page.getByRole("region", { name: "Plan day grid" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("heading", { name: "Actual", exact: true }),
+    ).toBeVisible();
+    await expect(page.getByRole("button", { name: "Add Actual" })).toBeEnabled();
+    await expect(page.getByTestId("plan-unavailable")).toBeVisible();
     await expect(page.getByTestId("plan-empty")).toHaveCount(0);
     await expect(page.getByTestId("calendar-error")).toHaveCount(0);
     await page.getByRole("button", { name: "Connect Calendar" }).click();

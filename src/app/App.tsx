@@ -3,8 +3,14 @@ import { useEffect, useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { PlanDayGrid } from "./components/PlanDayGrid";
-import type { CalendarEvent } from "../calendar/calendar-event";
+import type { CalendarEvent, TimedCalendarEvent } from "../calendar/calendar-event";
+import type { DayRecord } from "../domain/day-record";
+import { defaultSettings } from "../domain/settings";
+import { isExactPlanMatch } from "../domain/actual-save";
+import type { CalendarActualInput } from "../calendar/google-calendar-actual";
 import type { Result } from "../shared/result";
+import { sendRuntimeMessage } from "../shared/runtime-messages";
+import { loadDayRecord, saveDayRecord } from "../storage/day-record-storage";
 
 type CalendarState =
   | { status: "loading" }
@@ -19,18 +25,50 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const [calendarState, setCalendarState] = useState<CalendarState>({
     status: "loading",
   });
+  const [dayRecord, setDayRecord] = useState<DayRecord | null>(null);
+  const [actualHydrated, setActualHydrated] = useState(false);
+  const [actualStorageError, setActualStorageError] = useState<string>();
+  const [savingActuals, setSavingActuals] = useState(false);
+  const [actualSaveSummary, setActualSaveSummary] = useState<string>();
+
+  const currentDate = now();
+  const localDate = formatLocalDate(currentDate);
 
   useEffect(() => {
     void loadCalendarEvents(setCalendarState);
   }, []);
 
+  useEffect(() => {
+    let active = true;
+    void loadDayRecord(localDate)
+      .then((record) => {
+        if (!active) return;
+        setDayRecord(record);
+        setActualStorageError(undefined);
+      })
+      .catch((error: unknown) => {
+        if (!active) return;
+        setActualStorageError(
+          error instanceof Error
+            ? error.message
+            : "Unable to load Actuals from local storage.",
+        );
+      })
+      .finally(() => {
+        if (active) setActualHydrated(true);
+      });
+    return () => {
+      active = false;
+    };
+  }, [localDate]);
+
   async function connectCalendar() {
     setCalendarState({ status: "connecting" });
 
     try {
-      const authResponse = (await chrome.runtime.sendMessage({
+      const authResponse = await sendRuntimeMessage({
         type: "auth.requestInteractiveToken",
-      })) as Result<{ status: "connected" }>;
+      });
 
       if (!authResponse.ok) {
         setCalendarState({
@@ -49,6 +87,130 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     }
   }
 
+  async function addActual() {
+    const createdAt = now();
+    const minutes = createdAt.getHours() * 60 + createdAt.getMinutes();
+    const startMinutes =
+      Math.floor(minutes / defaultSettings.snapMinutes) *
+      defaultSettings.snapMinutes;
+    const nextRecord: DayRecord = {
+      schemaVersion: 1,
+      date: localDate,
+      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      actual: [
+        {
+          id: crypto.randomUUID(),
+          summary: "Actual",
+          startMinutes,
+          durationMinutes: 30,
+          colorId: defaultSettings.defaultActualColorId,
+          saveDisposition: "unsaved",
+        },
+      ],
+      updatedAt: createdAt.toISOString(),
+    };
+
+    try {
+      await saveDayRecord(nextRecord);
+      setDayRecord(nextRecord);
+      setActualStorageError(undefined);
+    } catch (error) {
+      setActualStorageError(
+        error instanceof Error ? error.message : "Unable to save Actual locally.",
+      );
+    }
+  }
+
+  async function saveActuals() {
+    if (!dayRecord || savingActuals) return;
+    const unsaved = dayRecord.actual.filter(
+      (actual) => (actual.saveDisposition ?? "unsaved") === "unsaved",
+    );
+    if (unsaved.length === 0) {
+      setActualSaveSummary("Nothing new to save");
+      return;
+    }
+
+    setSavingActuals(true);
+    setActualSaveSummary(undefined);
+    let workingRecord = dayRecord;
+    let savedCount = 0;
+    let matchedCount = 0;
+    let failedCount = 0;
+
+    try {
+      const planResponse = await requestFreshCalendarEvents();
+      if (!planResponse.ok) {
+        setActualSaveSummary(`Failed ${unsaved.length}: ${planResponse.error.message}`);
+        return;
+      }
+
+      const timedPlanEvents = planResponse.value.events.filter(
+        (event): event is TimedCalendarEvent =>
+          event.kind === "timed" && event.appKind !== "actual",
+      );
+
+      for (const actual of unsaved) {
+        const attemptedAt = now().toISOString();
+        if (
+          timedPlanEvents.some((event) =>
+            isExactPlanMatch(actual, workingRecord, event),
+          )
+        ) {
+          workingRecord = updateActual(workingRecord, actual.id, {
+            saveDisposition: "planMatched",
+            lastSaveAttemptAt: attemptedAt,
+            lastSaveError: undefined,
+          }, attemptedAt);
+          await saveDayRecord(workingRecord);
+          setDayRecord(workingRecord);
+          matchedCount += 1;
+          continue;
+        }
+
+        const input: CalendarActualInput = {
+          block: actual,
+          date: workingRecord.date,
+          timezone: workingRecord.timezone,
+          summaryPrefix: defaultSettings.actualEventPrefix,
+          defaultColorId: defaultSettings.defaultActualColorId,
+        };
+        const response = await insertCalendarActual(input);
+
+        if (response.ok) {
+          workingRecord = updateActual(workingRecord, actual.id, {
+            saveDisposition: "calendarSaved",
+            calendarEventId: response.value.eventId,
+            lastSaveAttemptAt: attemptedAt,
+            lastSaveError: undefined,
+          }, attemptedAt);
+          savedCount += 1;
+        } else {
+          workingRecord = updateActual(workingRecord, actual.id, {
+            saveDisposition: "unsaved",
+            lastSaveAttemptAt: attemptedAt,
+            lastSaveError: response.error,
+          }, attemptedAt);
+          failedCount += 1;
+        }
+        await saveDayRecord(workingRecord);
+        setDayRecord(workingRecord);
+      }
+
+      const parts = [];
+      if (savedCount) parts.push(`Saved ${savedCount}`);
+      if (matchedCount) parts.push(`${matchedCount} matched Plan`);
+      if (failedCount) parts.push(`Failed ${failedCount}`);
+      setActualSaveSummary(parts.join(", ") || "Nothing new to save");
+    } catch (error) {
+      setActualStorageError(
+        error instanceof Error ? error.message : "Unable to save Actual locally.",
+      );
+    } finally {
+      setSavingActuals(false);
+    }
+  }
+
   const events =
     calendarState.status === "connected" ? calendarState.events : [];
   const errorMessage =
@@ -57,8 +219,6 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       : calendarState.status === "disconnected"
         ? calendarState.errorMessage
         : undefined;
-  const currentDate = now();
-
   return (
     <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
@@ -107,17 +267,98 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
               Connect Calendar
             </Button>
           </section>
-        ) : (
-          <PlanDayGrid
-            events={events}
-            now={now}
-            status={calendarState.status}
-            today={currentDate}
-          />
-        )}
+        ) : null}
+
+        {actualStorageError ? (
+          <p
+            className="rounded-md border border-destructive bg-white px-4 py-3 text-sm font-medium text-destructive"
+            data-testid="actual-storage-error"
+          >
+            {actualStorageError}
+          </p>
+        ) : null}
+
+        <PlanDayGrid
+          actuals={dayRecord?.actual ?? []}
+          canAddActual={actualHydrated && !actualStorageError && !dayRecord?.actual.length}
+          events={events}
+          now={now}
+          onAddActual={() => void addActual()}
+          status={calendarState.status === "disconnected" ? "error" : calendarState.status}
+          today={currentDate}
+        />
+
+        {dayRecord?.actual.length ? (
+          <footer className="flex items-center gap-4">
+            <Button
+              disabled={savingActuals || calendarState.status !== "connected"}
+              onClick={() => void saveActuals()}
+              type="button"
+            >
+              {savingActuals ? "Saving Actual" : "Save Actual to calendar"}
+            </Button>
+            {actualSaveSummary ? (
+              <p className="text-sm text-muted-foreground" data-testid="actual-save-summary">
+                {actualSaveSummary}
+              </p>
+            ) : null}
+          </footer>
+        ) : null}
       </section>
     </main>
   );
+}
+
+async function requestFreshCalendarEvents(): Promise<
+  Result<{ events: CalendarEvent[] }>
+> {
+  try {
+    return await sendRuntimeMessage({ type: "calendar.listEvents" });
+  } catch {
+    return calendarBoundaryUnavailable();
+  }
+}
+
+async function insertCalendarActual(
+  input: CalendarActualInput,
+): Promise<Result<{ eventId: string }>> {
+  try {
+    return await sendRuntimeMessage({ type: "calendar.insertActual", input });
+  } catch {
+    return calendarBoundaryUnavailable();
+  }
+}
+
+function calendarBoundaryUnavailable(): Result<never> {
+  return {
+    ok: false,
+    error: {
+      code: "CALENDAR_BOUNDARY_UNAVAILABLE",
+      message: "Unable to reach the background Calendar boundary.",
+    },
+  };
+}
+
+function updateActual(
+  record: DayRecord,
+  actualId: string,
+  changes: Partial<DayRecord["actual"][number]>,
+  updatedAt: string,
+): DayRecord {
+  return {
+    ...record,
+    actual: record.actual.map((actual) =>
+      actual.id === actualId ? { ...actual, ...changes } : actual,
+    ),
+    updatedAt,
+  };
+}
+
+function formatLocalDate(date: Date) {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
 }
 
 async function loadCalendarEvents(
@@ -126,9 +367,9 @@ async function loadCalendarEvents(
   setCalendarState({ status: "loading" });
 
   try {
-    const response = (await chrome.runtime.sendMessage({
+    const response = await sendRuntimeMessage({
       type: "calendar.listEvents",
-    })) as Result<{ events: CalendarEvent[] }>;
+    });
 
     if (response.ok) {
       setCalendarState({ status: "connected", events: response.value.events });

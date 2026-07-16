@@ -10,7 +10,7 @@ const range = {
 const now = () => new Date(fixedNow);
 
 type MessageListener = (
-  message: { type?: string },
+  message: { type?: string; input?: unknown },
   sender: unknown,
   sendResponse: (response: unknown) => void,
 ) => boolean;
@@ -53,6 +53,10 @@ function installServiceWorker(
       ok: true as const,
       value: { events: [] },
     })),
+    insertPrimaryCalendarActual: vi.fn(async () => ({
+      ok: true as const,
+      value: { eventId: "calendar-actual-id" },
+    })),
     ...overrides,
   };
 
@@ -73,6 +77,19 @@ async function sendMessage(listener: MessageListener, type: string) {
     await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
   }
 
+  return { keepsChannelOpen, response: sendResponse.mock.calls[0]?.[0] };
+}
+
+async function sendMessageWithInput(
+  listener: MessageListener,
+  type: string,
+  input: unknown,
+) {
+  const sendResponse = vi.fn();
+  const keepsChannelOpen = listener({ type, input }, undefined, sendResponse);
+  if (keepsChannelOpen) {
+    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
+  }
   return { keepsChannelOpen, response: sendResponse.mock.calls[0]?.[0] };
 }
 
@@ -301,6 +318,38 @@ describe("registerServiceWorker", () => {
       },
     });
     expect(dependencies.listPrimaryCalendarEvents).not.toHaveBeenCalled();
+  });
+
+  it("inserts an Actual through cached auth", async () => {
+    const input = { block: { id: "actual-1" } };
+    const { dependencies, messageListener } = installServiceWorker();
+
+    await expect(
+      sendMessageWithInput(messageListener, "calendar.insertActual", input),
+    ).resolves.toMatchObject({
+      keepsChannelOpen: true,
+      response: { ok: true, value: { eventId: "calendar-actual-id" } },
+    });
+    expect(dependencies.insertPrimaryCalendarActual).toHaveBeenCalledWith(
+      "token-123",
+      input,
+    );
+  });
+
+  it("does not insert an Actual without cached auth", async () => {
+    const { dependencies, messageListener } = installServiceWorker({
+      requestCachedToken: vi.fn(async () => ({
+        ok: false as const,
+        error: { code: "AUTH_TOKEN_UNAVAILABLE", message: "missing" },
+      })),
+    });
+
+    await expect(
+      sendMessageWithInput(messageListener, "calendar.insertActual", {}),
+    ).resolves.toMatchObject({
+      response: { ok: false, error: { code: "AUTH_NOT_CONNECTED" } },
+    });
+    expect(dependencies.insertPrimaryCalendarActual).not.toHaveBeenCalled();
   });
 
   it("ignores messages outside its contract", async () => {

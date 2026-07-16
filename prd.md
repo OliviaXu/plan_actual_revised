@@ -198,10 +198,10 @@ These defaults are represented as user configuration, but MVP does not include a
 
 Use Chrome extension storage rather than `localStorage`.
 
-- `chrome.storage.local`: daily working records, unsaved Actual blocks, save queue metadata, last catch-up result.
-- `chrome.storage.sync`: small user settings that should follow the user across Chrome profiles when sync is enabled.
+- `chrome.storage.local`: versioned daily working records, Actual save dispositions, save errors, and the last catch-up result.
 
 Do not use Web Storage for canonical product data.
+MVP settings are always derived from code and are not persisted in extension storage.
 
 ### 6.2 Daily Working Record
 
@@ -209,20 +209,15 @@ Each day has one `DayRecord` keyed by local date:
 
 ```ts
 type DayRecord = {
-  schemaVersion: number;
+  schemaVersion: 1;
   date: string;
   timezone: string;
-  planSnapshot: PlanBlock[];
   actual: ActualBlock[];
-  revised: RevisedBlock[];
-  focus: IntentionEvent[];
-  weeklyLearning: IntentionEvent[];
-  cascadePriorities: Record<string, number>;
   updatedAt: string;
 };
 ```
 
-`planSnapshot` is cached for comparison and recovery, but Google Calendar remains the source of truth for the Plan column.
+Later phases extend the versioned record only when their persisted concepts are implemented. Google Calendar remains the source of truth for the Plan column.
 
 ### 6.3 Editable Block Model
 
@@ -235,21 +230,21 @@ Each Actual/Revised block has:
 - `durationMinutes`: positive whole number.
 - `colorId`: empty string or Google Calendar color ID.
 - `isSlack`: true if created through the Slack audit flow.
-- `saveStatus`: `unsaved`, `saving`, `saved`, or `failed`.
+- `saveDisposition`: `unsaved`, `calendarSaved`, or `planMatched`.
 - `calendarEventId`: created Google Calendar event ID, once known.
 - `lastSaveAttemptAt`: optional timestamp.
 - `lastSaveError`: optional normalized error.
 
-`saveStatus` replaces the prototype's `savedToCalendar` boolean. The boolean was sufficient for a prototype but too weak for ambiguous network failures and production retry behavior.
+`saving` is transient UI state and is never persisted. A failed or ambiguous attempt remains `unsaved` with `lastSaveAttemptAt` and `lastSaveError`. A `planMatched` decision is terminal and is not reconsidered on later saves.
 
 ### 6.4 Settings Model
 
-Settings are separate from daily records.
+Settings are code-defined defaults and are separate from daily records.
 
 MVP requirement:
 
-- Define and consume the settings schema.
-- Load defaults from the storage layer.
+- Define and consume the settings schema directly from code.
+- Do not persist, validate, migrate, or repair settings in Chrome storage.
 - Do not show a settings page, modal, drawer, form, or header button for editing settings.
 - Do not treat settings updates as a supported in-product user workflow yet.
 
@@ -494,19 +489,17 @@ The first production version does not require alarm-based background saving. The
 Eligible blocks:
 
 - Actual blocks only.
-- `saveStatus` is `unsaved` or `failed`.
+- `saveDisposition` is `unsaved` or absent on a pre-save Phase 4A block.
 - Not an exact copy of a Plan event.
 
 Exact Plan copy definition:
 
-- Same source calendar event, summary, start time, and duration.
-- Or same summary, start time, and duration against the cached Plan snapshot if `sourceCalendarEventId` is unavailable.
+- Same normalized summary, local date/start time, duration/end time, effective color, and effective timezone against one fresh day-level Calendar read.
 
 Skipped blocks:
 
-- Already `saved`.
-- Currently `saving`.
-- Exact Plan copies.
+- Already `calendarSaved`.
+- Permanently classified `planMatched` blocks.
 - Revised blocks.
 
 ### 12.3 What Gets Written
@@ -521,20 +514,18 @@ Each saved block becomes a new event on the user's primary calendar:
 - Extended private properties:
   - `planActualRevised: "true"`
   - `sourceBlockId: <block.id>`
-  - `sourceDate: <DayRecord.date>`
-  - `kind: "actual" | "slack"`
+  - `kind: "actual"`
 
 ### 12.4 Idempotency
 
-Before inserting an Actual event, the Calendar adapter checks whether an event already exists with private extended property `sourceBlockId=<block.id>`.
+The Calendar adapter derives a valid deterministic Google Calendar event ID from the stable local block ID and inserts directly without a pre-insert lookup.
 
 Rules:
 
-- If a matching existing event is found, mark the block `saved` and store its `calendarEventId`.
-- If no matching event is found, insert a new event.
-- If insert succeeds, mark the block `saved` and store returned event ID.
-- If insert fails or the result is ambiguous, keep the block local with `saveStatus: failed`.
-- Never delete the day record after an ambiguous calendar outcome.
+- If insert succeeds, mark the block `calendarSaved` and store the returned event ID.
+- If insert returns duplicate/409, fetch that deterministic event ID and verify the ownership marker and `sourceBlockId` before marking it `calendarSaved`.
+- If verification detects a collision, or insert fails or is ambiguous, keep the block local as `unsaved` with normalized failure details.
+- Phase 4 retains `calendarSaved` and `planMatched` blocks locally so the active Actual column has one source.
 
 This prevents duplicate events when a network response is lost after Google Calendar successfully created the event.
 
@@ -558,7 +549,6 @@ Every save path must show visible success, failure, or no-op feedback.
 
 Catch-up runs on extension page load after:
 
-- Settings have loaded.
 - Today's day record has loaded.
 - Initial Calendar fetch has returned or failed.
 
@@ -566,13 +556,13 @@ The UI remains interactive while catch-up runs.
 
 ### 13.2 What It Does
 
-For every past-day `DayRecord` in `chrome.storage.local`:
+The active window is today plus the two most recent nonempty prior `DayRecord`s, regardless of calendar gaps. For retained past-day records:
 
-- Filter Actual blocks to eligible save candidates.
-- Save each eligible block with idempotency checks.
+- Retry only `unsaved` Actual blocks.
+- Never retry `calendarSaved` or `planMatched` blocks.
 - Persist per-block save results immediately after each attempt.
-- If all Actual blocks are saved or skipped and no unsaved work remains, remove the day record.
-- If any block fails or has ambiguous status, keep the day record for future retry.
+- When a record leaves the active window, make one final retry for its unsaved blocks and then delete the entire record regardless of outcome.
+- Surface saved, matched, failed, and discarded counts so bounded data loss is explicit.
 
 Days are independent. A failure for Monday must not interfere with Tuesday's local record.
 
@@ -779,9 +769,8 @@ Required coverage:
 - Save eligibility filtering.
 - Exact Plan copy detection.
 - Google Calendar event mapping.
-- Idempotency lookup behavior.
+- Deterministic Calendar ID and duplicate-verification behavior.
 - Catch-up success, partial failure, and all-failure semantics.
-- Settings defaulting and validation.
 - Storage migration behavior.
 
 ### 18.2 Component Tests
@@ -805,10 +794,10 @@ Required E2E flows:
 - Add Actual block, edit it, resize it, delete it.
 - Save Actual writes Calendar event with expected payload.
 - Failed save keeps local pending block and shows visible error.
-- Catch-up saves a past day and removes local record only after proven success.
-- Ambiguous insert does not delete local data.
+- Catch-up retries retained past days on app open.
+- A record leaving the bounded active window receives one final attempt and is then deleted with visible discarded counts.
 - Slack logging creates a block and attempts protocol launch through user gesture.
-- Stored settings defaults affect hidden colors, palette, and day range.
+- Code-defined settings defaults affect hidden colors, palette, and day range.
 
 Networked Calendar tests should mock the Google API boundary by default. A small manually-run smoke test may exercise a real Google account only when credentials are intentionally configured.
 
@@ -822,7 +811,7 @@ Networked Calendar tests should mock the Google API boundary by default. A small
 - Extension app page.
 - Background service worker.
 - Typed message boundary.
-- Storage wrapper and settings defaults.
+- Versioned daily-record storage wrapper and code-defined settings defaults.
 
 ### Phase 2 - Calendar and Auth
 
@@ -856,7 +845,7 @@ Networked Calendar tests should mock the Google API boundary by default. A small
 - Manual save.
 - Catch-up.
 - Error normalization.
-- Storage cleanup after proven success only.
+- Bounded catch-up retries and explicit cleanup after the active window.
 
 ### Phase 6 - Configuration Foundation and Polish
 

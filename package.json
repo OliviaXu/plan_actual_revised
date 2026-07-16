@@ -14,6 +14,7 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
+    "test:real:actual": "npm run build && playwright test --config=playwright.real.config.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

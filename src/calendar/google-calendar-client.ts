@@ -111,6 +111,16 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
   const colorId = typeof value.colorId === "string" ? value.colorId : null;
   const start = isRecord(value.start) ? value.start : null;
   const end = isRecord(value.end) ? value.end : null;
+  const privateProperties =
+    isRecord(value.extendedProperties) &&
+    isRecord(value.extendedProperties.private)
+      ? value.extendedProperties.private
+      : null;
+  const appKind =
+    privateProperties?.planActualRevised === "true" &&
+    privateProperties.kind === "actual"
+      ? ("actual" as const)
+      : undefined;
 
   if (
     start &&
@@ -127,6 +137,7 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
         start: start.dateTime,
         end: end.dateTime,
         timeZone: typeof start.timeZone === "string" ? start.timeZone : null,
+        ...(appKind ? { appKind } : {}),
       },
     ];
   }
@@ -145,6 +156,7 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
         colorId,
         startDate: start.date,
         endDate: end.date,
+        ...(appKind ? { appKind } : {}),
       },
     ];
   }

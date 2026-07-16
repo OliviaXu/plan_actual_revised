@@ -8,6 +8,7 @@ export type TimedCalendarEvent = {
   start: string;
   end: string;
   timeZone: string | null;
+  appKind?: "actual";
 };
 
 export type AllDayCalendarEvent = {
@@ -17,6 +18,7 @@ export type AllDayCalendarEvent = {
   colorId: string | null;
   startDate: string;
   endDate: string;
+  appKind?: "actual";
 };
 
 export type CalendarEventRange = {
