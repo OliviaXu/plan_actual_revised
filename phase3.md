@@ -16,7 +16,7 @@ The visible Phase 3 surface contains only Time and Plan. Actual, Revised, intent
 
 ## Slice 3A - Calendar-to-Plan Read Tracer
 
-Status: implemented and verified; pending independent commit approval.
+Status: implemented, verified, and committed.
 
 ### Behavior
 
@@ -46,7 +46,7 @@ Status: implemented and verified; pending independent commit approval.
 - A successful empty Calendar response shows `No timed events today`.
 - Calendar failure remains visible while the Plan surface stays usable.
 
-## Slice 3A.1 - Calendar Freshness Tracer
+## Slice 3A.1 - Calendar Freshness and Load Stats
 
 Goal: guarantee that Plan represents the current local day without introducing cache invalidation or manual-refresh complexity before measurements justify it.
 
@@ -62,12 +62,12 @@ Goal: guarantee that Plan represents the current local day without introducing c
 - Coalesce only simultaneous in-flight requests for the same calendar, local date, and timezone. A later page open still starts a fresh request.
 - Follow `nextPageToken` until the complete bounded-day result is loaded; do not assume the default first page contains every event.
 
-### Tracer
+### Verification
 
-`tests/e2e/plan-freshness.spec.ts` will verify:
+Coverage belongs in the existing unit and boundary suites; no dedicated Playwright freshness tracer is required. These tests verify:
 
-- Opening a new extension page performs a fresh Calendar request.
-- React state changes do not trigger duplicate requests.
+- Mounting a new extension app page performs a fresh Calendar request.
+- Focus, visibility, and local-midnight changes do not refetch while the current page remains mounted.
 - Simultaneous requests for the same day share one in-flight fetch.
 - Refreshing or reopening after local midnight requests the new day's boundaries.
 - Paginated Calendar responses are combined before Plan renders.
@@ -87,14 +87,19 @@ Emit one structured background summary per Plan load. Include the page count, ra
 
 Keep load stats inside the service-worker boundary and separate from canonical Calendar events and future persisted `planSnapshot` data. React render cost is paid on every app open regardless of Calendar freshness policy, so it is not part of the cache decision measurement.
 
-Tests will verify that:
+Unit coverage is split across two boundaries:
+
+- `listPrimaryCalendarEvents()` returns pagination, raw-event-count, HTTP/JSON-duration, and normalization-duration stats.
+- `registerServiceWorker()` adds cached-auth duration, rendered timed-event count, and background-total duration to the structured `calendar-plan-load` summary.
+
+Tests verify that:
 
 - Successful and empty responses produce one complete timing summary.
 - Paginated responses report the combined page and event counts.
 - Timing values are finite and non-negative; tests do not assert real elapsed-time thresholds.
 - Logs contain no event content or credentials.
 
-Use the opt-in real Calendar smoke to collect representative successful background-load samples before choosing a TTL, stale-while-revalidate cache, refresh action, or latency target. Document the measured environment and sample distribution rather than deciding from a single run.
+Collect representative successful background-load samples before choosing a TTL, stale-while-revalidate cache, refresh action, or latency target. Document the measured environment and sample distribution rather than deciding from a single run. The tooling for real Calendar sampling belongs to the separate follow-up below.
 
 ### Deferred Cache Decision
 
@@ -154,18 +159,18 @@ It will verify that only eligible timed events render, colors and title fallback
 
 ### Behavior
 
-- Group intersecting events into overlap clusters.
-- Assign deterministic cascade depths.
+- Group intersecting events into overlap groups.
+- Assign deterministic overlap layers.
 - Preserve every event's true vertical start.
-- Offset each depth 8px horizontally using a named layout constant.
-- Increase z-index with depth.
+- Offset each layer 12px horizontally using a named layout constant.
+- Increase z-index with the layer index.
 - Bring a peeking event to the front when clicked.
 - Keep click-to-front priority transient; persistence belongs to Phase 4.
 - Treat events where one ends exactly as another begins as non-overlapping.
 
 ### Tracer
 
-`tests/e2e/plan-overlap.spec.ts` will cover separate, partially overlapping, nested, and boundary-touching events. It will verify cluster membership, depth, horizontal offset, z-index, true vertical position, and click-to-front behavior.
+`tests/e2e/plan-overlap.spec.ts` covers separate, partially overlapping, nested, and boundary-touching events. It verifies group membership, layer index, horizontal offset, z-index, true vertical position, and click-to-front behavior.
 
 ## Slice 3E - Live-Time and Viewport Tracer
 
@@ -179,13 +184,10 @@ It will verify that only eligible timed events render, colors and title fallback
 - Hide the line when the current time is outside the displayed range.
 - Auto-scroll once after the first successful render so current time is approximately 30% below the viewport top.
 - Do not override later user scrolling.
-- Add an opt-in, headful, read-only real Calendar smoke through production OAuth and `events.list`.
 
 ### Tracers
 
-`tests/e2e/plan-current-time.spec.ts` will use a fixed clock to verify now-line position and updates, absence outside the range, initial auto-scroll, preserved user scrolling, sticky headers, and divider alignment.
-
-The real smoke will pass when eligible real events render or when a valid authenticated-empty state appears. It will perform no Calendar writes.
+`tests/e2e/plan-current-time.spec.ts` uses a fixed clock to verify now-line position and updates, absence outside the range, initial auto-scroll, preserved user scrolling, sticky headers, and divider alignment.
 
 ## Per-Slice TDD and Verification
 
@@ -199,7 +201,13 @@ For every slice:
 6. Run all earlier Phase 3 tracers.
 7. Run `git diff --check`.
 
-After Slice 3E, run the complete unit suite, lint, build, and deterministic E2E suite. Run the real smoke only when intentionally enabled. Review findings before fixes, apply only selected fixes, and commit only after explicit approval.
+After Slice 3E, run the complete unit suite, lint, build, and deterministic E2E suite. Review findings before fixes, apply only selected fixes, and commit only after explicit approval.
+
+## Deferred Follow-Up - Real Calendar Read Smoke
+
+Add an explicitly opt-in, headful, read-only smoke through production OAuth and `events.list`. Keep its profile and authentication affordances separate from the deterministic Phase 3 suite so normal test runs contain no skipped real-integration test.
+
+The smoke passes when eligible real events render or when a valid authenticated-empty state appears. It performs no Calendar writes. Use it to collect representative successful background-load samples when evaluating the deferred cache decision.
 
 ## Deferred Follow-Up - Debug Calendar Disconnect
 

@@ -138,6 +138,34 @@ describe("registerServiceWorker", () => {
     expect(clock).toHaveBeenCalledOnce();
   });
 
+  it("derives a new local-day range for a later request after midnight", async () => {
+    const clock = vi
+      .fn()
+      .mockReturnValueOnce(new Date(2026, 6, 15, 23, 59))
+      .mockReturnValueOnce(new Date(2026, 6, 16, 0, 1));
+    const { dependencies, messageListener } = installServiceWorker({}, clock);
+
+    await sendMessage(messageListener, "calendar.listEvents");
+    await sendMessage(messageListener, "calendar.listEvents");
+
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenNthCalledWith(
+      1,
+      "token-123",
+      {
+        timeMin: new Date(2026, 6, 15).toISOString(),
+        timeMax: new Date(2026, 6, 16).toISOString(),
+      },
+    );
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenNthCalledWith(
+      2,
+      "token-123",
+      {
+        timeMin: new Date(2026, 6, 16).toISOString(),
+        timeMax: new Date(2026, 6, 17).toISOString(),
+      },
+    );
+  });
+
   it("logs Calendar load stats without a constant request reason", async () => {
     const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const { messageListener } = installServiceWorker();
@@ -147,6 +175,74 @@ describe("registerServiceWorker", () => {
     expect(log.mock.calls[0]?.[1]).not.toHaveProperty("reason");
     log.mockRestore();
   });
+
+  it.each([
+    { events: [], renderedTimedEventCount: 0 },
+    {
+      events: [
+        {
+          kind: "timed" as const,
+          id: "private-event-id",
+          summary: "Private meeting",
+          colorId: null,
+          start: "2026-07-15T09:00:00-07:00",
+          end: "2026-07-15T10:00:00-07:00",
+          timeZone: "America/Los_Angeles",
+        },
+      ],
+      renderedTimedEventCount: 1,
+    },
+  ])(
+    "logs one complete privacy-safe summary for %# event set",
+    async ({ events, renderedTimedEventCount }) => {
+      const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
+      const { messageListener } = installServiceWorker({
+        listPrimaryCalendarEvents: vi.fn(async () => ({
+          ok: true as const,
+          value: {
+            events,
+            stats: {
+              pageCount: 2,
+              rawEventCount: 3,
+              calendarHttpAndJsonDurationMs: 4,
+              normalizationDurationMs: 5,
+            },
+          },
+        })),
+      });
+
+      await sendMessage(messageListener, "calendar.listEvents");
+
+      expect(log).toHaveBeenCalledOnce();
+      expect(log).toHaveBeenCalledWith("calendar-plan-load", {
+        ok: true,
+        renderedTimedEventCount,
+        pageCount: 2,
+        rawEventCount: 3,
+        calendarHttpAndJsonDurationMs: 4,
+        normalizationDurationMs: 5,
+        cachedAuthDurationMs: expect.any(Number),
+        backgroundTotalDurationMs: expect.any(Number),
+      });
+      const summary = log.mock.calls[0]?.[1] as Record<string, unknown>;
+      for (const durationName of [
+        "calendarHttpAndJsonDurationMs",
+        "normalizationDurationMs",
+        "cachedAuthDurationMs",
+        "backgroundTotalDurationMs",
+      ]) {
+        const duration = summary[durationName];
+        expect(typeof duration).toBe("number");
+        expect(Number.isFinite(duration)).toBe(true);
+        expect(duration).toBeGreaterThanOrEqual(0);
+      }
+      const serializedLog = JSON.stringify(log.mock.calls);
+      expect(serializedLog).not.toContain("token-123");
+      expect(serializedLog).not.toContain("private-event-id");
+      expect(serializedLog).not.toContain("Private meeting");
+      log.mockRestore();
+    },
+  );
 
   it("coalesces simultaneous reads for the same local day", async () => {
     let resolveCalendar: ((value: unknown) => void) | undefined;

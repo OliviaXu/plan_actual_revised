@@ -74,6 +74,24 @@ describe("App Plan loading", () => {
     expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
   });
 
+  it("starts a fresh Calendar request when a new app page mounts", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [timedEvent] } };
+      }
+      return unexpectedMessage(message);
+    });
+
+    const firstPage = render(<App now={now} />);
+    await screen.findByText("Design review");
+    firstPage.unmount();
+
+    render(<App now={now} />);
+    await screen.findByText("Design review");
+
+    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(2);
+  });
+
   it("shows Connect without an error when cached auth is unavailable", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {

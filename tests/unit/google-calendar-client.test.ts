@@ -24,9 +24,12 @@ describe("listPrimaryCalendarEvents", () => {
         new Response(JSON.stringify({ items: [{ id: "all-day-event", start: { date: "2026-07-15" }, end: { date: "2026-07-16" } }] }), { status: 200 }),
       );
 
-    await expect(
-      listPrimaryCalendarEvents("token-123", range, fetchCalendar),
-    ).resolves.toMatchObject({
+    const result = await listPrimaryCalendarEvents(
+      "token-123",
+      range,
+      fetchCalendar,
+    );
+    expect(result).toMatchObject({
       ok: true,
       value: {
         events: [
@@ -36,6 +39,15 @@ describe("listPrimaryCalendarEvents", () => {
         stats: expect.objectContaining({ pageCount: 2, rawEventCount: 2 }),
       },
     });
+    if (!result.ok) {
+      throw new Error("Expected a successful Calendar result.");
+    }
+    expect(result.value.stats.calendarHttpAndJsonDurationMs).toSatisfy(
+      (duration: number) => Number.isFinite(duration) && duration >= 0,
+    );
+    expect(result.value.stats.normalizationDurationMs).toSatisfy(
+      (duration: number) => Number.isFinite(duration) && duration >= 0,
+    );
     expect(fetchCalendar.mock.calls[1]?.[0]).toContain("pageToken=page-2");
   });
   it("normalizes timed and all-day events from a dated Calendar response", async () => {
