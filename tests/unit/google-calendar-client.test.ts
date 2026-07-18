@@ -14,6 +14,7 @@ describe("listPrimaryCalendarEvents", () => {
       .mockResolvedValueOnce(
         new Response(
           JSON.stringify({
+            timeZone: "America/Los_Angeles",
             items: [{ id: "timed-event", start: { dateTime: "2026-07-15T09:00:00-07:00" }, end: { dateTime: "2026-07-15T10:00:00-07:00" } }],
             nextPageToken: "page-2",
           }),
@@ -21,7 +22,7 @@ describe("listPrimaryCalendarEvents", () => {
         ),
       )
       .mockResolvedValueOnce(
-        new Response(JSON.stringify({ items: [{ id: "all-day-event", start: { date: "2026-07-15" }, end: { date: "2026-07-16" } }] }), { status: 200 }),
+        new Response(JSON.stringify({ timeZone: "America/Los_Angeles", items: [{ id: "all-day-event", start: { date: "2026-07-15" }, end: { date: "2026-07-16" } }] }), { status: 200 }),
       );
 
     const result = await listPrimaryCalendarEvents(
@@ -32,6 +33,7 @@ describe("listPrimaryCalendarEvents", () => {
     expect(result).toMatchObject({
       ok: true,
       value: {
+        timeZone: "America/Los_Angeles",
         events: [
           expect.objectContaining({ id: "timed-event" }),
           expect.objectContaining({ id: "all-day-event" }),
@@ -54,6 +56,7 @@ describe("listPrimaryCalendarEvents", () => {
     const fetchCalendar = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         Response.json({
+          timeZone: "America/Los_Angeles",
           items: [
             {
               id: "timed",
@@ -135,6 +138,7 @@ describe("listPrimaryCalendarEvents", () => {
   it("omits malformed individual events", async () => {
     const fetchCalendar = vi.fn(async () =>
       Response.json({
+        timeZone: "America/Los_Angeles",
         items: [
           { id: "missing-times", summary: "Broken" },
           {

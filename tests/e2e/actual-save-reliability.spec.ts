@@ -22,7 +22,7 @@ registerServiceWorker({
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
   listPrimaryCalendarEvents: async () => ({
     ok: true,
-    value: { events: ${scenario === "planMatch" ? `[{
+    value: { timeZone: "America/Los_Angeles", events: ${scenario === "planMatch" ? `[{
       kind: "timed",
       id: "matching-plan",
       summary: "Actual",
@@ -45,7 +45,7 @@ registerServiceWorker({
     }
     return { ok: true, value: { eventId: event.id } };
   },
-});
+}, () => new Date("2026-07-15T19:00:00.000Z"));
 `,
   );
   return extensionPath;

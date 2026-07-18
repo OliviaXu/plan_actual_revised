@@ -41,9 +41,9 @@ registerServiceWorker({
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
   listPrimaryCalendarEvents: async () => ({
     ok: true,
-    value: { events: ${JSON.stringify(events)} },
+    value: { timeZone: "America/Los_Angeles", events: ${JSON.stringify(events)} },
   }),
-});
+}, () => new Date("2026-07-15T19:00:00.000Z"));
 `,
   );
   return extensionPath;

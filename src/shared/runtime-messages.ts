@@ -8,7 +8,7 @@ type RuntimeMessageMap = {
   };
   "calendar.listEvents": {
     request: { type: "calendar.listEvents" };
-    response: Result<{ events: CalendarEvent[] }>;
+    response: Result<{ events: CalendarEvent[]; date: string; timeZone: string }>;
   };
   "calendar.insertEvent": {
     request: { type: "calendar.insertEvent"; event: CalendarInsertEvent };

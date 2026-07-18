@@ -6,6 +6,10 @@ import type {
 import type { CalendarLoadStats } from "../calendar/google-calendar-client";
 import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { RuntimeMessage } from "../shared/runtime-messages";
+import {
+  getCalendarDayRange,
+  getCalendarTime,
+} from "../calendar/calendar-time";
 
 type ServiceWorkerDependencies = {
   openAppPage: () => Promise<unknown>;
@@ -14,20 +18,31 @@ type ServiceWorkerDependencies = {
   listPrimaryCalendarEvents: (
     token: string,
     range: CalendarEventRange,
-  ) => Promise<Result<{ events: CalendarEvent[]; stats?: CalendarLoadStats }>>;
+  ) => Promise<Result<{
+    events: CalendarEvent[];
+    stats?: CalendarLoadStats;
+    timeZone: string;
+  }>>;
   insertPrimaryCalendarEvent: (
     token: string,
     event: CalendarInsertEvent,
   ) => Promise<Result<{ eventId: string }>>;
 };
 
-type CalendarResult = Result<{ events: CalendarEvent[] }>;
+type CalendarResult = Result<{
+  events: CalendarEvent[];
+  date: string;
+  timeZone: string;
+}>;
 
 export default function registerServiceWorker(
   dependencies: ServiceWorkerDependencies,
   now: () => Date = () => new Date(),
+  readBrowserTimezone: () => string = () =>
+    Intl.DateTimeFormat().resolvedOptions().timeZone,
 ) {
-  const inFlightReads = new Map<string, Promise<CalendarResult>>();
+  let inFlightRead: Promise<CalendarResult> | undefined;
+  let primaryCalendarTimezone: string | undefined;
   chrome.action.onClicked.addListener(() => {
     void dependencies.openAppPage();
   });
@@ -45,15 +60,21 @@ export default function registerServiceWorker(
     }
 
     if (message?.type === "calendar.listEvents") {
-      const range = getLocalDayRange(now());
-      const requestKey = `${range.timeMin}:${range.timeMax}`;
-      let load = inFlightReads.get(requestKey);
-      if (!load) {
-        load = loadCalendarEvents(dependencies, range);
-        inFlightReads.set(requestKey, load);
-        void load.finally(() => inFlightReads.delete(requestKey));
+      if (!inFlightRead) {
+        const requestedAt = now();
+        inFlightRead = loadCalendarEvents(
+          dependencies,
+          requestedAt,
+          primaryCalendarTimezone ?? readBrowserTimezone(),
+        ).then((result) => {
+          if (result.ok) primaryCalendarTimezone = result.value.timeZone;
+          return result;
+        });
+        void inFlightRead.finally(() => {
+          inFlightRead = undefined;
+        });
       }
-      void load.then(sendResponse);
+      void inFlightRead.then(sendResponse);
       return true;
     }
 
@@ -85,7 +106,8 @@ async function insertEvent(
 
 async function loadCalendarEvents(
   dependencies: ServiceWorkerDependencies,
-  range: CalendarEventRange,
+  requestedAt: Date,
+  assumedTimezone: string,
 ): Promise<CalendarResult> {
   const startedAt = performance.now();
   const authResult = await dependencies.requestCachedToken();
@@ -106,7 +128,18 @@ async function loadCalendarEvents(
     return result;
   }
 
-  const result = await dependencies.listPrimaryCalendarEvents(authResult.value, range);
+  const assumedDay = getCalendarDayRange(
+    getCalendarTime(requestedAt, assumedTimezone).date,
+    assumedTimezone,
+  );
+  const assumedRange: CalendarEventRange = {
+    timeMin: assumedDay.timeMin,
+    timeMax: assumedDay.timeMax,
+  };
+  let result = await dependencies.listPrimaryCalendarEvents(
+    authResult.value,
+    assumedRange,
+  );
   if (!result.ok) {
     console.info("calendar-plan-load", {
       ok: false,
@@ -114,6 +147,21 @@ async function loadCalendarEvents(
       backgroundTotalDurationMs: performance.now() - startedAt,
     });
     return result;
+  }
+
+  const calendarDay = getCalendarDayRange(
+    getCalendarTime(requestedAt, result.value.timeZone).date,
+    result.value.timeZone,
+  );
+  if (
+    calendarDay.timeMin !== assumedDay.timeMin ||
+    calendarDay.timeMax !== assumedDay.timeMax
+  ) {
+    result = await dependencies.listPrimaryCalendarEvents(authResult.value, {
+      timeMin: calendarDay.timeMin,
+      timeMax: calendarDay.timeMax,
+    });
+    if (!result.ok) return result;
   }
 
   console.info("calendar-plan-load", {
@@ -125,15 +173,12 @@ async function loadCalendarEvents(
     cachedAuthDurationMs,
     backgroundTotalDurationMs: performance.now() - startedAt,
   });
-  return { ok: true, value: { events: result.value.events } };
-}
-
-function getLocalDayRange(now: Date): CalendarEventRange {
-  const timeMin = new Date(now.getFullYear(), now.getMonth(), now.getDate());
-  const timeMax = new Date(
-    now.getFullYear(),
-    now.getMonth(),
-    now.getDate() + 1,
-  );
-  return { timeMin: timeMin.toISOString(), timeMax: timeMax.toISOString() };
+  return {
+    ok: true,
+    value: {
+      events: result.value.events,
+      date: calendarDay.date,
+      timeZone: result.value.timeZone,
+    },
+  };
 }

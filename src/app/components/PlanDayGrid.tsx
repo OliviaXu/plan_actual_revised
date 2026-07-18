@@ -13,6 +13,7 @@ import {
 } from "./plan-day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
 import type { ActualBlock } from "../../domain/day-record";
+import { getCalendarTime } from "../../calendar/calendar-time";
 
 const PLAN_TIME_AXIS_WIDTH = "4.5rem";
 const PLAN_GRID_TEMPLATE_COLUMNS = `${PLAN_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
@@ -31,7 +32,8 @@ export function PlanDayGrid({
   now = readSystemTime,
   onAddActual,
   status,
-  today,
+  date,
+  timeZone,
 }: {
   actuals?: ActualBlock[];
   canAddActual?: boolean;
@@ -39,7 +41,8 @@ export function PlanDayGrid({
   now?: () => Date;
   onAddActual?: () => void;
   status: PlanLoadStatus;
-  today: Date;
+  date: string;
+  timeZone: string;
 }) {
   const [frontEventId, setFrontEventId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(now);
@@ -54,13 +57,15 @@ export function PlanDayGrid({
   );
   const layout = calculatePlanDayGridLayout(
     eligibleTimedEvents,
-    today,
+    date,
+    timeZone,
     defaultSettings,
   );
   const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
   const nowIndicatorTopPx = calculatePlanNowIndicatorTopPx(
     currentTime,
-    today,
+    date,
+    timeZone,
     layout.startHour,
     layout.endHour,
     defaultSettings.pixelsPerMinute,
@@ -146,7 +151,7 @@ export function PlanDayGrid({
             >
               <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-now" />
               <span className="absolute right-2 top-0 -translate-y-full bg-white px-1 text-xs font-medium text-now">
-                {formatTime(currentTime)}
+                {formatTime(currentTime, timeZone)}
               </span>
             </div>
           ) : null}
@@ -222,6 +227,7 @@ export function PlanDayGrid({
                   isFront={frontEventId === block.event.id}
                   key={block.event.id}
                   onBringToFront={() => setFrontEventId(block.event.id)}
+                  timeZone={timeZone}
                 />
               ))}
             </div>
@@ -282,11 +288,13 @@ function PlanEventBlock({
   frontZIndex,
   isFront,
   onBringToFront,
+  timeZone,
 }: {
   block: PlanDayGridBlock;
   frontZIndex: number;
   isFront: boolean;
   onBringToFront: () => void;
+  timeZone: string;
 }) {
   const eventColor = resolveGoogleCalendarEventColor(block.event.colorId);
 
@@ -333,7 +341,7 @@ function PlanEventBlock({
           className="block truncate text-muted-foreground"
           data-testid="plan-event-time-range"
         >
-          {formatTime(block.clippedStart)} – {formatTime(block.clippedEnd)}
+          {formatTime(block.clippedStart, timeZone)} – {formatTime(block.clippedEnd, timeZone)}
         </span>
       ) : null}
     </button>
@@ -354,9 +362,9 @@ function formatDuration(durationMinutes: number) {
   return `${hours}h ${minutes}m`;
 }
 
-function formatTime(date: Date) {
-  const hour = date.getHours();
-  const minutes = date.getMinutes().toString().padStart(2, "0");
+function formatTime(date: Date, timeZone: string) {
+  const { hour, minute } = getCalendarTime(date, timeZone);
+  const minutes = String(minute).padStart(2, "0");
   const suffix = hour >= 12 ? "PM" : "AM";
   const clockHour = hour % 12 || 12;
   return `${clockHour}:${minutes} ${suffix}`;

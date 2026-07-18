@@ -17,8 +17,8 @@ registerServiceWorker({
   openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
   requestCachedToken: async () => ({ ok: true, value: "test-token" }),
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
-  listPrimaryCalendarEvents: async () => ({ ok: true, value: { events: [] } }),
-});
+  listPrimaryCalendarEvents: async () => ({ ok: true, value: { timeZone: "America/Los_Angeles", events: [] } }),
+}, () => new Date("2026-07-15T19:00:00.000Z"));
 `,
   );
   return extensionPath;

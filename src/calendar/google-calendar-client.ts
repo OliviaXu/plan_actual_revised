@@ -66,7 +66,11 @@ export async function listPrimaryCalendarEvents(
   token: string,
   range: CalendarEventRange,
   fetchCalendar: typeof fetch = fetch,
-): Promise<Result<{ events: CalendarEvent[]; stats: CalendarLoadStats }>> {
+): Promise<Result<{
+  events: CalendarEvent[];
+  stats: CalendarLoadStats;
+  timeZone: string;
+}>> {
   const url = new URL(
     "https://www.googleapis.com/calendar/v3/calendars/primary/events",
   );
@@ -80,6 +84,7 @@ export async function listPrimaryCalendarEvents(
     const items: unknown[] = [];
     let pageCount = 0;
     let pageToken: string | undefined;
+    let timeZone: string | undefined;
 
     do {
       if (pageToken) url.searchParams.set("pageToken", pageToken);
@@ -114,12 +119,25 @@ export async function listPrimaryCalendarEvents(
       }
 
       pageCount += 1;
+      if (!timeZone && typeof body.timeZone === "string") {
+        timeZone = body.timeZone;
+      }
       items.push(...(Array.isArray(body.items) ? body.items : []));
       pageToken =
         typeof body.nextPageToken === "string"
           ? body.nextPageToken
           : undefined;
     } while (pageToken);
+
+    if (!timeZone) {
+      return {
+        ok: false,
+        error: {
+          code: CALENDAR_LIST_FAILED_CODE,
+          message: "Unable to read the Calendar timezone.",
+        },
+      };
+    }
 
     const calendarHttpAndJsonDurationMs = performance.now() - startedAt;
     const normalizationStartedAt = performance.now();
@@ -129,6 +147,7 @@ export async function listPrimaryCalendarEvents(
       ok: true,
       value: {
         events,
+        timeZone,
         stats: {
           pageCount,
           rawEventCount: items.length,

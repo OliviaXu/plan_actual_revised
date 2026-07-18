@@ -80,6 +80,7 @@ Goal: turn Calendar reads into the first real product surface: a correct read-on
 Build:
 
 - Calendar event normalization for timed events, all-day events, colors, timezone, and duration.
+- Primary Calendar timezone discovery and Calendar-local day ranges, positioning, and now-line behavior.
 - Plan-only day grid with time axis, sticky header, now line, block rendering, overlap cascade, hidden color filtering, and all-day exclusions.
 - Use settings defaults for day range, hidden colors, vertical density, and Calendar color tokens.
 
@@ -107,7 +108,7 @@ Goal: prove the core durability promise before building complex editing and drag
 Build:
 
 - Chrome extension storage wrapper for canonical daily records; settings remain code-derived.
-- Versioned `DayRecord` shape with one local date key per day.
+- Versioned `DayRecord` shape with one primary-Calendar-local date key per day.
 - Minimal Actual block creation path for a single block.
 - Manual save path for Actual blocks.
 - Calendar insert payload mapping with private extended metadata.

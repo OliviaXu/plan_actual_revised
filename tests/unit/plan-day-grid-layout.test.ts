@@ -8,7 +8,8 @@ import {
   MINIMUM_PLAN_BLOCK_HEIGHT_PX,
 } from "../../src/app/components/plan-day-grid-layout";
 
-const today = new Date(2026, 6, 15, 12);
+const date = "2026-07-15";
+const timeZone = "America/Los_Angeles";
 
 function timedEvent(
   id: string,
@@ -27,6 +28,26 @@ function timedEvent(
 }
 
 describe("calculatePlanDayGridLayout", () => {
+  it("positions events in the Calendar timezone instead of the browser timezone", () => {
+    const layout = calculatePlanDayGridLayout(
+      [
+        timedEvent(
+          "tokyo-morning",
+          "2026-07-15T01:00:00.000Z",
+          "2026-07-15T02:00:00.000Z",
+        ),
+      ],
+      "2026-07-15",
+      "Asia/Tokyo",
+      defaultSettings,
+    );
+
+    expect(layout.blocks[0]).toMatchObject({
+      durationMinutes: 60,
+      topPx: 252,
+    });
+  });
+
   it("uses the configured range and exact time geometry by default", () => {
     const layout = calculatePlanDayGridLayout(
       [
@@ -36,7 +57,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T10:00:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -68,7 +90,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T21:30:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -90,11 +113,29 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T21:00:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
     expect(layout.endHour).toBe(21);
+  });
+
+  it("positions event starts at minute precision", () => {
+    const layout = calculatePlanDayGridLayout(
+      [
+        timedEvent(
+          "sub-minute-start",
+          "2026-07-15T09:00:30-07:00",
+          "2026-07-15T10:00:30-07:00",
+        ),
+      ],
+      date,
+      timeZone,
+      defaultSettings,
+    );
+
+    expect(layout.blocks[0]).toMatchObject({ topPx: 168 });
   });
 
   it("applies the named minimum height and the time-range threshold", () => {
@@ -106,7 +147,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T10:05:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     ).blocks[0];
     const atThreshold = calculatePlanDayGridLayout(
@@ -117,7 +159,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T10:20:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       { ...defaultSettings, pixelsPerMinute: 2 },
     ).blocks[0];
 
@@ -136,7 +179,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T21:00:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -165,7 +209,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-14T10:00:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -188,7 +233,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-16T00:30:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -245,7 +291,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T14:00:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -282,7 +329,8 @@ describe("calculatePlanDayGridLayout", () => {
           "2026-07-15T10:30:00-07:00",
         ),
       ],
-      today,
+      date,
+      timeZone,
       defaultSettings,
     );
 
@@ -302,7 +350,8 @@ describe("calculatePlanNowIndicatorTopPx", () => {
     expect(
       calculatePlanNowIndicatorTopPx(
         new Date(2026, 6, 15, 12, 30),
-        today,
+        date,
+        timeZone,
         7,
         21,
         1.4,
@@ -311,7 +360,8 @@ describe("calculatePlanNowIndicatorTopPx", () => {
     expect(
       calculatePlanNowIndicatorTopPx(
         new Date(2026, 6, 15, 6, 59),
-        today,
+        date,
+        timeZone,
         7,
         21,
         1.4,
@@ -320,7 +370,8 @@ describe("calculatePlanNowIndicatorTopPx", () => {
     expect(
       calculatePlanNowIndicatorTopPx(
         new Date(2026, 6, 16, 12, 30),
-        today,
+        date,
+        timeZone,
         7,
         21,
         1.4,

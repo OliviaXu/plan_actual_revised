@@ -2,6 +2,10 @@ import type {
   TimedCalendarEvent,
 } from "../../calendar/calendar-event";
 import type { AppSettings } from "../../domain/settings";
+import {
+  getCalendarDayRange,
+  getCalendarTime,
+} from "../../calendar/calendar-time";
 
 const MINUTES_PER_HOUR = 60;
 const MILLISECONDS_PER_MINUTE = 60_000;
@@ -38,19 +42,13 @@ export type PlanDayGridLayout = {
 
 export function calculatePlanDayGridLayout(
   events: TimedCalendarEvent[],
-  today: Date,
+  date: string,
+  timeZone: string,
   settings: PlanGridSettings,
 ): PlanDayGridLayout {
-  const dayStart = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate(),
-  );
-  const dayEnd = new Date(
-    today.getFullYear(),
-    today.getMonth(),
-    today.getDate() + 1,
-  );
+  const day = getCalendarDayRange(date, timeZone);
+  const dayStart = new Date(day.timeMin);
+  const dayEnd = new Date(day.timeMax);
 
   const clippedEvents = events.flatMap((event) => {
     const eventStart = new Date(event.start);
@@ -67,8 +65,12 @@ export function calculatePlanDayGridLayout(
 
     const clippedStart = eventStart < dayStart ? dayStart : eventStart;
     const clippedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-    const clippedStartMinuteOfDay = minuteOfDay(clippedStart, dayEnd);
-    const clippedEndMinuteOfDay = minuteOfDay(clippedEnd, dayEnd);
+    const clippedStartMinuteOfDay = minuteOfDay(
+      clippedStart,
+      dayEnd,
+      timeZone,
+    );
+    const clippedEndMinuteOfDay = minuteOfDay(clippedEnd, dayEnd, timeZone);
 
     return [
       {
@@ -146,22 +148,16 @@ export function calculatePlanDayGridLayout(
 
 export function calculatePlanNowIndicatorTopPx(
   currentTime: Date,
-  today: Date,
+  date: string,
+  timeZone: string,
   startHour: number,
   endHour: number,
   pixelsPerMinute: number,
 ) {
-  if (
-    currentTime.getFullYear() !== today.getFullYear() ||
-    currentTime.getMonth() !== today.getMonth() ||
-    currentTime.getDate() !== today.getDate()
-  ) {
-    return null;
-  }
+  const current = getCalendarTime(currentTime, timeZone);
+  if (current.date !== date) return null;
 
-  const currentMinuteOfDay =
-    currentTime.getHours() * MINUTES_PER_HOUR +
-    currentTime.getMinutes();
+  const currentMinuteOfDay = current.minutesSinceMidnight;
   if (
     currentMinuteOfDay < startHour * MINUTES_PER_HOUR ||
     currentMinuteOfDay > endHour * MINUTES_PER_HOUR
@@ -218,15 +214,10 @@ function roundPixel(value: number) {
   return Math.round(value * 1_000_000) / 1_000_000;
 }
 
-function minuteOfDay(date: Date, dayEnd: Date) {
+function minuteOfDay(date: Date, dayEnd: Date, timeZone: string) {
   if (date.getTime() === dayEnd.getTime()) {
     return 24 * MINUTES_PER_HOUR;
   }
 
-  return (
-    date.getHours() * MINUTES_PER_HOUR +
-    date.getMinutes() +
-    date.getSeconds() / 60 +
-    date.getMilliseconds() / MILLISECONDS_PER_MINUTE
-  );
+  return getCalendarTime(date, timeZone).minutesSinceMidnight;
 }

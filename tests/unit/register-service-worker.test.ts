@@ -51,7 +51,7 @@ function installServiceWorker(
     })),
     listPrimaryCalendarEvents: vi.fn(async () => ({
       ok: true as const,
-      value: { events: [] },
+      value: { events: [], timeZone: "America/Los_Angeles" },
     })),
     insertPrimaryCalendarEvent: vi.fn(async () => ({
       ok: true as const,
@@ -146,6 +146,36 @@ describe("registerServiceWorker", () => {
     );
   });
 
+  it("uses the primary Calendar timezone for its date and day range", async () => {
+    const clock = () => new Date("2026-07-15T01:00:00.000Z");
+    const { dependencies, messageListener } = installServiceWorker(
+      {
+        listPrimaryCalendarEvents: vi.fn(async () => ({
+          ok: true as const,
+          value: { events: [], timeZone: "Asia/Tokyo" },
+        })),
+      },
+      clock,
+    );
+
+    await expect(
+      sendMessage(messageListener, "calendar.listEvents"),
+    ).resolves.toMatchObject({
+      response: {
+        ok: true,
+        value: { events: [], timeZone: "Asia/Tokyo", date: "2026-07-15" },
+      },
+    });
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledTimes(2);
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenLastCalledWith(
+      "token-123",
+      {
+        timeMin: "2026-07-14T15:00:00.000Z",
+        timeMax: "2026-07-15T15:00:00.000Z",
+      },
+    );
+  });
+
   it("reads the clock once when deriving a Calendar request range", async () => {
     const clock = vi.fn(now);
     const { messageListener } = installServiceWorker({}, clock);
@@ -218,6 +248,7 @@ describe("registerServiceWorker", () => {
           ok: true as const,
           value: {
             events,
+            timeZone: "America/Los_Angeles",
             stats: {
               pageCount: 2,
               rawEventCount: 3,
@@ -271,7 +302,10 @@ describe("registerServiceWorker", () => {
     const second = sendMessage(messageListener, "calendar.listEvents");
 
     await vi.waitFor(() => expect(listPrimaryCalendarEvents).toHaveBeenCalledOnce());
-    resolveCalendar?.({ ok: true, value: { events: [] } });
+    resolveCalendar?.({
+      ok: true,
+      value: { events: [], timeZone: "America/Los_Angeles" },
+    });
 
     await expect(Promise.all([first, second])).resolves.toEqual([
       expect.objectContaining({ response: expect.objectContaining({ ok: true, value: expect.objectContaining({ events: [] }) }) }),

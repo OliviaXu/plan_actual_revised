@@ -1,4 +1,10 @@
-import { cleanup, fireEvent, render, screen } from "@testing-library/react";
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../src/app/App";
@@ -52,7 +58,7 @@ describe("App Plan loading", () => {
   it("silently loads today's Calendar events through cached auth", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [timedEvent] } };
+        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
 
       return unexpectedMessage(message);
@@ -72,7 +78,7 @@ describe("App Plan loading", () => {
     let currentTime = new Date("2026-07-15T23:59:00-07:00");
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [timedEvent] } };
+        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -89,7 +95,7 @@ describe("App Plan loading", () => {
   it("starts a fresh Calendar request when a new app page mounts", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [timedEvent] } };
+        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -150,7 +156,7 @@ describe("App Plan loading", () => {
                 message: "Connect Calendar before requesting events.",
               },
             }
-          : { ok: true, value: { events: [timedEvent] } };
+          : { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "auth.requestInteractiveToken") {
         return { ok: true, value: { status: "connected" } };
@@ -182,7 +188,7 @@ describe("App Plan loading", () => {
                 message: "Connect Calendar before requesting events.",
               },
             }
-          : { ok: true, value: { events: [timedEvent] } };
+          : { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "auth.requestInteractiveToken") {
         authAttempts += 1;
@@ -221,7 +227,7 @@ describe("App Plan loading", () => {
   it("renders a connected empty Plan state", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
 
       return unexpectedMessage(message);
@@ -260,10 +266,61 @@ describe("App Plan loading", () => {
 });
 
 describe("App Actual persistence", () => {
+  it("uses the browser day until Calendar supplies its day and timezone", async () => {
+    let resolveCalendar: ((value: unknown) => void) | undefined;
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return new Promise((resolve) => {
+          resolveCalendar = resolve;
+        });
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+
+    await expect(
+      screen.findByRole("button", { name: "Add Actual" }),
+    ).resolves.toBeEnabled();
+
+    resolveCalendar?.({
+      ok: true,
+      value: { events: [], date: "2026-07-15", timeZone: "Asia/Tokyo" },
+    });
+
+    await screen.findByTestId("plan-empty");
+  });
+
+  it("creates and stores Actuals in the primary Calendar timezone", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: { events: [], timeZone: "Asia/Tokyo", date: "2026-07-15" },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.stubGlobal("crypto", { randomUUID: () => "tokyo-actual" });
+
+    render(<App now={() => new Date("2026-07-15T01:00:00.000Z")} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        date: "2026-07-15",
+        timezone: "Asia/Tokyo",
+        actual: [expect.objectContaining({ startMinutes: 600 })],
+      }),
+    });
+  });
+
   it("hydrates an existing Actual before allowing creation", async () => {
     const stored = mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -290,7 +347,7 @@ describe("App Actual persistence", () => {
   it("persists a new Actual before rendering it", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -298,6 +355,7 @@ describe("App Actual persistence", () => {
 
     render(<App now={now} />);
     const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
 
     expect(await screen.findByText("Actual")).toBeVisible();
@@ -319,7 +377,7 @@ describe("App Actual persistence", () => {
   it("does not render a new Actual when persistence fails", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -328,7 +386,9 @@ describe("App Actual persistence", () => {
     );
 
     render(<App now={now} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Add Actual" }));
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
 
     expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
       "Unable to save Actual locally.",
@@ -375,7 +435,7 @@ describe("App Actual Calendar saving", () => {
   it("permanently classifies an exact Plan match without inserting", async () => {
     const handler = vi.fn(async (message: RuntimeMessage) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [timedEvent] } };
+        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -402,7 +462,7 @@ describe("App Actual Calendar saving", () => {
   it("saves a nonmatching Actual and persists its Calendar disposition", async () => {
     const handler = vi.fn(async (message: RuntimeMessage) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "calendar.insertEvent") {
         return { ok: true, value: { eventId: "calendar-actual-id" } };
@@ -437,7 +497,7 @@ describe("App Actual Calendar saving", () => {
   it("keeps a failed Actual unsaved with a durable normalized error", async () => {
     const handler = vi.fn(async (message: RuntimeMessage) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "calendar.insertEvent") {
         return { ok: false, error: {
@@ -472,7 +532,7 @@ describe("App Actual Calendar saving", () => {
   it("persists a runtime transport failure as a failed Calendar attempt", async () => {
     const handler = vi.fn(async (message: RuntimeMessage) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [] } };
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "calendar.insertEvent") {
         throw new Error("The message port closed.");

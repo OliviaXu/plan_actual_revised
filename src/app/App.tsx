@@ -15,13 +15,22 @@ import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { Result } from "../shared/result";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
 import { loadDayRecord, saveDayRecord } from "../storage/day-record-storage";
+import { getCalendarTime } from "../calendar/calendar-time";
 
 type CalendarState =
   | { status: "loading" }
   | { status: "disconnected"; errorMessage?: string }
   | { status: "connecting" }
-  | { status: "connected"; events: CalendarEvent[] }
+  | {
+      status: "connected";
+      events: CalendarEvent[];
+    }
   | { status: "error"; message: string };
+
+type CalendarDay = {
+  date: string;
+  timeZone: string;
+};
 
 const readSystemTime = () => new Date();
 
@@ -29,25 +38,39 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const [calendarState, setCalendarState] = useState<CalendarState>({
     status: "loading",
   });
-  const [dayRecord, setDayRecord] = useState<DayRecord | null>(null);
-  const [actualHydrated, setActualHydrated] = useState(false);
+  const [calendarDay, setCalendarDay] = useState<CalendarDay>(() => {
+    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
+    return {
+      date: getCalendarTime(now(), timeZone).date,
+      timeZone,
+    };
+  });
+  const [hydratedActuals, setHydratedActuals] = useState<{
+    key: string;
+    record: DayRecord | null;
+  }>();
   const [actualStorageError, setActualStorageError] = useState<string>();
   const [savingActuals, setSavingActuals] = useState(false);
   const [actualSaveSummary, setActualSaveSummary] = useState<string>();
 
   const currentDate = now();
-  const localDate = formatLocalDate(currentDate);
+  const calendarDayKey = `${calendarDay.date}:${calendarDay.timeZone}`;
+  const dayRecord =
+    hydratedActuals?.key === calendarDayKey
+      ? hydratedActuals.record
+      : null;
+  const actualHydrated = hydratedActuals?.key === calendarDayKey;
 
   useEffect(() => {
-    void loadCalendarEvents(setCalendarState);
+    void loadCalendarEvents(setCalendarState, setCalendarDay);
   }, []);
 
   useEffect(() => {
     let active = true;
-    void loadDayRecord(localDate)
+    void loadDayRecord(calendarDay.date)
       .then((record) => {
         if (!active) return;
-        setDayRecord(record);
+        setHydratedActuals({ key: calendarDayKey, record });
         setActualStorageError(undefined);
       })
       .catch((error: unknown) => {
@@ -57,14 +80,12 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             ? error.message
             : "Unable to load Actuals from local storage.",
         );
-      })
-      .finally(() => {
-        if (active) setActualHydrated(true);
+        setHydratedActuals({ key: calendarDayKey, record: null });
       });
     return () => {
       active = false;
     };
-  }, [localDate]);
+  }, [calendarDay, calendarDayKey]);
 
   async function connectCalendar() {
     setCalendarState({ status: "connecting" });
@@ -82,7 +103,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         return;
       }
 
-      await loadCalendarEvents(setCalendarState);
+      await loadCalendarEvents(setCalendarState, setCalendarDay);
     } catch {
       setCalendarState({
         status: "disconnected",
@@ -93,14 +114,17 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
 
   async function addActual() {
     const createdAt = now();
-    const minutes = createdAt.getHours() * 60 + createdAt.getMinutes();
+    const minutes = getCalendarTime(
+      createdAt,
+      calendarDay.timeZone,
+    ).minutesSinceMidnight;
     const startMinutes =
       Math.floor(minutes / defaultSettings.snapMinutes) *
       defaultSettings.snapMinutes;
     const nextRecord: DayRecord = {
       schemaVersion: 1,
-      date: localDate,
-      timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+      date: calendarDay.date,
+      timezone: calendarDay.timeZone,
       actual: [
         {
           id: crypto.randomUUID(),
@@ -116,7 +140,10 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
 
     try {
       await saveDayRecord(nextRecord);
-      setDayRecord(nextRecord);
+      setHydratedActuals({
+        key: `${calendarDay.date}:${calendarDay.timeZone}`,
+        record: nextRecord,
+      });
       setActualStorageError(undefined);
     } catch (error) {
       setActualStorageError(
@@ -167,7 +194,10 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             lastSaveError: undefined,
           }, attemptedAt);
           await saveDayRecord(workingRecord);
-          setDayRecord(workingRecord);
+          setHydratedActuals({
+            key: `${workingRecord.date}:${workingRecord.timezone}`,
+            record: workingRecord,
+          });
           matchedCount += 1;
           continue;
         }
@@ -198,7 +228,10 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           failedCount += 1;
         }
         await saveDayRecord(workingRecord);
-        setDayRecord(workingRecord);
+        setHydratedActuals({
+          key: `${workingRecord.date}:${workingRecord.timezone}`,
+          record: workingRecord,
+        });
       }
 
       const parts = [];
@@ -234,6 +267,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             <div>
               <p className="text-sm text-muted-foreground">
                 {currentDate.toLocaleDateString(undefined, {
+                  timeZone: calendarDay.timeZone,
                   weekday: "long",
                   month: "long",
                   day: "numeric",
@@ -289,7 +323,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           now={now}
           onAddActual={() => void addActual()}
           status={calendarState.status === "disconnected" ? "error" : calendarState.status}
-          today={currentDate}
+          date={calendarDay.date}
+          timeZone={calendarDay.timeZone}
         />
 
         {dayRecord?.actual.length ? (
@@ -358,15 +393,9 @@ function updateActual(
   };
 }
 
-function formatLocalDate(date: Date) {
-  const year = date.getFullYear();
-  const month = String(date.getMonth() + 1).padStart(2, "0");
-  const day = String(date.getDate()).padStart(2, "0");
-  return `${year}-${month}-${day}`;
-}
-
 async function loadCalendarEvents(
   setCalendarState: (state: CalendarState) => void,
+  setCalendarDay: (day: CalendarDay) => void,
 ) {
   setCalendarState({ status: "loading" });
 
@@ -376,7 +405,14 @@ async function loadCalendarEvents(
     });
 
     if (response.ok) {
-      setCalendarState({ status: "connected", events: response.value.events });
+      setCalendarDay({
+        date: response.value.date,
+        timeZone: response.value.timeZone,
+      });
+      setCalendarState({
+        status: "connected",
+        events: response.value.events,
+      });
       return;
     }
 

@@ -2,7 +2,7 @@
 
 ## Slice 4A - Actual Persistence Tracer
 
-Store one versioned `DayRecord` per local date in `chrome.storage.local`. The app hydrates today's Actual blocks on every page load and persists the minimal one-click Actual before rendering it. Settings remain code-derived and are not stored.
+Store one versioned `DayRecord` per primary-Calendar-local date in `chrome.storage.local`. The app lazily adopts the primary Calendar timezone returned by its event read, hydrates that Calendar day's Actual blocks on every page load, and persists the minimal one-click Actual before rendering it. Settings remain code-derived and are not stored.
 
 ## Slice 4B - Calendar Save Reliability Tracer
 

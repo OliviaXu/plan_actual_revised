@@ -47,6 +47,7 @@ registerServiceWorker({
   listPrimaryCalendarEvents: async () => ({
     ok: true,
     value: {
+      timeZone: "America/Los_Angeles",
       events: [{
         kind: "timed",
         id: "phase-two-event",
@@ -58,7 +59,7 @@ registerServiceWorker({
       }],
     },
   }),
-});
+}, () => new Date("2026-07-15T19:00:00.000Z"));
 `,
   );
 

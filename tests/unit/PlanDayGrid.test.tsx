@@ -11,7 +11,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import { PlanDayGrid } from "../../src/app/components/PlanDayGrid";
 
-const today = new Date(2026, 6, 15, 12);
+const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
 
 function timedEvent(
   id: string,
@@ -36,7 +36,7 @@ afterEach(() => {
 
 describe("PlanDayGrid", () => {
   it("renders the complete default hour axis without full-width grid lines", () => {
-    render(<PlanDayGrid events={[]} status="connected" today={today} />);
+    render(<PlanDayGrid events={[]} status="connected" {...calendarDay} />);
 
     expect(screen.queryByTestId("plan-hour-line")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("plan-hour-tick")).toHaveLength(15);
@@ -64,7 +64,7 @@ describe("PlanDayGrid", () => {
           ),
         ]}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
 
@@ -91,7 +91,7 @@ describe("PlanDayGrid", () => {
           ),
         ]}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
 
@@ -118,7 +118,7 @@ describe("PlanDayGrid", () => {
           ),
         ]}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
 
@@ -178,7 +178,7 @@ describe("PlanDayGrid", () => {
           },
         ]}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
 
@@ -220,7 +220,7 @@ describe("PlanDayGrid", () => {
           ),
         ]}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
 
@@ -264,7 +264,7 @@ describe("PlanDayGrid", () => {
         events={[]}
         now={() => currentTime}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
 
@@ -283,7 +283,7 @@ describe("PlanDayGrid", () => {
   it("auto-scrolls once after connected content renders", () => {
     const now = () => new Date(2026, 6, 15, 12);
     const { rerender } = render(
-      <PlanDayGrid events={[]} now={now} status="loading" today={today} />,
+      <PlanDayGrid events={[]} now={now} status="loading" {...calendarDay} />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
     const header = screen.getByTestId("plan-grid-header");
@@ -291,7 +291,7 @@ describe("PlanDayGrid", () => {
     Object.defineProperty(header, "offsetHeight", { value: 35 });
 
     rerender(
-      <PlanDayGrid events={[]} now={now} status="connected" today={today} />,
+      <PlanDayGrid events={[]} now={now} status="connected" {...calendarDay} />,
     );
     expect(viewport.scrollTop).toBe(305);
 
@@ -307,7 +307,7 @@ describe("PlanDayGrid", () => {
         ]}
         now={now}
         status="connected"
-        today={today}
+        {...calendarDay}
       />,
     );
     expect(viewport.scrollTop).toBe(700);

@@ -34,10 +34,11 @@ registerServiceWorker({
   listPrimaryCalendarEvents: async () => ${scenario === "error"
     ? `({ ok: false, error: { code: "CALENDAR_LIST_FAILED", message: "Seeded Calendar failure." } })`
     : scenario === "empty"
-      ? `({ ok: true, value: { events: [] } })`
+      ? `({ ok: true, value: { timeZone: "America/Los_Angeles", events: [] } })`
     : `({
       ok: true,
       value: {
+        timeZone: "America/Los_Angeles",
         events: [{
           kind: "timed",
           id: "seeded-design-review",
@@ -49,7 +50,7 @@ registerServiceWorker({
         }],
       },
     })`},
-});
+}, () => new Date("2026-07-15T19:00:00.000Z"));
 `,
   );
   return extensionPath;

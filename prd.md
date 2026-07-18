@@ -164,11 +164,13 @@ Required REST operations:
 - `events.list` for fetching Plan, daily focus, weekly learning, and idempotency checks.
 - `events.insert` for writing focus events, weekly learning events, and Actual logs.
 
-All timestamps are handled in the user's local IANA timezone, detected via:
-
-```ts
-Intl.DateTimeFormat().resolvedOptions().timeZone
-```
+After authentication, all dates and times use the primary Calendar's IANA
+timezone returned by `events.list`. The first read starts with a browser-local
+range, adopts the returned Calendar timezone, and repeats once only if that
+timezone changes the requested day boundaries. Later reads reuse the discovered
+timezone. The browser timezone is otherwise only a disconnected fallback.
+Additional timezones displayed by the Google Calendar UI do not replace the
+primary Calendar timezone.
 
 Use the primary calendar for MVP unless user settings later introduce calendar selection.
 
@@ -205,7 +207,7 @@ MVP settings are always derived from code and are not persisted in extension sto
 
 ### 6.2 Daily Working Record
 
-Each day has one `DayRecord` keyed by local date:
+Each day has one `DayRecord` keyed by its primary-Calendar-local date:
 
 ```ts
 type DayRecord = {
