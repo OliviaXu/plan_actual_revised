@@ -69,6 +69,39 @@ describe("Calendar Actual insertion", () => {
     });
   });
 
+  it("keeps an Actual's end as a local time when it crosses midnight", () => {
+    expect(
+      mapActualToCalendarEvent({
+        ...input,
+        block: {
+          ...input.block,
+          startMinutes: 23 * 60 + 30,
+          durationMinutes: 90,
+        },
+      }),
+    ).toMatchObject({
+      start: { dateTime: "2026-07-15T23:30:00", timeZone: "America/Los_Angeles" },
+      end: { dateTime: "2026-07-16T01:00:00", timeZone: "America/Los_Angeles" },
+    });
+  });
+
+  it("uses the timezone's DST transition when an Actual spans it", () => {
+    expect(
+      mapActualToCalendarEvent({
+        ...input,
+        date: "2026-03-08",
+        block: {
+          ...input.block,
+          startMinutes: 90,
+          durationMinutes: 60,
+        },
+      }),
+    ).toMatchObject({
+      start: { dateTime: "2026-03-08T01:30:00", timeZone: "America/Los_Angeles" },
+      end: { dateTime: "2026-03-08T03:30:00", timeZone: "America/Los_Angeles" },
+    });
+  });
+
   it("treats a duplicate response as proof of the deterministic event", async () => {
     const fetchCalendar = vi.fn(async () =>
       Response.json({ error: {} }, { status: 409 }),

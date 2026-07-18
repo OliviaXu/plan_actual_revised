@@ -1,3 +1,5 @@
+import { DateTime } from "luxon";
+
 import type { ActualBlock } from "../domain/day-record";
 import type { CalendarInsertEvent } from "./calendar-event";
 
@@ -20,13 +22,18 @@ export function mapActualToCalendarEvent(
     id: calendarEventIdForActual(input.block.id),
     summary: `${input.summaryPrefix} ${input.block.summary}`.trim(),
     start: {
-      dateTime: localDateTime(input.date, input.block.startMinutes),
+      dateTime: localDateTime(
+        input.date,
+        input.block.startMinutes,
+        input.timezone,
+      ),
       timeZone: input.timezone,
     },
     end: {
       dateTime: localDateTime(
         input.date,
         input.block.startMinutes + input.block.durationMinutes,
+        input.timezone,
       ),
       timeZone: input.timezone,
     },
@@ -39,8 +46,9 @@ export function mapActualToCalendarEvent(
   };
 }
 
-function localDateTime(date: string, totalMinutes: number) {
-  const base = new Date(`${date}T00:00:00Z`);
-  base.setUTCMinutes(totalMinutes);
-  return `${base.getUTCFullYear()}-${String(base.getUTCMonth() + 1).padStart(2, "0")}-${String(base.getUTCDate()).padStart(2, "0")}T${String(base.getUTCHours()).padStart(2, "0")}:${String(base.getUTCMinutes()).padStart(2, "0")}:00`;
+function localDateTime(date: string, totalMinutes: number, timeZone: string) {
+  return DateTime.fromISO(date, { zone: timeZone })
+    .startOf("day")
+    .plus({ minutes: totalMinutes })
+    .toFormat("yyyy-MM-dd'T'HH:mm:ss");
 }

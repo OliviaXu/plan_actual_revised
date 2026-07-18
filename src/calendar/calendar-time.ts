@@ -1,3 +1,5 @@
+import { DateTime } from "luxon";
+
 export function getCalendarTime(instant: Date | number, timeZone: string) {
   const values = Object.fromEntries(
     new Intl.DateTimeFormat("en-CA", {
@@ -24,35 +26,11 @@ export function getCalendarTime(instant: Date | number, timeZone: string) {
 }
 
 export function getCalendarDayRange(localDate: string, timeZone: string) {
-  const tomorrow = new Date(`${localDate}T00:00:00Z`);
-  tomorrow.setUTCDate(tomorrow.getUTCDate() + 1);
+  const dayStart = DateTime.fromISO(localDate, { zone: timeZone }).startOf("day");
+  const nextDayStart = dayStart.plus({ days: 1 }).startOf("day");
   return {
     date: localDate,
-    timeMin: localMidnight(localDate, timeZone).toISOString(),
-    timeMax: localMidnight(tomorrow.toISOString().slice(0, 10), timeZone).toISOString(),
+    timeMin: dayStart.toUTC().toJSDate().toISOString(),
+    timeMax: nextDayStart.toUTC().toJSDate().toISOString(),
   };
-}
-
-function localMidnight(date: string, timeZone: string) {
-  const [year, month, day] = date.split("-").map(Number);
-  const target = Date.UTC(year, month - 1, day);
-  let candidate = target;
-
-  // Date cannot construct an IANA-zoned time, so converge from a UTC guess.
-  for (let attempt = 0; attempt < 3; attempt += 1) {
-    const local = getCalendarTime(candidate, timeZone);
-    const [localYear, localMonth, localDay] = local.date.split("-").map(Number);
-    const represented = Date.UTC(
-      localYear,
-      localMonth - 1,
-      localDay,
-      local.hour,
-      local.minute,
-    );
-    const correction = target - represented;
-    candidate += correction;
-    if (correction === 0) break;
-  }
-
-  return new Date(candidate);
 }
