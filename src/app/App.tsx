@@ -66,6 +66,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   }, []);
 
   useEffect(() => {
+    if (calendarState.status !== "connected") return;
+
     let active = true;
     void loadDayRecord(calendarDay.date)
       .then((record) => {
@@ -85,7 +87,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     return () => {
       active = false;
     };
-  }, [calendarDay, calendarDayKey]);
+  }, [calendarDay, calendarDayKey, calendarState.status]);
 
   async function connectCalendar() {
     setCalendarState({ status: "connecting" });
@@ -113,6 +115,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   }
 
   async function addActual() {
+    if (calendarState.status !== "connected" || !actualHydrated) return;
+
     const createdAt = now();
     const minutes = getCalendarTime(
       createdAt,
@@ -318,7 +322,12 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
 
         <PlanDayGrid
           actuals={dayRecord?.actual ?? []}
-          canAddActual={actualHydrated && !actualStorageError && !dayRecord?.actual.length}
+          canAddActual={
+            calendarState.status === "connected" &&
+            actualHydrated &&
+            !actualStorageError &&
+            !dayRecord?.actual.length
+          }
           events={events}
           now={now}
           onAddActual={() => void addActual()}

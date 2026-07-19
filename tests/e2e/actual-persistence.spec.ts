@@ -1,12 +1,34 @@
 import { expect, chromium, test } from "@playwright/test";
+import fs from "node:fs/promises";
+import os from "node:os";
 import path from "node:path";
 
 test("a created Actual survives a full extension-page reload", async () => {
+  const extensionPath = await fs.mkdtemp(
+    path.join(os.tmpdir(), "actual-persistence-extension-"),
+  );
+  await fs.cp(path.resolve("dist"), extensionPath, { recursive: true });
+  await fs.writeFile(
+    path.join(extensionPath, "background/service-worker.js"),
+    `
+import registerServiceWorker from "./register-service-worker.js";
+
+registerServiceWorker({
+  openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+  requestCachedToken: async () => ({ ok: true, value: "test-token" }),
+  requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
+  listPrimaryCalendarEvents: async () => ({
+    ok: true,
+    value: { timeZone: "America/Los_Angeles", events: [] },
+  }),
+}, () => new Date("2026-07-15T19:00:00.000Z"));
+`,
+  );
   const context = await chromium.launchPersistentContext("", {
     headless: false,
     args: [
-      `--disable-extensions-except=${path.resolve("dist")}`,
-      `--load-extension=${path.resolve("dist")}`,
+      `--disable-extensions-except=${extensionPath}`,
+      `--load-extension=${extensionPath}`,
     ],
   });
   const serviceWorker =
@@ -31,5 +53,6 @@ test("a created Actual survives a full extension-page reload", async () => {
     await expect(page.getByTestId("actual-block")).toContainText("Actual");
   } finally {
     await context.close();
+    await fs.rm(extensionPath, { recursive: true, force: true });
   }
 });

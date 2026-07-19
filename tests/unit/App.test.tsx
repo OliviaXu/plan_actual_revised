@@ -266,7 +266,7 @@ describe("App Plan loading", () => {
 });
 
 describe("App Actual persistence", () => {
-  it("uses the browser day until Calendar supplies its day and timezone", async () => {
+  it("waits for Plan before hydrating or enabling Actual creation", async () => {
     let resolveCalendar: ((value: unknown) => void) | undefined;
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
@@ -279,9 +279,9 @@ describe("App Actual persistence", () => {
 
     render(<App now={now} />);
 
-    await expect(
-      screen.findByRole("button", { name: "Add Actual" }),
-    ).resolves.toBeEnabled();
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    expect(add).toBeDisabled();
+    expect(chrome.storage.local.get).not.toHaveBeenCalled();
 
     resolveCalendar?.({
       ok: true,
@@ -289,6 +289,10 @@ describe("App Actual persistence", () => {
     });
 
     await screen.findByTestId("plan-empty");
+    await waitFor(() => expect(add).toBeEnabled());
+    expect(chrome.storage.local.get).toHaveBeenCalledWith(
+      "dayRecord:2026-07-15",
+    );
   });
 
   it("creates and stores Actuals in the primary Calendar timezone", async () => {
@@ -396,7 +400,7 @@ describe("App Actual persistence", () => {
     expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
   });
 
-  it("keeps Actual available while Calendar is disconnected", async () => {
+  it("keeps Actual creation disabled while Calendar is disconnected", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return {
@@ -409,8 +413,11 @@ describe("App Actual persistence", () => {
 
     render(<App now={now} />);
 
-    expect(await screen.findByRole("button", { name: "Add Actual" })).toBeVisible();
+    expect(
+      await screen.findByRole("button", { name: "Add Actual" }),
+    ).toBeDisabled();
     expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
+    expect(chrome.storage.local.get).not.toHaveBeenCalled();
   });
 });
 
