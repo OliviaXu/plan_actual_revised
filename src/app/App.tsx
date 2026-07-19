@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { PlanDayGrid } from "./components/PlanDayGrid";
@@ -14,7 +14,10 @@ import {
 import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { Result } from "../shared/result";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
-import { loadDayRecord, saveDayRecord } from "../storage/day-record-storage";
+import {
+  createDayRecordWriteQueue,
+  loadDayRecord,
+} from "../storage/day-record-storage";
 import { getCalendarTime } from "../calendar/calendar-time";
 
 type CalendarState =
@@ -50,8 +53,13 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     record: DayRecord | null;
   }>();
   const [actualStorageError, setActualStorageError] = useState<string>();
-  const [savingActuals, setSavingActuals] = useState(false);
-  const [actualSaveSummary, setActualSaveSummary] = useState<string>();
+  const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
+    useState(false);
+  const [calendarSaveSummary, setCalendarSaveSummary] = useState<string>();
+  const dayRecordWriteQueueRef = useRef<
+    ReturnType<typeof createDayRecordWriteQueue>
+  >(createDayRecordWriteQueue());
+  const latestDayRecordWriteIdRef = useRef(0);
 
   const currentDate = now();
   const calendarDayKey = `${calendarDay.date}:${calendarDay.timeZone}`;
@@ -59,7 +67,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     hydratedActuals?.key === calendarDayKey
       ? hydratedActuals.record
       : null;
-  const actualHydrated = hydratedActuals?.key === calendarDayKey;
+  const actualLoadSettled = hydratedActuals?.key === calendarDayKey;
 
   useEffect(() => {
     void loadCalendarEvents(setCalendarState, setCalendarDay);
@@ -115,7 +123,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   }
 
   async function addActual() {
-    if (calendarState.status !== "connected" || !actualHydrated) return;
+    if (calendarState.status !== "connected" || !actualLoadSettled) return;
 
     const createdAt = now();
     const minutes = getCalendarTime(
@@ -142,32 +150,45 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       updatedAt: createdAt.toISOString(),
     };
 
+    void saveDayRecordLocally(nextRecord);
+  }
+
+  async function saveDayRecordLocally(record: DayRecord) {
+    const writeId = ++latestDayRecordWriteIdRef.current;
+    setHydratedActuals({
+      key: `${record.date}:${record.timezone}`,
+      record,
+    });
+    setActualStorageError(undefined);
+
     try {
-      await saveDayRecord(nextRecord);
-      setHydratedActuals({
-        key: `${calendarDay.date}:${calendarDay.timeZone}`,
-        record: nextRecord,
-      });
-      setActualStorageError(undefined);
+      await dayRecordWriteQueueRef.current(record);
+      if (writeId === latestDayRecordWriteIdRef.current) {
+        setActualStorageError(undefined);
+      }
     } catch (error) {
-      setActualStorageError(
-        error instanceof Error ? error.message : "Unable to save Actual locally.",
-      );
+      if (writeId === latestDayRecordWriteIdRef.current) {
+        setActualStorageError(
+          error instanceof Error
+            ? error.message
+            : "Unable to save Actual locally.",
+        );
+      }
     }
   }
 
-  async function saveActuals() {
-    if (!dayRecord || savingActuals) return;
+  async function saveActualsToCalendar() {
+    if (!dayRecord || isSavingActualsToCalendar) return;
     const unsaved = dayRecord.actual.filter(
       (actual) => (actual.saveDisposition ?? "unsaved") === "unsaved",
     );
     if (unsaved.length === 0) {
-      setActualSaveSummary("Nothing new to save");
+      setCalendarSaveSummary("Nothing new to save");
       return;
     }
 
-    setSavingActuals(true);
-    setActualSaveSummary(undefined);
+    setIsSavingActualsToCalendar(true);
+    setCalendarSaveSummary(undefined);
     let workingRecord = dayRecord;
     let savedCount = 0;
     let matchedCount = 0;
@@ -176,7 +197,9 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     try {
       const planResponse = await requestFreshCalendarEvents();
       if (!planResponse.ok) {
-        setActualSaveSummary(`Failed ${unsaved.length}: ${planResponse.error.message}`);
+        setCalendarSaveSummary(
+          `Failed ${unsaved.length}: ${planResponse.error.message}`,
+        );
         return;
       }
 
@@ -197,11 +220,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             lastSaveAttemptAt: attemptedAt,
             lastSaveError: undefined,
           }, attemptedAt);
-          await saveDayRecord(workingRecord);
-          setHydratedActuals({
-            key: `${workingRecord.date}:${workingRecord.timezone}`,
-            record: workingRecord,
-          });
+          await saveDayRecordLocally(workingRecord);
           matchedCount += 1;
           continue;
         }
@@ -231,24 +250,16 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           }, attemptedAt);
           failedCount += 1;
         }
-        await saveDayRecord(workingRecord);
-        setHydratedActuals({
-          key: `${workingRecord.date}:${workingRecord.timezone}`,
-          record: workingRecord,
-        });
+        await saveDayRecordLocally(workingRecord);
       }
 
       const parts = [];
       if (savedCount) parts.push(`Saved ${savedCount}`);
       if (matchedCount) parts.push(`${matchedCount} matched Plan`);
       if (failedCount) parts.push(`Failed ${failedCount}`);
-      setActualSaveSummary(parts.join(", ") || "Nothing new to save");
-    } catch (error) {
-      setActualStorageError(
-        error instanceof Error ? error.message : "Unable to save Actual locally.",
-      );
+      setCalendarSaveSummary(parts.join(", ") || "Nothing new to save");
     } finally {
-      setSavingActuals(false);
+      setIsSavingActualsToCalendar(false);
     }
   }
 
@@ -324,8 +335,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           actuals={dayRecord?.actual ?? []}
           canAddActual={
             calendarState.status === "connected" &&
-            actualHydrated &&
-            !actualStorageError &&
+            actualLoadSettled &&
             !dayRecord?.actual.length
           }
           events={events}
@@ -339,15 +349,20 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         {dayRecord?.actual.length ? (
           <footer className="flex items-center gap-4">
             <Button
-              disabled={savingActuals || calendarState.status !== "connected"}
-              onClick={() => void saveActuals()}
+              disabled={
+                isSavingActualsToCalendar ||
+                calendarState.status !== "connected"
+              }
+              onClick={() => void saveActualsToCalendar()}
               type="button"
             >
-              {savingActuals ? "Saving Actual" : "Save Actual to calendar"}
+              {isSavingActualsToCalendar
+                ? "Saving Actual"
+                : "Save Actual to calendar"}
             </Button>
-            {actualSaveSummary ? (
+            {calendarSaveSummary ? (
               <p className="text-sm text-muted-foreground" data-testid="actual-save-summary">
-                {actualSaveSummary}
+                {calendarSaveSummary}
               </p>
             ) : null}
           </footer>

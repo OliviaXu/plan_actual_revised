@@ -2,6 +2,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
   DayRecordStorageError,
+  createDayRecordWriteQueue,
   dayRecordStorageKey,
   loadDayRecord,
   saveDayRecord,
@@ -79,5 +80,33 @@ describe("day record storage", () => {
     await expect(saveDayRecord(record)).rejects.toMatchObject({
       code: "DAY_RECORD_WRITE_FAILED",
     });
+  });
+
+  it("serializes record writes and continues after a rejected write", async () => {
+    let rejectFirstWrite: ((reason?: unknown) => void) | undefined;
+    const write = vi.fn((nextRecord: DayRecord) => {
+      if (nextRecord.updatedAt === "2026-07-15T19:01:00.000Z") {
+        return new Promise<void>((_resolve, reject) => {
+          rejectFirstWrite = reject;
+        });
+      }
+      return Promise.resolve();
+    });
+    const enqueue = createDayRecordWriteQueue(write);
+    const first = enqueue({
+      ...record,
+      updatedAt: "2026-07-15T19:01:00.000Z",
+    });
+    const secondRecord = {
+      ...record,
+      updatedAt: "2026-07-15T19:02:00.000Z",
+    };
+    const second = enqueue(secondRecord);
+
+    expect(write).toHaveBeenCalledTimes(1);
+    rejectFirstWrite?.(new Error("quota exceeded"));
+    await expect(first).rejects.toThrow("quota exceeded");
+    await expect(second).resolves.toBeUndefined();
+    expect(write).toHaveBeenNthCalledWith(2, secondRecord);
   });
 });

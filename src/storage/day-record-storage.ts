@@ -52,3 +52,17 @@ export async function saveDayRecord(record: DayRecord): Promise<void> {
     );
   }
 }
+
+export function createDayRecordWriteQueue(
+  write: (record: DayRecord) => Promise<void> = saveDayRecord,
+) {
+  let previousWrite: Promise<void> | undefined;
+
+  return (record: DayRecord) => {
+    const currentWrite = previousWrite
+      ? previousWrite.catch(() => undefined).then(() => write(record))
+      : write(record);
+    previousWrite = currentWrite;
+    return currentWrite;
+  };
+}

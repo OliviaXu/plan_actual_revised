@@ -348,7 +348,7 @@ describe("App Actual persistence", () => {
     expect(screen.getByRole("button", { name: "Add Actual" })).toBeDisabled();
   });
 
-  it("persists a new Actual before rendering it", async () => {
+  it("renders a new Actual optimistically while persisting it", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
@@ -362,7 +362,7 @@ describe("App Actual persistence", () => {
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
 
-    expect(await screen.findByText("Actual")).toBeVisible();
+    expect(await screen.findByTestId("actual-block")).toHaveTextContent("Actual");
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
       "dayRecord:2026-07-15": expect.objectContaining({
         schemaVersion: 1,
@@ -378,10 +378,13 @@ describe("App Actual persistence", () => {
     });
   });
 
-  it("does not render a new Actual when persistence fails", async () => {
+  it("keeps a failed optimistic Actual visible and lets Calendar saving retry storage", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+      }
+      if (message.type === "calendar.insertEvent") {
+        return { ok: true, value: { eventId: "calendar-actual-id" } };
       }
       return unexpectedMessage(message);
     });
@@ -397,7 +400,76 @@ describe("App Actual persistence", () => {
     expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
       "Unable to save Actual locally.",
     );
-    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+    expect(screen.getByTestId("actual-block")).toHaveTextContent("Actual");
+    const save = screen.getByRole("button", {
+      name: "Save Actual to calendar",
+    });
+    expect(save).toBeEnabled();
+    fireEvent.click(save);
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument(),
+    );
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(2);
+    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
+      "Saved 1",
+    );
+  });
+
+  it("allows Calendar saving while an optimistic Actual write is pending", async () => {
+    let finishWrite: (() => void) | undefined;
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.mocked(chrome.storage.local.set).mockImplementationOnce(
+      () =>
+        new Promise<void>((resolve) => {
+          finishWrite = resolve;
+        }),
+    );
+
+    render(<App now={now} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
+
+    expect(await screen.findByTestId("actual-block")).toBeVisible();
+    const save = screen.getByRole("button", {
+      name: "Save Actual to calendar",
+    });
+    expect(save).toBeEnabled();
+
+    finishWrite?.();
+  });
+
+  it("treats a rare storage read failure as an empty usable day", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(
+      new Error("profile storage unavailable"),
+    );
+
+    render(<App now={now} />);
+
+    expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
+      "Unable to load Actuals from local storage.",
+    );
+    const add = screen.getByRole("button", { name: "Add Actual" });
+    expect(add).toBeEnabled();
+    fireEvent.click(add);
+
+    expect(await screen.findByTestId("actual-block")).toHaveTextContent("Actual");
+    await waitFor(() =>
+      expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument(),
+    );
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
   });
 
   it("keeps Actual creation disabled while Calendar is disconnected", async () => {
