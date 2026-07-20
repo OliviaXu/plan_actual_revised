@@ -36,6 +36,7 @@ type CalendarDay = {
 };
 
 const readSystemTime = () => new Date();
+const defaultActualDurationMinutes = 30;
 
 export function App({ now = readSystemTime }: { now?: () => Date }) {
   const [calendarState, setCalendarState] = useState<CalendarState>({
@@ -48,7 +49,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       timeZone,
     };
   });
-  const [hydratedActuals, setHydratedActuals] = useState<{
+  const [dayRecordState, setDayRecordState] = useState<{
     key: string;
     record: DayRecord | null;
   }>();
@@ -64,10 +65,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const currentDate = now();
   const calendarDayKey = `${calendarDay.date}:${calendarDay.timeZone}`;
   const dayRecord =
-    hydratedActuals?.key === calendarDayKey
-      ? hydratedActuals.record
-      : null;
-  const actualLoadSettled = hydratedActuals?.key === calendarDayKey;
+    dayRecordState?.key === calendarDayKey ? dayRecordState.record : null;
+  const actualLoadSettled = dayRecordState?.key === calendarDayKey;
 
   useEffect(() => {
     void loadCalendarEvents(setCalendarState, setCalendarDay);
@@ -80,7 +79,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     void loadDayRecord(calendarDay.date)
       .then((record) => {
         if (!active) return;
-        setHydratedActuals({ key: calendarDayKey, record });
+        setDayRecordState({ key: calendarDayKey, record });
         setActualStorageError(undefined);
       })
       .catch((error: unknown) => {
@@ -90,7 +89,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             ? error.message
             : "Unable to load Actuals from local storage.",
         );
-        setHydratedActuals({ key: calendarDayKey, record: null });
+        setDayRecordState({ key: calendarDayKey, record: null });
       });
     return () => {
       active = false;
@@ -122,8 +121,14 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     }
   }
 
-  async function addActual() {
-    if (calendarState.status !== "connected" || !actualLoadSettled) return;
+  function addActual() {
+    if (
+      calendarState.status !== "connected" ||
+      !actualLoadSettled ||
+      isSavingActualsToCalendar
+    ) {
+      return;
+    }
 
     const createdAt = now();
     const minutes = getCalendarTime(
@@ -133,29 +138,44 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     const startMinutes =
       Math.floor(minutes / defaultSettings.snapMinutes) *
       defaultSettings.snapMinutes;
-    const nextRecord: DayRecord = {
-      schemaVersion: 1,
-      date: calendarDay.date,
-      timezone: calendarDay.timeZone,
-      actual: [
-        {
-          id: crypto.randomUUID(),
-          summary: "Actual",
-          startMinutes,
-          durationMinutes: 30,
-          colorId: defaultSettings.defaultActualColorId,
-          saveDisposition: "unsaved",
-        },
-      ],
-      updatedAt: createdAt.toISOString(),
+    const lastPossibleStartMinutes =
+      24 * 60 - defaultSettings.minimumBlockDurationMinutes;
+    const boundedStartMinutes = Math.min(
+      startMinutes,
+      lastPossibleStartMinutes,
+    );
+    const durationMinutes = Math.min(
+      defaultActualDurationMinutes,
+      24 * 60 - boundedStartMinutes,
+    );
+    const newActual = {
+      id: crypto.randomUUID(),
+      summary: "Actual",
+      startMinutes: boundedStartMinutes,
+      durationMinutes,
+      colorId: defaultSettings.defaultActualColorId,
+      saveDisposition: "unsaved" as const,
     };
+    const nextRecord: DayRecord = dayRecord
+      ? {
+          ...dayRecord,
+          actual: [...dayRecord.actual, newActual],
+          updatedAt: createdAt.toISOString(),
+        }
+      : {
+          schemaVersion: 1,
+          date: calendarDay.date,
+          timezone: calendarDay.timeZone,
+          actual: [newActual],
+          updatedAt: createdAt.toISOString(),
+        };
 
     void saveDayRecordLocally(nextRecord);
   }
 
   async function saveDayRecordLocally(record: DayRecord) {
     const writeId = ++latestDayRecordWriteIdRef.current;
-    setHydratedActuals({
+    setDayRecordState({
       key: `${record.date}:${record.timezone}`,
       record,
     });
@@ -336,11 +356,11 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           canAddActual={
             calendarState.status === "connected" &&
             actualLoadSettled &&
-            !dayRecord?.actual.length
+            !isSavingActualsToCalendar
           }
           events={events}
           now={now}
-          onAddActual={() => void addActual()}
+          onAddActual={addActual}
           status={calendarState.status === "disconnected" ? "error" : calendarState.status}
           date={calendarDay.date}
           timeZone={calendarDay.timeZone}

@@ -321,7 +321,7 @@ describe("App Actual persistence", () => {
     });
   });
 
-  it("hydrates an existing Actual before allowing creation", async () => {
+  it("appends a new Actual at the current snapped time", async () => {
     const stored = mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
@@ -341,11 +341,78 @@ describe("App Actual persistence", () => {
       }],
       updatedAt: "2026-07-15T17:00:00.000Z",
     };
+    vi.stubGlobal("crypto", { randomUUID: () => "appended-actual" });
 
     render(<App now={now} />);
 
     expect(await screen.findByText("Restored Actual")).toBeVisible();
-    expect(screen.getByRole("button", { name: "Add Actual" })).toBeDisabled();
+    const add = screen.getByRole("button", { name: "Add Actual" });
+    expect(add).toBeEnabled();
+    fireEvent.click(add);
+
+    expect(await screen.findAllByTestId("actual-block")).toHaveLength(2);
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [
+          expect.objectContaining({ id: "restored-actual" }),
+          expect.objectContaining({
+            id: "appended-actual",
+            startMinutes: 720,
+            durationMinutes: 30,
+          }),
+        ],
+      }),
+    });
+  });
+
+  it("shortens a new Actual to the time remaining before midnight", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={() => new Date("2026-07-15T23:52:00-07:00")} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [
+          expect.objectContaining({
+            startMinutes: 1430,
+            durationMinutes: 10,
+          }),
+        ],
+      }),
+    });
+  });
+
+  it("uses a five-minute 11:55 PM block when fewer than five minutes remain", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={() => new Date("2026-07-15T23:58:00-07:00")} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
+
+    expect(chrome.storage.local.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [
+          expect.objectContaining({
+            startMinutes: 1435,
+            durationMinutes: 5,
+          }),
+        ],
+      }),
+    });
   });
 
   it("renders a new Actual optimistically while persisting it", async () => {
@@ -510,6 +577,53 @@ describe("App Actual Calendar saving", () => {
       updatedAt: "2026-07-15T17:00:00.000Z",
     };
   }
+
+  it("disables Actual creation until Calendar saving finishes", async () => {
+    let listRequests = 0;
+    let finishCalendarRefresh: ((value: unknown) => void) | undefined;
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        listRequests += 1;
+        if (listRequests === 1) {
+          return {
+            ok: true,
+            value: {
+              events: [timedEvent],
+              date: "2026-07-15",
+              timeZone: "America/Los_Angeles",
+            },
+          };
+        }
+        return new Promise((resolve) => {
+          finishCalendarRefresh = resolve;
+        });
+      }
+      return unexpectedMessage(message);
+    });
+    seedUnsavedActual(stored);
+
+    render(<App now={now} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(
+      screen.getByRole("button", { name: "Save Actual to calendar" }),
+    );
+
+    expect(add).toBeDisabled();
+    finishCalendarRefresh?.({
+      ok: true,
+      value: {
+        events: [timedEvent],
+        date: "2026-07-15",
+        timeZone: "America/Los_Angeles",
+      },
+    });
+
+    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
+      "1 matched Plan",
+    );
+    await waitFor(() => expect(add).toBeEnabled());
+  });
 
   it("permanently classifies an exact Plan match without inserting", async () => {
     const handler = vi.fn(async (message: RuntimeMessage) => {

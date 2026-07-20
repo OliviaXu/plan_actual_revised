@@ -118,22 +118,15 @@ Unit and component coverage includes:
 Storage failure translation remains unit-tested. Failure UI is
 component-tested. No artificial storage-failure E2E hook is added.
 
-### Review Note
-
-The current implementation clears an existing storage warning as soon as a
-later write is enqueued. Prefer keeping the warning visible until the latest
-write actually succeeds, so a slow or repeatedly failing retry does not
-temporarily imply durability.
-
 ### Status
 
-Implemented and verified:
+Completed and committed as `58ea138`
+(`Make Actual persistence optimistic and ordered`).
 
-- 100 unit tests passed.
-- 18 deterministic E2E tests passed.
-- Typecheck, lint, build, and `git diff --check` passed.
-
-Awaiting selection of the review-note fix and commit approval.
+The implementation intentionally clears an existing storage warning when a
+later complete write begins. If that write fails, the warning is shown again.
+This keeps the deliberately lightweight, availability-first failure policy
+without adding separate pending-durability UI.
 
 ## Slice 5C — Multiple-Block Add and Edit
 
@@ -142,14 +135,19 @@ Awaiting selection of the review-note fix and commit approval.
 - Remove the one-Actual limit.
 - Add creates an `Untitled`, 30-minute, default-colored, unsaved block.
 - Immediately open the new block's dialog with its title selected.
-- Start a new block at the latest Actual end.
-- When the day has no Actuals, start at the current time snapped down to
-  `snapMinutes`.
+- Start every new block at the current time snapped down to `snapMinutes`.
+- Allow new blocks to overlap existing Actuals. Overlap is unavoidable once
+  dragging and Slack blocks are introduced, so creation does not maintain or
+  cache a latest-Actual-end value.
 - Near midnight, shorten the default duration to the remaining time.
 - If fewer than five minutes remain, create a five-minute block beginning at
   11:55 PM.
-- Derive mutations from the latest in-memory record so rapid actions cannot
-  overwrite one another through stale render closures.
+- Derive each Add from the rendered `DayRecord` without a duplicate
+  synchronous record mirror. Same-render rapid clicks are intentionally not
+  supported; the edit modal will serialize normal creation.
+- Disable Add while Actuals are being saved to Calendar, with the same guard at
+  the handler boundary, so a disposition write cannot replace a newly added
+  block with its older Calendar-save snapshot.
 
 ### Edit Dialog
 
@@ -184,8 +182,7 @@ Awaiting selection of the review-note fix and commit approval.
 Unit and component coverage includes:
 
 - multiple-block placement;
-- latest-end placement;
-- empty-day current-time placement;
+- current-time placement with intentional overlap;
 - late-night shortening and the 11:55 PM minimum case;
 - immediate dialog opening and title selection;
 - title and duration validation;

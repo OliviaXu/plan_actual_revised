@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-test("a created Actual survives a full extension-page reload", async () => {
+test("multiple created Actuals survive a full extension-page reload", async () => {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "actual-persistence-extension-"),
   );
@@ -40,17 +40,39 @@ registerServiceWorker({
   try {
     await page.goto(`chrome-extension://${extensionId}/index.html`);
     await page.getByRole("button", { name: "Add Actual" }).click();
-    const actual = page.getByTestId("actual-block");
-    await expect(actual).toContainText("Actual");
-    const actualId = await actual.getAttribute("data-actual-id");
+    await page.getByRole("button", { name: "Add Actual" }).click();
+    const actuals = page.getByTestId("actual-block");
+    await expect(actuals).toHaveCount(2);
+    const actualIds = await actuals.evaluateAll((blocks) =>
+      blocks.map((block) => block.getAttribute("data-actual-id")),
+    );
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const stored = await chrome.storage.local.get(
+            "dayRecord:2026-07-15",
+          );
+          const dayRecord = stored["dayRecord:2026-07-15"] as
+            | { actual?: unknown[] }
+            | undefined;
+          return dayRecord?.actual?.length;
+        }),
+      )
+      .toBe(2);
 
     await page.reload();
 
-    await expect(page.getByTestId("actual-block")).toHaveAttribute(
-      "data-actual-id",
-      actualId ?? "missing-id",
+    await expect(page.getByTestId("actual-block")).toHaveCount(2);
+    await expect
+      .poll(() =>
+        page.getByTestId("actual-block").evaluateAll((blocks) =>
+          blocks.map((block) => block.getAttribute("data-actual-id")),
+        ),
+      )
+      .toEqual(actualIds);
+    await expect(page.getByTestId("actual-block").first()).toContainText(
+      "Actual",
     );
-    await expect(page.getByTestId("actual-block")).toContainText("Actual");
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });
