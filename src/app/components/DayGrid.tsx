@@ -1,7 +1,3 @@
-import type {
-  CalendarEvent,
-  TimedCalendarEvent,
-} from "../../calendar/calendar-event";
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
@@ -14,7 +10,7 @@ import {
   type PlanDayGridBlock,
 } from "./day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
-import type { ActualBlock } from "../../domain/day-record";
+import type { ActualEvent, PlanEvent } from "../../domain/day-event";
 import { getCalendarTime } from "../../calendar/calendar-time";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
@@ -30,7 +26,7 @@ type DayGridStatus =
 export function DayGrid({
   actuals,
   canAddActual,
-  events,
+  planEvents,
   now = readSystemTime,
   onAddActual,
   onEditActual,
@@ -38,9 +34,9 @@ export function DayGrid({
   date,
   timeZone,
 }: {
-  actuals?: ActualBlock[];
+  actuals?: ActualEvent[];
   canAddActual?: boolean;
-  events: CalendarEvent[];
+  planEvents: PlanEvent[];
   now?: () => Date;
   onAddActual?: () => void;
   onEditActual?: (actualId: string) => void;
@@ -54,16 +50,8 @@ export function DayGrid({
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
-  const eligibleTimedEvents = events.filter(
-    (event): event is TimedCalendarEvent =>
-      event.kind === "timed" &&
-      !event.isExtensionActual &&
-      !defaultSettings.hiddenPlanColorIds.includes(event.colorId ?? ""),
-  );
   const layout = calculatePlanDayGridLayout(
-    eligibleTimedEvents,
-    date,
-    timeZone,
+    planEvents,
     defaultSettings,
   );
   const actualBlocks = calculateActualDayGridLayout(
@@ -238,7 +226,6 @@ export function DayGrid({
                   isFront={frontEventId === block.event.id}
                   key={block.event.id}
                   onBringToFront={() => setFrontEventId(block.event.id)}
-                  timeZone={timeZone}
                 />
               ))}
             </div>
@@ -352,13 +339,11 @@ function PlanEventBlock({
   frontZIndex,
   isFront,
   onBringToFront,
-  timeZone,
 }: {
   block: PlanDayGridBlock;
   frontZIndex: number;
   isFront: boolean;
   onBringToFront: () => void;
-  timeZone: string;
 }) {
   const eventColor = resolveGoogleCalendarEventColor(block.event.colorId);
 
@@ -394,7 +379,7 @@ function PlanEventBlock({
           className="min-w-0 truncate font-medium"
           data-testid="plan-event-title"
         >
-          {block.event.summary ?? "Untitled event"}
+          {block.event.summary || "Untitled event"}
         </span>
         <span className="shrink-0 text-muted-foreground">
           {formatDuration(block.durationMinutes)}
@@ -405,7 +390,8 @@ function PlanEventBlock({
           className="block truncate text-muted-foreground"
           data-testid="plan-event-time-range"
         >
-          {formatTime(block.clippedStart, timeZone)} – {formatTime(block.clippedEnd, timeZone)}
+          {formatMinuteOfDay(block.clippedStartMinutes)} –{" "}
+          {formatMinuteOfDay(block.clippedEndMinutes)}
         </span>
       ) : null}
     </button>

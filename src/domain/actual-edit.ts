@@ -1,15 +1,15 @@
-import type { ActualBlock } from "./day-record";
+import type { ActualEvent } from "./day-event";
 
 type ActualEditChanges = Pick<
-  ActualBlock,
+  ActualEvent,
   "summary" | "durationMinutes" | "colorId"
 >;
 
 export function buildEditedActual(
-  actual: ActualBlock,
+  actual: ActualEvent,
   changes: ActualEditChanges,
   createId: () => string,
-): ActualBlock {
+): ActualEvent {
   const isUnsaved = (actual.saveDisposition ?? "unsaved") === "unsaved";
   const needsFreshId =
     actual.saveDisposition === "calendarSaved" ||

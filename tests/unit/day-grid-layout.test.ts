@@ -1,7 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import type { TimedCalendarEvent } from "../../src/calendar/calendar-event";
-import type { ActualBlock } from "../../src/domain/day-record";
+import type { ActualEvent, PlanEvent } from "../../src/domain/day-event";
 import { defaultSettings } from "../../src/domain/settings";
 import {
   calculateActualDayGridLayout,
@@ -13,27 +12,25 @@ import {
 const date = "2026-07-15";
 const timeZone = "America/Los_Angeles";
 
-function timedEvent(
-  id: string,
-  start: string,
-  end: string,
-): TimedCalendarEvent {
-  return {
-    kind: "timed",
-    id,
-    summary: id,
-    colorId: null,
-    start,
-    end,
-    timeZone: "America/Los_Angeles",
-  };
-}
-
-function actualBlock(
+function planEvent(
   id: string,
   startMinutes: number,
   durationMinutes: number,
-): ActualBlock {
+): PlanEvent {
+  return {
+    id,
+    summary: id,
+    colorId: "",
+    startMinutes,
+    durationMinutes,
+  };
+}
+
+function actualEvent(
+  id: string,
+  startMinutes: number,
+  durationMinutes: number,
+): ActualEvent {
   return {
     id,
     summary: id,
@@ -45,17 +42,9 @@ function actualBlock(
 }
 
 describe("calculatePlanDayGridLayout", () => {
-  it("positions events in the Calendar timezone instead of the browser timezone", () => {
+  it("positions normalized day-relative events", () => {
     const layout = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "tokyo-morning",
-          "2026-07-15T01:00:00.000Z",
-          "2026-07-15T02:00:00.000Z",
-        ),
-      ],
-      "2026-07-15",
-      "Asia/Tokyo",
+      [planEvent("morning", 600, 60)],
       defaultSettings,
     );
 
@@ -67,15 +56,7 @@ describe("calculatePlanDayGridLayout", () => {
 
   it("uses the configured range and exact time geometry by default", () => {
     const layout = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "design-review",
-          "2026-07-15T09:00:00-07:00",
-          "2026-07-15T10:00:00-07:00",
-        ),
-      ],
-      date,
-      timeZone,
+      [planEvent("design-review", 540, 60)],
       defaultSettings,
     );
 
@@ -96,19 +77,9 @@ describe("calculatePlanDayGridLayout", () => {
   it("expands and rounds the range to whole-hour boundaries", () => {
     const layout = calculatePlanDayGridLayout(
       [
-        timedEvent(
-          "early",
-          "2026-07-15T06:30:00-07:00",
-          "2026-07-15T07:00:00-07:00",
-        ),
-        timedEvent(
-          "late",
-          "2026-07-15T21:15:00-07:00",
-          "2026-07-15T21:30:00-07:00",
-        ),
+        planEvent("early", 390, 30),
+        planEvent("late", 1_275, 15),
       ],
-      date,
-      timeZone,
       defaultSettings,
     );
 
@@ -123,15 +94,7 @@ describe("calculatePlanDayGridLayout", () => {
 
   it("does not expand an event ending exactly at the configured end hour", () => {
     const layout = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "ends-at-nine",
-          "2026-07-15T20:30:00-07:00",
-          "2026-07-15T21:00:00-07:00",
-        ),
-      ],
-      date,
-      timeZone,
+      [planEvent("ends-at-nine", 1_230, 30)],
       defaultSettings,
     );
 
@@ -140,15 +103,7 @@ describe("calculatePlanDayGridLayout", () => {
 
   it("positions event starts at minute precision", () => {
     const layout = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "sub-minute-start",
-          "2026-07-15T09:00:30-07:00",
-          "2026-07-15T10:00:30-07:00",
-        ),
-      ],
-      date,
-      timeZone,
+      [planEvent("minute-start", 540, 60)],
       defaultSettings,
     );
 
@@ -157,27 +112,11 @@ describe("calculatePlanDayGridLayout", () => {
 
   it("applies the named minimum height and the time-range threshold", () => {
     const belowThreshold = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "short",
-          "2026-07-15T10:00:00-07:00",
-          "2026-07-15T10:05:00-07:00",
-        ),
-      ],
-      date,
-      timeZone,
+      [planEvent("short", 600, 5)],
       defaultSettings,
     ).blocks[0];
     const atThreshold = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "threshold",
-          "2026-07-15T10:00:00-07:00",
-          "2026-07-15T10:20:00-07:00",
-        ),
-      ],
-      date,
-      timeZone,
+      [planEvent("threshold", 600, 20)],
       { ...defaultSettings, pixelsPerMinute: 2 },
     ).blocks[0];
 
@@ -189,15 +128,7 @@ describe("calculatePlanDayGridLayout", () => {
 
   it("allows enough bottom space to show a minimum-height boundary block", () => {
     const layout = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "ends-at-boundary",
-          "2026-07-15T20:55:00-07:00",
-          "2026-07-15T21:00:00-07:00",
-        ),
-      ],
-      date,
-      timeZone,
+      [planEvent("ends-at-boundary", 1_255, 5)],
       defaultSettings,
     );
 
@@ -206,52 +137,12 @@ describe("calculatePlanDayGridLayout", () => {
     expect(layout.blocks[0]).toMatchObject({ topPx: 1_169, heightPx: 20 });
   });
 
-  it("discards malformed, non-positive, and out-of-day events", () => {
+  it("positions events normalized at both local-midnight boundaries", () => {
     const layout = calculatePlanDayGridLayout(
       [
-        timedEvent("malformed", "not-a-date", "still-not-a-date"),
-        timedEvent(
-          "zero",
-          "2026-07-15T09:00:00-07:00",
-          "2026-07-15T09:00:00-07:00",
-        ),
-        timedEvent(
-          "negative",
-          "2026-07-15T10:00:00-07:00",
-          "2026-07-15T09:00:00-07:00",
-        ),
-        timedEvent(
-          "yesterday",
-          "2026-07-14T09:00:00-07:00",
-          "2026-07-14T10:00:00-07:00",
-        ),
+        planEvent("from-yesterday", -30, 60),
+        planEvent("into-tomorrow", 1_410, 60),
       ],
-      date,
-      timeZone,
-      defaultSettings,
-    );
-
-    expect(layout.blocks).toEqual([]);
-    expect(layout.startHour).toBe(7);
-    expect(layout.endHour).toBe(21);
-  });
-
-  it("clips events at both local-midnight boundaries", () => {
-    const layout = calculatePlanDayGridLayout(
-      [
-        timedEvent(
-          "from-yesterday",
-          "2026-07-14T23:30:00-07:00",
-          "2026-07-15T00:30:00-07:00",
-        ),
-        timedEvent(
-          "into-tomorrow",
-          "2026-07-15T23:30:00-07:00",
-          "2026-07-16T00:30:00-07:00",
-        ),
-      ],
-      date,
-      timeZone,
       defaultSettings,
     );
 
@@ -259,24 +150,24 @@ describe("calculatePlanDayGridLayout", () => {
     expect(layout.endHour).toBe(24);
     expect(layout.blocks.map((block) => ({
       id: block.event.id,
-      start: block.clippedStart.toISOString(),
-      end: block.clippedEnd.toISOString(),
+      startMinutes: block.clippedStartMinutes,
+      endMinutes: block.clippedEndMinutes,
       durationMinutes: block.durationMinutes,
       topPx: block.topPx,
       heightPx: block.heightPx,
     }))).toEqual([
       {
         id: "from-yesterday",
-        start: "2026-07-15T07:00:00.000Z",
-        end: "2026-07-15T07:30:00.000Z",
+        startMinutes: 0,
+        endMinutes: 30,
         durationMinutes: 30,
         topPx: 0,
         heightPx: 42,
       },
       {
         id: "into-tomorrow",
-        start: "2026-07-16T06:30:00.000Z",
-        end: "2026-07-16T07:00:00.000Z",
+        startMinutes: 1_410,
+        endMinutes: 1_440,
         durationMinutes: 30,
         topPx: 1_974,
         heightPx: 42,
@@ -287,29 +178,11 @@ describe("calculatePlanDayGridLayout", () => {
   it("assigns deterministic layers within transitive overlap groups", () => {
     const layout = calculatePlanDayGridLayout(
       [
-        timedEvent(
-          "chain-end",
-          "2026-07-15T10:00:00-07:00",
-          "2026-07-15T11:00:00-07:00",
-        ),
-        timedEvent(
-          "chain-middle",
-          "2026-07-15T09:30:00-07:00",
-          "2026-07-15T10:30:00-07:00",
-        ),
-        timedEvent(
-          "chain-start",
-          "2026-07-15T09:00:00-07:00",
-          "2026-07-15T10:00:00-07:00",
-        ),
-        timedEvent(
-          "separate",
-          "2026-07-15T13:00:00-07:00",
-          "2026-07-15T14:00:00-07:00",
-        ),
+        planEvent("chain-end", 600, 60),
+        planEvent("chain-middle", 570, 60),
+        planEvent("chain-start", 540, 60),
+        planEvent("separate", 780, 60),
       ],
-      date,
-      timeZone,
       defaultSettings,
     );
 
@@ -330,24 +203,10 @@ describe("calculatePlanDayGridLayout", () => {
   it("orders same-start nested events deterministically and reuses touching layers", () => {
     const layout = calculatePlanDayGridLayout(
       [
-        timedEvent(
-          "shorter",
-          "2026-07-15T09:00:00-07:00",
-          "2026-07-15T10:00:00-07:00",
-        ),
-        timedEvent(
-          "longer",
-          "2026-07-15T09:00:00-07:00",
-          "2026-07-15T11:00:00-07:00",
-        ),
-        timedEvent(
-          "touching-shorter",
-          "2026-07-15T10:00:00-07:00",
-          "2026-07-15T10:30:00-07:00",
-        ),
+        planEvent("shorter", 540, 60),
+        planEvent("longer", 540, 120),
+        planEvent("touching-shorter", 600, 30),
       ],
-      date,
-      timeZone,
       defaultSettings,
     );
 
@@ -366,10 +225,10 @@ describe("calculateActualDayGridLayout", () => {
   it("uses the same deterministic overlap groups and reusable layers as Plan", () => {
     const blocks = calculateActualDayGridLayout(
       [
-        actualBlock("chain-end", 600, 60),
-        actualBlock("chain-middle", 570, 60),
-        actualBlock("chain-start", 540, 60),
-        actualBlock("separate", 780, 60),
+        actualEvent("chain-end", 600, 60),
+        actualEvent("chain-middle", 570, 60),
+        actualEvent("chain-start", 540, 60),
+        actualEvent("separate", 780, 60),
       ],
       7,
       21,
@@ -395,10 +254,10 @@ describe("calculateActualDayGridLayout", () => {
   it("clips partial Actuals and omits blocks outside the Plan-derived range", () => {
     const blocks = calculateActualDayGridLayout(
       [
-        actualBlock("before", 300, 60),
-        actualBlock("early-clipped", 390, 60),
-        actualBlock("late-clipped", 1_425, 60),
-        actualBlock("after", 1_440, 30),
+        actualEvent("before", 300, 60),
+        actualEvent("early-clipped", 390, 60),
+        actualEvent("late-clipped", 1_425, 60),
+        actualEvent("after", 1_440, 30),
       ],
       7,
       24,

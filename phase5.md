@@ -98,7 +98,7 @@ that risk.
   malformed, or manually modified record.
 - Trust the statically typed `DayRecord` on the write path. The app constructs
   these records itself, so `saveDayRecord(record: DayRecord)` does not repeat
-  `isDayRecord` or `isActualBlock` validation.
+  `isDayRecord` or `isActualEvent` validation.
 - Old records are expected to be removed in a later phase. Until then, the
   limited read-boundary validation remains inexpensive and keeps the runtime
   type boundary honest.
@@ -254,7 +254,7 @@ Playwright reloads after resizing to prove canonical persistence.
 
 - Extend `DayGrid` with Actual edit and resize callbacks plus a
   mutation-disabled state.
-- Keep `ActualBlock` unchanged.
+- Keep the persisted `ActualEvent` shape unchanged.
 - Keep `DayRecord.schemaVersion` unchanged.
 - Keep queue, dialog draft, error display, and resize-preview state transient.
 - Add `@radix-ui/react-dialog` and a local shadcn-style Dialog primitive.

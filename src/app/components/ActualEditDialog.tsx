@@ -1,7 +1,7 @@
 import { Check } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 
-import type { ActualBlock } from "../../domain/day-record";
+import type { ActualEvent } from "../../domain/day-event";
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import { Button } from "./ui/button";
 import {
@@ -25,7 +25,7 @@ export function ActualEditDialog({
   paletteColorIds,
   titleFocusMode,
 }: {
-  actual: ActualBlock;
+  actual: ActualEvent;
   onDelete?: () => void;
   onDismiss: () => void;
   onSave: (draft: ActualDraft) => void;

@@ -1,15 +1,8 @@
-import type {
-  TimedCalendarEvent,
-} from "../../calendar/calendar-event";
-import type { ActualBlock } from "../../domain/day-record";
+import type { ActualEvent, PlanEvent } from "../../domain/day-event";
 import type { AppSettings } from "../../domain/settings";
-import {
-  getCalendarDayRange,
-  getCalendarTime,
-} from "../../calendar/calendar-time";
+import { getCalendarTime } from "../../calendar/calendar-time";
 
 const MINUTES_PER_HOUR = 60;
-const MILLISECONDS_PER_MINUTE = 60_000;
 
 export const MINIMUM_PLAN_BLOCK_HEIGHT_PX = 20;
 export const PLAN_BLOCK_TIME_RANGE_MINIMUM_HEIGHT_PX = 40;
@@ -22,9 +15,9 @@ type PlanGridSettings = Pick<
 >;
 
 export type PlanDayGridBlock = {
-  event: TimedCalendarEvent;
-  clippedStart: Date;
-  clippedEnd: Date;
+  event: PlanEvent;
+  clippedStartMinutes: number;
+  clippedEndMinutes: number;
   durationMinutes: number;
   topPx: number;
   heightPx: number;
@@ -42,7 +35,7 @@ export type PlanDayGridLayout = {
 };
 
 export type ActualDayGridBlock = {
-  actual: ActualBlock;
+  actual: ActualEvent;
   clippedStartMinutes: number;
   clippedEndMinutes: number;
   durationMinutes: number;
@@ -54,58 +47,33 @@ export type ActualDayGridBlock = {
 };
 
 export function calculatePlanDayGridLayout(
-  events: TimedCalendarEvent[],
-  date: string,
-  timeZone: string,
+  events: PlanEvent[],
   settings: PlanGridSettings,
 ): PlanDayGridLayout {
-  const day = getCalendarDayRange(date, timeZone);
-  const dayStart = new Date(day.timeMin);
-  const dayEnd = new Date(day.timeMax);
-
-  const clippedEvents = events.flatMap((event) => {
-    const eventStart = new Date(event.start);
-    const eventEnd = new Date(event.end);
-    if (
-      !Number.isFinite(eventStart.getTime()) ||
-      !Number.isFinite(eventEnd.getTime()) ||
-      eventEnd <= eventStart ||
-      eventEnd <= dayStart ||
-      eventStart >= dayEnd
-    ) {
+  const visibleEvents = events.flatMap((event) => {
+    const eventEndMinutes = event.startMinutes + event.durationMinutes;
+    if (eventEndMinutes <= 0 || event.startMinutes >= 24 * MINUTES_PER_HOUR) {
       return [];
     }
-
-    const clippedStart = eventStart < dayStart ? dayStart : eventStart;
-    const clippedEnd = eventEnd > dayEnd ? dayEnd : eventEnd;
-    const clippedStartMinuteOfDay = minuteOfDay(
-      clippedStart,
-      dayEnd,
-      timeZone,
-    );
-    const clippedEndMinuteOfDay = minuteOfDay(clippedEnd, dayEnd, timeZone);
-
-    return [
-      {
-        event,
-        clippedStart,
-        clippedEnd,
-        clippedStartMinuteOfDay,
-        clippedEndMinuteOfDay,
-      },
-    ];
+    return [{
+      event,
+      clippedStartMinutes: Math.max(0, event.startMinutes),
+      clippedEndMinutes: Math.min(
+        24 * MINUTES_PER_HOUR,
+        eventEndMinutes,
+      ),
+    }];
   });
-
   const startHour = Math.min(
     settings.dayStartHour,
-    ...clippedEvents.map(({ clippedStartMinuteOfDay }) =>
-      Math.floor(clippedStartMinuteOfDay / MINUTES_PER_HOUR),
+    ...visibleEvents.map(({ clippedStartMinutes }) =>
+      Math.floor(clippedStartMinutes / MINUTES_PER_HOUR),
     ),
   );
   const endHour = Math.max(
     settings.dayEndHour,
-    ...clippedEvents.map(({ clippedEndMinuteOfDay }) =>
-      Math.ceil(clippedEndMinuteOfDay / MINUTES_PER_HOUR),
+    ...visibleEvents.map(({ clippedEndMinutes }) =>
+      Math.ceil(clippedEndMinutes / MINUTES_PER_HOUR),
     ),
   );
   const rangeHeightPx = roundPixel(
@@ -117,11 +85,9 @@ export function calculatePlanDayGridLayout(
     { length: endHour - startHour + 1 },
     (_, index) => startHour + index,
   );
-  const positionedBlocks = clippedEvents.map(
-    ({ event, clippedStart, clippedEnd, clippedStartMinuteOfDay }) => {
-      const durationMinutes =
-        (clippedEnd.getTime() - clippedStart.getTime()) /
-        MILLISECONDS_PER_MINUTE;
+  const positionedBlocks = visibleEvents.map(
+    ({ event, clippedStartMinutes, clippedEndMinutes }) => {
+      const durationMinutes = clippedEndMinutes - clippedStartMinutes;
       const heightPx = roundPixel(
         Math.max(
           MINIMUM_PLAN_BLOCK_HEIGHT_PX,
@@ -131,11 +97,11 @@ export function calculatePlanDayGridLayout(
 
       return {
         event,
-        clippedStart,
-        clippedEnd,
+        clippedStartMinutes,
+        clippedEndMinutes,
         durationMinutes,
         topPx: roundPixel(
-          (clippedStartMinuteOfDay - startHour * MINUTES_PER_HOUR) *
+          (clippedStartMinutes - startHour * MINUTES_PER_HOUR) *
             settings.pixelsPerMinute,
         ),
         heightPx,
@@ -146,8 +112,8 @@ export function calculatePlanDayGridLayout(
   );
   const blocks = assignOverlapLayers(positionedBlocks, (block) => ({
     id: block.event.id,
-    start: block.clippedStart.getTime(),
-    end: block.clippedEnd.getTime(),
+    start: block.clippedStartMinutes,
+    end: block.clippedEndMinutes,
   }));
   const heightPx = Math.max(
     rangeHeightPx,
@@ -164,7 +130,7 @@ export function calculatePlanDayGridLayout(
 }
 
 export function calculateActualDayGridLayout(
-  actuals: ActualBlock[],
+  actuals: ActualEvent[],
   startHour: number,
   endHour: number,
   settings: PlanGridSettings,
@@ -294,12 +260,4 @@ function assignOverlapLayers<T>(
 
 function roundPixel(value: number) {
   return Math.round(value * 1_000_000) / 1_000_000;
-}
-
-function minuteOfDay(date: Date, dayEnd: Date, timeZone: string) {
-  if (date.getTime() === dayEnd.getTime()) {
-    return 24 * MINUTES_PER_HOUR;
-  }
-
-  return getCalendarTime(date, timeZone).minutesSinceMidnight;
 }

@@ -1,22 +1,11 @@
 import { isRecord } from "../shared/is-record";
-
-export type ActualBlock = {
-  id: string;
-  summary: string;
-  startMinutes: number;
-  durationMinutes: number;
-  colorId: string;
-  saveDisposition?: "unsaved" | "calendarSaved" | "planMatched";
-  calendarEventId?: string;
-  lastSaveAttemptAt?: string;
-  lastSaveError?: { code: string; message: string };
-};
+import type { ActualEvent } from "./day-event";
 
 export type DayRecord = {
   schemaVersion: 1;
   date: string;
   timezone: string;
-  actual: ActualBlock[];
+  actual: ActualEvent[];
   updatedAt: string;
 };
 
@@ -27,13 +16,13 @@ export function isDayRecord(value: unknown): value is DayRecord {
     isLocalDate(value.date) &&
     isTimeZone(value.timezone) &&
     Array.isArray(value.actual) &&
-    value.actual.every(isActualBlock) &&
+    value.actual.every(isActualEvent) &&
     typeof value.updatedAt === "string" &&
     Number.isFinite(Date.parse(value.updatedAt))
   );
 }
 
-function isActualBlock(value: unknown): value is ActualBlock {
+function isActualEvent(value: unknown): value is ActualEvent {
   if (!isRecord(value)) return false;
   return (
     typeof value.id === "string" &&

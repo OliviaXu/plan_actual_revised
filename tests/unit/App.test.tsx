@@ -9,7 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../src/app/App";
-import type { ActualBlock } from "../../src/domain/day-record";
+import type { ActualEvent } from "../../src/domain/day-event";
 
 type RuntimeMessage = {
   type: string;
@@ -603,7 +603,7 @@ describe("App new Actual dialog", () => {
   }
 
   async function openExistingActualDialog(
-    actualOverrides: Partial<ActualBlock> = {},
+    actualOverrides: Partial<ActualEvent> = {},
   ) {
     const stored = mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {

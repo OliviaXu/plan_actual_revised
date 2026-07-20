@@ -8,33 +8,32 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { CalendarEvent } from "../../src/calendar/calendar-event";
-import type { ActualBlock } from "../../src/domain/day-record";
+import type { ActualEvent, PlanEvent } from "../../src/domain/day-event";
 import { DayGrid } from "../../src/app/components/DayGrid";
 
 const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
 
-function timedEvent(
-  id: string,
-  start: string,
-  end: string,
-): CalendarEvent {
-  return {
-    kind: "timed",
-    id,
-    summary: id,
-    colorId: null,
-    start,
-    end,
-    timeZone: "America/Los_Angeles",
-  };
-}
-
-function actualBlock(
+function planEvent(
   id: string,
   startMinutes: number,
   durationMinutes: number,
-): ActualBlock {
+  overrides: Partial<PlanEvent> = {},
+): PlanEvent {
+  return {
+    id,
+    summary: id,
+    colorId: "",
+    startMinutes,
+    durationMinutes,
+    ...overrides,
+  };
+}
+
+function actualEvent(
+  id: string,
+  startMinutes: number,
+  durationMinutes: number,
+): ActualEvent {
   return {
     id,
     summary: id,
@@ -52,7 +51,7 @@ afterEach(() => {
 
 describe("DayGrid", () => {
   it("renders the complete default hour axis without full-width grid lines", () => {
-    render(<DayGrid events={[]} status="connected" {...calendarDay} />);
+    render(<DayGrid planEvents={[]} status="connected" {...calendarDay} />);
 
     expect(screen.queryByTestId("plan-hour-line")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("plan-hour-tick")).toHaveLength(15);
@@ -72,12 +71,8 @@ describe("DayGrid", () => {
   it("renders title, duration, exact geometry, and a tall-block time range", () => {
     render(
       <DayGrid
-        events={[
-          timedEvent(
-            "Design review",
-            "2026-07-15T09:00:00-07:00",
-            "2026-07-15T10:00:00-07:00",
-          ),
+        planEvents={[
+          planEvent("Design review", 540, 60),
         ]}
         status="connected"
         {...calendarDay}
@@ -94,17 +89,9 @@ describe("DayGrid", () => {
   it("hides the time range below 40px and shows it above 40px", () => {
     render(
       <DayGrid
-        events={[
-          timedEvent(
-            "Below threshold",
-            "2026-07-15T09:00:00-07:00",
-            "2026-07-15T09:20:00-07:00",
-          ),
-          timedEvent(
-            "Above threshold",
-            "2026-07-15T10:00:00-07:00",
-            "2026-07-15T10:30:00-07:00",
-          ),
+        planEvents={[
+          planEvent("Below threshold", 540, 20),
+          planEvent("Above threshold", 600, 30),
         ]}
         status="connected"
         {...calendarDay}
@@ -126,12 +113,8 @@ describe("DayGrid", () => {
   it("keeps a minimum-height block visible at the final boundary", () => {
     render(
       <DayGrid
-        events={[
-          timedEvent(
-            "Final five minutes",
-            "2026-07-15T20:55:00-07:00",
-            "2026-07-15T21:00:00-07:00",
-          ),
+        planEvents={[
+          planEvent("Final five minutes", 1_255, 5),
         ]}
         status="connected"
         {...calendarDay}
@@ -147,51 +130,15 @@ describe("DayGrid", () => {
     });
   });
 
-  it("filters ineligible events before layout and applies Calendar colors", () => {
+  it("renders normalized titles and Calendar colors", () => {
     render(
       <DayGrid
-        events={[
-          {
-            ...timedEvent(
-              "visible-color",
-              "2026-07-15T09:00:00-07:00",
-              "2026-07-15T10:00:00-07:00",
-            ),
-            colorId: "1",
-          },
-          {
-            ...timedEvent(
-              "hidden-early",
-              "2026-07-15T05:30:00-07:00",
-              "2026-07-15T06:00:00-07:00",
-            ),
-            colorId: "2",
-          },
-          {
-            ...timedEvent(
-              "hidden-late",
-              "2026-07-15T22:00:00-07:00",
-              "2026-07-15T22:30:00-07:00",
-            ),
-            colorId: "10",
-          },
-          {
-            kind: "allDay",
-            id: "daily-focus",
-            summary: "Daily focus",
-            colorId: "5",
-            startDate: "2026-07-15",
-            endDate: "2026-07-16",
-          },
-          {
-            ...timedEvent(
-              "untitled-neutral",
-              "2026-07-15T11:00:00-07:00",
-              "2026-07-15T11:30:00-07:00",
-            ),
-            summary: null,
-            colorId: null,
-          },
+        planEvents={[
+          planEvent("visible-color", 540, 60, { colorId: "1" }),
+          planEvent("untitled-neutral", 660, 30, {
+            summary: "",
+            colorId: "",
+          }),
         ]}
         status="connected"
         {...calendarDay}
@@ -206,9 +153,6 @@ describe("DayGrid", () => {
       "data-end-hour",
       "21",
     );
-    expect(screen.queryByTestId("plan-event-hidden-early")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plan-event-hidden-late")).not.toBeInTheDocument();
-    expect(screen.queryByTestId("plan-event-daily-focus")).not.toBeInTheDocument();
     expect(screen.getByText("Untitled event")).toBeVisible();
     expect(screen.getByTestId("plan-event-visible-color")).toHaveStyle({
       backgroundColor: "#7986cb40",
@@ -223,17 +167,9 @@ describe("DayGrid", () => {
   it("cascades overlapping blocks and brings a clicked block to the front", () => {
     render(
       <DayGrid
-        events={[
-          timedEvent(
-            "base",
-            "2026-07-15T09:00:00-07:00",
-            "2026-07-15T11:00:00-07:00",
-          ),
-          timedEvent(
-            "nested",
-            "2026-07-15T09:30:00-07:00",
-            "2026-07-15T10:30:00-07:00",
-          ),
+        planEvents={[
+          planEvent("base", 540, 120),
+          planEvent("nested", 570, 60),
         ]}
         status="connected"
         {...calendarDay}
@@ -276,10 +212,10 @@ describe("DayGrid", () => {
     render(
       <DayGrid
         actuals={[
-          actualBlock("base-actual", 540, 120),
-          actualBlock("nested-actual", 570, 60),
+          actualEvent("base-actual", 540, 120),
+          actualEvent("nested-actual", 570, 60),
         ]}
-        events={[]}
+        planEvents={[]}
         status="connected"
         {...calendarDay}
       />,
@@ -327,13 +263,9 @@ describe("DayGrid", () => {
   it("clips a minimum-height Actual at midnight instead of the extended Plan body", () => {
     render(
       <DayGrid
-        actuals={[actualBlock("midnight-actual", 1_435, 60)]}
-        events={[
-          timedEvent(
-            "midnight-plan",
-            "2026-07-15T23:55:00-07:00",
-            "2026-07-16T00:00:00-07:00",
-          ),
+        actuals={[actualEvent("midnight-actual", 1_435, 60)]}
+        planEvents={[
+          planEvent("midnight-plan", 1_435, 5),
         ]}
         status="connected"
         {...calendarDay}
@@ -357,7 +289,7 @@ describe("DayGrid", () => {
     let currentTime = new Date(2026, 6, 15, 12, 34);
     render(
       <DayGrid
-        events={[]}
+        planEvents={[]}
         now={() => currentTime}
         status="connected"
         {...calendarDay}
@@ -379,7 +311,7 @@ describe("DayGrid", () => {
   it("auto-scrolls once after connected content renders", () => {
     const now = () => new Date(2026, 6, 15, 12);
     const { rerender } = render(
-      <DayGrid events={[]} now={now} status="loading" {...calendarDay} />,
+      <DayGrid planEvents={[]} now={now} status="loading" {...calendarDay} />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
     const header = screen.getByTestId("day-grid-header");
@@ -387,19 +319,15 @@ describe("DayGrid", () => {
     Object.defineProperty(header, "offsetHeight", { value: 35 });
 
     rerender(
-      <DayGrid events={[]} now={now} status="connected" {...calendarDay} />,
+      <DayGrid planEvents={[]} now={now} status="connected" {...calendarDay} />,
     );
     expect(viewport.scrollTop).toBe(305);
 
     viewport.scrollTop = 700;
     rerender(
       <DayGrid
-        events={[
-          timedEvent(
-            "Later event",
-            "2026-07-15T14:00:00-07:00",
-            "2026-07-15T15:00:00-07:00",
-          ),
+        planEvents={[
+          planEvent("Later event", 840, 60),
         ]}
         now={now}
         status="connected"

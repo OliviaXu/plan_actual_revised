@@ -1,10 +1,10 @@
 import { DateTime } from "luxon";
 
-import type { ActualBlock } from "../domain/day-record";
+import type { ActualEvent } from "../domain/day-event";
 import type { CalendarInsertEvent } from "./calendar-event";
 
-export type CalendarActualInput = {
-  block: ActualBlock;
+export type ActualCalendarEventInput = {
+  actual: ActualEvent;
   date: string;
   timezone: string;
   summaryPrefix: string;
@@ -16,15 +16,15 @@ export function calendarEventIdForActual(blockId: string) {
 }
 
 export function mapActualToCalendarEvent(
-  input: CalendarActualInput,
+  input: ActualCalendarEventInput,
 ): CalendarInsertEvent {
   return {
-    id: calendarEventIdForActual(input.block.id),
-    summary: `${input.summaryPrefix} ${input.block.summary}`.trim(),
+    id: calendarEventIdForActual(input.actual.id),
+    summary: `${input.summaryPrefix} ${input.actual.summary}`.trim(),
     start: {
       dateTime: localDateTime(
         input.date,
-        input.block.startMinutes,
+        input.actual.startMinutes,
         input.timezone,
       ),
       timeZone: input.timezone,
@@ -32,12 +32,12 @@ export function mapActualToCalendarEvent(
     end: {
       dateTime: localDateTime(
         input.date,
-        input.block.startMinutes + input.block.durationMinutes,
+        input.actual.startMinutes + input.actual.durationMinutes,
         input.timezone,
       ),
       timeZone: input.timezone,
     },
-    colorId: input.block.colorId || input.defaultColorId,
+    colorId: input.actual.colorId || input.defaultColorId,
     attendees: [],
     reminders: { useDefault: false },
     extendedProperties: {

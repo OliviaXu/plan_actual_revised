@@ -1,9 +1,9 @@
 import { describe, expect, it, vi } from "vitest";
 
 import { buildEditedActual } from "../../src/domain/actual-edit";
-import type { ActualBlock } from "../../src/domain/day-record";
+import type { ActualEvent } from "../../src/domain/day-event";
 
-function actualBlock(overrides: Partial<ActualBlock> = {}): ActualBlock {
+function actualEvent(overrides: Partial<ActualEvent> = {}): ActualEvent {
   return {
     id: "original-id",
     summary: "Original title",
@@ -26,7 +26,7 @@ describe("buildEditedActual", () => {
     const createId = vi.fn(() => "replacement-id");
 
     expect(
-      buildEditedActual(actualBlock(), titleEdit, createId),
+      buildEditedActual(actualEvent(), titleEdit, createId),
     ).toEqual({
       id: "original-id",
       summary: "Edited title",
@@ -43,7 +43,7 @@ describe("buildEditedActual", () => {
 
     expect(
       buildEditedActual(
-        actualBlock({
+        actualEvent({
           saveDisposition: "planMatched",
           calendarEventId: "stale-calendar-id",
           lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
@@ -68,7 +68,7 @@ describe("buildEditedActual", () => {
 
     expect(
       buildEditedActual(
-        actualBlock({
+        actualEvent({
           saveDisposition: "calendarSaved",
           calendarEventId: "calendar-event-id",
           lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
@@ -92,7 +92,7 @@ describe("buildEditedActual", () => {
 
     expect(
       buildEditedActual(
-        actualBlock({
+        actualEvent({
           saveDisposition: undefined,
           lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
           lastSaveError: {

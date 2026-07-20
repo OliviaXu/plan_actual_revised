@@ -7,14 +7,16 @@ import {
   ActualEditDialog,
   type ActualDraft,
 } from "./components/ActualEditDialog";
-import type { CalendarEvent, TimedCalendarEvent } from "../calendar/calendar-event";
-import type { ActualBlock, DayRecord } from "../domain/day-record";
+import type { CalendarEvent } from "../calendar/calendar-event";
+import type { ActualEvent, PlanEvent } from "../domain/day-event";
+import type { DayRecord } from "../domain/day-record";
+import { toPlanEvents } from "../domain/plan-event";
 import { defaultSettings } from "../domain/settings";
 import { buildEditedActual } from "../domain/actual-edit";
 import { isExactPlanMatch } from "../domain/actual-save";
 import {
   mapActualToCalendarEvent,
-  type CalendarActualInput,
+  type ActualCalendarEventInput,
 } from "../calendar/actual-calendar-event";
 import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { Result } from "../shared/result";
@@ -31,7 +33,7 @@ type CalendarState =
   | { status: "connecting" }
   | {
       status: "connected";
-      events: CalendarEvent[];
+      planEvents: PlanEvent[];
     }
   | { status: "error"; message: string };
 
@@ -41,7 +43,7 @@ type CalendarDay = {
 };
 
 type ActualEditorState =
-  | { mode: "create"; proposedActual: ActualBlock }
+  | { mode: "create"; proposedActual: ActualEvent }
   | { mode: "edit"; targetId: string };
 
 const readSystemTime = () => new Date();
@@ -301,16 +303,18 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         return;
       }
 
-      const timedPlanEvents = planResponse.value.events.filter(
-        (event): event is TimedCalendarEvent =>
-          event.kind === "timed" && !event.isExtensionActual,
+      const planEvents = toPlanEvents(
+        planResponse.value.events,
+        workingRecord.date,
+        workingRecord.timezone,
+        defaultSettings.hiddenPlanColorIds,
       );
 
       for (const actual of unsaved) {
         const attemptedAt = now().toISOString();
         if (
-          timedPlanEvents.some((event) =>
-            isExactPlanMatch(actual, workingRecord, event),
+          planEvents.some((plan) =>
+            isExactPlanMatch(actual, plan),
           )
         ) {
           workingRecord = updateActual(workingRecord, actual.id, {
@@ -323,8 +327,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           continue;
         }
 
-        const input: CalendarActualInput = {
-          block: actual,
+        const input: ActualCalendarEventInput = {
+          actual,
           date: workingRecord.date,
           timezone: workingRecord.timezone,
           summaryPrefix: defaultSettings.actualEventPrefix,
@@ -361,8 +365,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     }
   }
 
-  const events =
-    calendarState.status === "connected" ? calendarState.events : [];
+  const planEvents =
+    calendarState.status === "connected" ? calendarState.planEvents : [];
   const errorMessage =
     calendarState.status === "error"
       ? calendarState.message
@@ -436,7 +440,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             actualLoadSettled &&
             !isSavingActualsToCalendar
           }
-          events={events}
+          planEvents={planEvents}
           now={now}
           onAddActual={addActual}
           onEditActual={(targetId) =>
@@ -552,7 +556,12 @@ async function loadCalendarEvents(
       });
       setCalendarState({
         status: "connected",
-        events: response.value.events,
+        planEvents: toPlanEvents(
+          response.value.events,
+          response.value.date,
+          response.value.timeZone,
+          defaultSettings.hiddenPlanColorIds,
+        ),
       });
       return;
     }

@@ -7,7 +7,7 @@ import {
 import { insertPrimaryCalendarEvent } from "../../src/calendar/google-calendar-client";
 
 const input = {
-  block: {
+  actual: {
     id: "123e4567-e89b-12d3-a456-426614174000",
     summary: "Design review",
     startMinutes: 540,
@@ -23,7 +23,7 @@ const input = {
 
 describe("Calendar Actual insertion", () => {
   it("derives a stable Calendar-compatible event ID", () => {
-    expect(calendarEventIdForActual(input.block.id)).toBe(
+    expect(calendarEventIdForActual(input.actual.id)).toBe(
       "par123e4567e89b12d3a456426614174000",
     );
   });
@@ -73,8 +73,8 @@ describe("Calendar Actual insertion", () => {
     expect(
       mapActualToCalendarEvent({
         ...input,
-        block: {
-          ...input.block,
+        actual: {
+          ...input.actual,
           startMinutes: 23 * 60 + 30,
           durationMinutes: 90,
         },
@@ -90,8 +90,8 @@ describe("Calendar Actual insertion", () => {
       mapActualToCalendarEvent({
         ...input,
         date: "2026-03-08",
-        block: {
-          ...input.block,
+        actual: {
+          ...input.actual,
           startMinutes: 90,
           durationMinutes: 60,
         },
