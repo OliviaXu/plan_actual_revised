@@ -10,6 +10,7 @@ import {
 import type { CalendarEvent, TimedCalendarEvent } from "../calendar/calendar-event";
 import type { ActualBlock, DayRecord } from "../domain/day-record";
 import { defaultSettings } from "../domain/settings";
+import { buildEditedActual } from "../domain/actual-edit";
 import { isExactPlanMatch } from "../domain/actual-save";
 import {
   mapActualToCalendarEvent,
@@ -214,9 +215,18 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       return;
     }
 
-    void saveDayRecordLocally(
-      updateActual(dayRecord, actualEditTarget.id, draft, updatedAt),
+    const editedActual = buildEditedActual(
+      actualEditTarget,
+      draft,
+      () => crypto.randomUUID(),
     );
+    void saveDayRecordLocally({
+      ...dayRecord,
+      actual: dayRecord.actual.map((actual) =>
+        actual.id === actualEditTarget.id ? editedActual : actual,
+      ),
+      updatedAt,
+    });
     setActualEditorState(undefined);
   }
 

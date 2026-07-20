@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { App } from "../../src/app/App";
+import type { ActualBlock } from "../../src/domain/day-record";
 
 type RuntimeMessage = {
   type: string;
@@ -601,7 +602,9 @@ describe("App new Actual dialog", () => {
     );
   }
 
-  async function openExistingActualDialog() {
+  async function openExistingActualDialog(
+    actualOverrides: Partial<ActualBlock> = {},
+  ) {
     const stored = mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return {
@@ -627,6 +630,7 @@ describe("App new Actual dialog", () => {
           durationMinutes: 30,
           colorId: "8",
           saveDisposition: "unsaved",
+          ...actualOverrides,
         },
       ],
       updatedAt: "2026-07-15T19:00:00.000Z",
@@ -832,6 +836,8 @@ describe("App new Actual dialog", () => {
 
   it("closes an unchanged existing Actual without writing", async () => {
     const dialog = await openExistingActualDialog();
+    const createId = vi.fn(() => "replacement-id");
+    vi.stubGlobal("crypto", { randomUUID: createId });
 
     fireEvent.click(dialog.getByRole("button", { name: "Save" }));
 
@@ -841,6 +847,39 @@ describe("App new Actual dialog", () => {
       ).not.toBeInTheDocument(),
     );
     expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(createId).not.toHaveBeenCalled();
+  });
+
+  it("gives a meaningfully edited Calendar-saved Actual a fresh identity", async () => {
+    const dialog = await openExistingActualDialog({
+      saveDisposition: "calendarSaved",
+      calendarEventId: "calendar-event-id",
+      lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
+      lastSaveError: { code: "STALE", message: "Stale error" },
+    });
+    vi.stubGlobal("crypto", { randomUUID: () => "replacement-id" });
+
+    fireEvent.change(dialog.getByRole("spinbutton", { name: "Duration" }), {
+      target: { value: "45" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        "dayRecord:2026-07-15": expect.objectContaining({
+          actual: [
+            {
+              id: "replacement-id",
+              summary: "Existing title",
+              startMinutes: 720,
+              durationMinutes: 45,
+              colorId: "8",
+              saveDisposition: "unsaved",
+            },
+          ],
+        }),
+      }),
+    );
   });
 
   it("deletes the local block without touching Calendar", async () => {

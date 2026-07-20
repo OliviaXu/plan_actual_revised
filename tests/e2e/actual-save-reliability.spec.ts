@@ -90,12 +90,15 @@ test("an exact Plan match is classified once and never inserted", async () => {
   }
 });
 
-test("a nonmatching Actual sends the complete save input and persists success", async () => {
+test("a Calendar-saved Actual becomes a new insert after a meaningful edit", async () => {
   const extensionPath = await createExtension("insert");
   const { context, page } = await openExtension(extensionPath);
   try {
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
+    const originalActualId = await page
+      .getByTestId("actual-block")
+      .getAttribute("data-actual-id");
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
     await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
@@ -115,6 +118,40 @@ test("a nonmatching Actual sends the complete save input and persists success", 
     });
     await page.reload();
     await expect(page.getByTestId("actual-block")).toContainText("Untitled");
+
+    await page.getByTestId("actual-block").click();
+    await page.getByRole("textbox", { name: "Title" }).fill("Edited Actual");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    const editedActual = page
+      .getByTestId("actual-block")
+      .filter({ hasText: "Edited Actual" });
+    await expect(editedActual).toHaveCount(1);
+    const editedActualId = await editedActual.getAttribute("data-actual-id");
+    expect(originalActualId).toBeTruthy();
+    expect(editedActualId).toBeTruthy();
+    expect(editedActualId).not.toBe(originalActualId);
+    expect(await readStorage(page, "dayRecord:2026-07-15")).toMatchObject({
+      actual: [
+        {
+          id: editedActualId,
+          summary: "Edited Actual",
+          saveDisposition: "unsaved",
+        },
+      ],
+    });
+
+    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
+    expect(await readStorage(page, "test:lastInsert")).toMatchObject({
+      id: `par${editedActualId?.toLowerCase().replaceAll("-", "")}`,
+      summary: "[Actual] Edited Actual",
+    });
+    expect(await readStorage(page, "test:uniqueInsertCount")).toBe(2);
+
+    await page.reload();
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Edited Actual" }),
+    ).toHaveAttribute("data-actual-id", editedActualId ?? "");
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });
