@@ -2,7 +2,7 @@ import { CalendarDays } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
 
 import { Button } from "./components/ui/button";
-import { PlanDayGrid } from "./components/PlanDayGrid";
+import { DayGrid } from "./components/DayGrid";
 import {
   ActualEditDialog,
   type ActualDraft,
@@ -429,7 +429,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           </p>
         ) : null}
 
-        <PlanDayGrid
+        <DayGrid
           actuals={dayRecord?.actual ?? []}
           canAddActual={
             calendarState.status === "connected" &&

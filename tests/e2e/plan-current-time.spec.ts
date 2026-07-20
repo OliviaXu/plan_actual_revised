@@ -45,14 +45,14 @@ test("tracks current time without taking over the sticky viewport", async () => 
     await page.goto(`chrome-extension://${extensionId}/index.html`);
 
     const viewport = page.getByTestId("plan-scroll-viewport");
-    const header = page.getByTestId("plan-grid-header");
+    const header = page.getByTestId("day-grid-header");
     const indicator = page.getByTestId("plan-now-indicator");
     await expect(indicator).toHaveCSS("top", "420px");
     await expect(indicator).toContainText("12:00 PM");
 
     const indicatorSpan = await page.evaluate(() => {
-      const axis = document.querySelector('[data-testid="plan-grid-axis"]');
-      const body = document.querySelector('[data-testid="plan-grid-body"]');
+      const axis = document.querySelector('[data-testid="day-grid-axis"]');
+      const body = document.querySelector('[data-testid="day-grid-body"]');
       const nowLine = document.querySelector(
         '[data-testid="plan-now-indicator"]',
       );
@@ -85,9 +85,9 @@ test("tracks current time without taking over the sticky viewport", async () => 
     const headerTop = (await header.boundingBox())!.y;
     const dividerDifference = await page.evaluate(() => {
       const headerAxis = document.querySelector(
-        '[data-testid="plan-grid-header-axis"]',
+        '[data-testid="day-grid-header-axis"]',
       );
-      const bodyAxis = document.querySelector('[data-testid="plan-grid-axis"]');
+      const bodyAxis = document.querySelector('[data-testid="day-grid-axis"]');
       if (!(headerAxis instanceof HTMLElement) || !(bodyAxis instanceof HTMLElement)) {
         return Number.POSITIVE_INFINITY;
       }

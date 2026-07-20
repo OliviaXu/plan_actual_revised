@@ -102,11 +102,11 @@ test("renders the default range and exact block geometry", async () => {
   const { context, page } = await openExtension(extensionPath);
 
   try {
-    await expect(page.getByTestId("plan-grid-body")).toHaveAttribute(
+    await expect(page.getByTestId("day-grid-body")).toHaveAttribute(
       "data-start-hour",
       "7",
     );
-    await expect(page.getByTestId("plan-grid-body")).toHaveAttribute(
+    await expect(page.getByTestId("day-grid-body")).toHaveAttribute(
       "data-end-hour",
       "21",
     );
@@ -116,7 +116,7 @@ test("renders the default range and exact block geometry", async () => {
       top: "1169px",
       height: "20px",
     });
-    await expect(page.getByTestId("plan-grid-body")).toHaveCSS(
+    await expect(page.getByTestId("day-grid-body")).toHaveCSS(
       "height",
       "1189px",
     );
@@ -142,11 +142,11 @@ test("expands early and late boundaries with whole-hour rounding", async () => {
   const { context, page } = await openExtension(extensionPath);
 
   try {
-    await expect(page.getByTestId("plan-grid-body")).toHaveAttribute(
+    await expect(page.getByTestId("day-grid-body")).toHaveAttribute(
       "data-start-hour",
       "6",
     );
-    await expect(page.getByTestId("plan-grid-body")).toHaveAttribute(
+    await expect(page.getByTestId("day-grid-body")).toHaveAttribute(
       "data-end-hour",
       "22",
     );
@@ -185,11 +185,11 @@ test("clips midnight crossings and discards malformed events", async () => {
   const { context, page } = await openExtension(extensionPath);
 
   try {
-    await expect(page.getByTestId("plan-grid-body")).toHaveAttribute(
+    await expect(page.getByTestId("day-grid-body")).toHaveAttribute(
       "data-start-hour",
       "0",
     );
-    await expect(page.getByTestId("plan-grid-body")).toHaveAttribute(
+    await expect(page.getByTestId("day-grid-body")).toHaveAttribute(
       "data-end-hour",
       "24",
     );

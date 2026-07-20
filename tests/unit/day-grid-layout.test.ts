@@ -8,7 +8,7 @@ import {
   calculatePlanDayGridLayout,
   calculatePlanNowIndicatorTopPx,
   MINIMUM_PLAN_BLOCK_HEIGHT_PX,
-} from "../../src/app/components/plan-day-grid-layout";
+} from "../../src/app/components/day-grid-layout";
 
 const date = "2026-07-15";
 const timeZone = "America/Los_Angeles";

@@ -252,7 +252,7 @@ Playwright reloads after resizing to prove canonical persistence.
 
 ## Interfaces and Dependencies
 
-- Extend `PlanDayGrid` with Actual edit and resize callbacks plus a
+- Extend `DayGrid` with Actual edit and resize callbacks plus a
   mutation-disabled state.
 - Keep `ActualBlock` unchanged.
 - Keep `DayRecord.schemaVersion` unchanged.

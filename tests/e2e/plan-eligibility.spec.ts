@@ -132,7 +132,7 @@ test("renders only eligible Plan events with Calendar color tokens", async () =>
   const { context, page } = await openExtension(extensionPath);
 
   try {
-    const grid = page.getByTestId("plan-grid-body");
+    const grid = page.getByTestId("day-grid-body");
     await expect(grid).toHaveAttribute("data-start-hour", "7");
     await expect(grid).toHaveAttribute("data-end-hour", "21");
 

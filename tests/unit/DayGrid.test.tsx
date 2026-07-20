@@ -10,7 +10,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import type { ActualBlock } from "../../src/domain/day-record";
-import { PlanDayGrid } from "../../src/app/components/PlanDayGrid";
+import { DayGrid } from "../../src/app/components/DayGrid";
 
 const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
 
@@ -50,9 +50,9 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("PlanDayGrid", () => {
+describe("DayGrid", () => {
   it("renders the complete default hour axis without full-width grid lines", () => {
-    render(<PlanDayGrid events={[]} status="connected" {...calendarDay} />);
+    render(<DayGrid events={[]} status="connected" {...calendarDay} />);
 
     expect(screen.queryByTestId("plan-hour-line")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("plan-hour-tick")).toHaveLength(15);
@@ -62,7 +62,7 @@ describe("PlanDayGrid", () => {
     expect(screen.getByTestId("plan-hour-marker-21")).toHaveStyle({
       top: "1176px",
     });
-    expect(screen.getByTestId("plan-grid-body")).toHaveStyle({
+    expect(screen.getByTestId("day-grid-body")).toHaveStyle({
       height: "1176px",
     });
     expect(screen.getByText("7 AM")).toBeVisible();
@@ -71,7 +71,7 @@ describe("PlanDayGrid", () => {
 
   it("renders title, duration, exact geometry, and a tall-block time range", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         events={[
           timedEvent(
             "Design review",
@@ -93,7 +93,7 @@ describe("PlanDayGrid", () => {
 
   it("hides the time range below 40px and shows it above 40px", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         events={[
           timedEvent(
             "Below threshold",
@@ -125,7 +125,7 @@ describe("PlanDayGrid", () => {
 
   it("keeps a minimum-height block visible at the final boundary", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         events={[
           timedEvent(
             "Final five minutes",
@@ -138,7 +138,7 @@ describe("PlanDayGrid", () => {
       />,
     );
 
-    expect(screen.getByTestId("plan-grid-body")).toHaveStyle({
+    expect(screen.getByTestId("day-grid-body")).toHaveStyle({
       height: "1189px",
     });
     expect(screen.getByTestId("plan-event-Final five minutes")).toHaveStyle({
@@ -149,7 +149,7 @@ describe("PlanDayGrid", () => {
 
   it("filters ineligible events before layout and applies Calendar colors", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         events={[
           {
             ...timedEvent(
@@ -198,11 +198,11 @@ describe("PlanDayGrid", () => {
       />,
     );
 
-    expect(screen.getByTestId("plan-grid-body")).toHaveAttribute(
+    expect(screen.getByTestId("day-grid-body")).toHaveAttribute(
       "data-start-hour",
       "7",
     );
-    expect(screen.getByTestId("plan-grid-body")).toHaveAttribute(
+    expect(screen.getByTestId("day-grid-body")).toHaveAttribute(
       "data-end-hour",
       "21",
     );
@@ -222,7 +222,7 @@ describe("PlanDayGrid", () => {
 
   it("cascades overlapping blocks and brings a clicked block to the front", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         events={[
           timedEvent(
             "base",
@@ -274,7 +274,7 @@ describe("PlanDayGrid", () => {
 
   it("cascades overlapping Actuals and brings a clicked Actual to the front", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         actuals={[
           actualBlock("base-actual", 540, 120),
           actualBlock("nested-actual", 570, 60),
@@ -326,7 +326,7 @@ describe("PlanDayGrid", () => {
 
   it("clips a minimum-height Actual at midnight instead of the extended Plan body", () => {
     render(
-      <PlanDayGrid
+      <DayGrid
         actuals={[actualBlock("midnight-actual", 1_435, 60)]}
         events={[
           timedEvent(
@@ -340,7 +340,7 @@ describe("PlanDayGrid", () => {
       />,
     );
 
-    expect(screen.getByTestId("plan-grid-body")).toHaveStyle({
+    expect(screen.getByTestId("day-grid-body")).toHaveStyle({
       height: "1441px",
     });
     expect(screen.getByTestId("actual-column-clip")).toHaveStyle({
@@ -356,7 +356,7 @@ describe("PlanDayGrid", () => {
     vi.useFakeTimers();
     let currentTime = new Date(2026, 6, 15, 12, 34);
     render(
-      <PlanDayGrid
+      <DayGrid
         events={[]}
         now={() => currentTime}
         status="connected"
@@ -365,7 +365,7 @@ describe("PlanDayGrid", () => {
     );
 
     const indicator = screen.getByTestId("plan-now-indicator");
-    expect(indicator.parentElement).toBe(screen.getByTestId("plan-grid-body"));
+    expect(indicator.parentElement).toBe(screen.getByTestId("day-grid-body"));
     expect(indicator).toHaveStyle({ top: "467.6px" });
     expect(within(indicator).getByText("12:34 PM")).toBeVisible();
 
@@ -379,21 +379,21 @@ describe("PlanDayGrid", () => {
   it("auto-scrolls once after connected content renders", () => {
     const now = () => new Date(2026, 6, 15, 12);
     const { rerender } = render(
-      <PlanDayGrid events={[]} now={now} status="loading" {...calendarDay} />,
+      <DayGrid events={[]} now={now} status="loading" {...calendarDay} />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
-    const header = screen.getByTestId("plan-grid-header");
+    const header = screen.getByTestId("day-grid-header");
     Object.defineProperty(viewport, "clientHeight", { value: 500 });
     Object.defineProperty(header, "offsetHeight", { value: 35 });
 
     rerender(
-      <PlanDayGrid events={[]} now={now} status="connected" {...calendarDay} />,
+      <DayGrid events={[]} now={now} status="connected" {...calendarDay} />,
     );
     expect(viewport.scrollTop).toBe(305);
 
     viewport.scrollTop = 700;
     rerender(
-      <PlanDayGrid
+      <DayGrid
         events={[
           timedEvent(
             "Later event",

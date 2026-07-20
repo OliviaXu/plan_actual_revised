@@ -12,22 +12,22 @@ import {
   PLAN_EVENT_LAYER_OFFSET_PX,
   type ActualDayGridBlock,
   type PlanDayGridBlock,
-} from "./plan-day-grid-layout";
+} from "./day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
 import type { ActualBlock } from "../../domain/day-record";
 import { getCalendarTime } from "../../calendar/calendar-time";
 
-const PLAN_TIME_AXIS_WIDTH = "4.5rem";
-const PLAN_GRID_TEMPLATE_COLUMNS = `${PLAN_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
+const DAY_TIME_AXIS_WIDTH = "4.5rem";
+const DAY_GRID_TEMPLATE_COLUMNS = `${DAY_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
 const readSystemTime = () => new Date();
 
-type PlanLoadStatus =
+type DayGridStatus =
   | "loading"
   | "connecting"
   | "connected"
   | "error";
 
-export function PlanDayGrid({
+export function DayGrid({
   actuals,
   canAddActual,
   events,
@@ -44,7 +44,7 @@ export function PlanDayGrid({
   now?: () => Date;
   onAddActual?: () => void;
   onEditActual?: (actualId: string) => void;
-  status: PlanLoadStatus;
+  status: DayGridStatus;
   date: string;
   timeZone: string;
 }) {
@@ -120,13 +120,13 @@ export function PlanDayGrid({
       >
         <div
           className="sticky top-0 z-20 grid border-b border-border bg-muted"
-          data-testid="plan-grid-header"
+          data-testid="day-grid-header"
           ref={gridHeaderRef}
-          style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
+          style={{ gridTemplateColumns: DAY_GRID_TEMPLATE_COLUMNS }}
         >
           <div
             className="border-r border-border px-3 py-2 text-xs font-medium uppercase text-muted-foreground"
-            data-testid="plan-grid-header-axis"
+            data-testid="day-grid-header-axis"
           >
             Time
           </div>
@@ -147,7 +147,7 @@ export function PlanDayGrid({
           className="relative"
           data-end-hour={layout.endHour}
           data-start-hour={layout.startHour}
-          data-testid="plan-grid-body"
+          data-testid="day-grid-body"
           style={{ height: layout.heightPx }}
         >
           {nowIndicatorTopPx !== null ? (
@@ -155,7 +155,7 @@ export function PlanDayGrid({
               className="pointer-events-none absolute right-0 border-t border-now"
               data-testid="plan-now-indicator"
               style={{
-                left: PLAN_TIME_AXIS_WIDTH,
+                left: DAY_TIME_AXIS_WIDTH,
                 top: nowIndicatorTopPx,
                 zIndex: Math.max(layout.blocks.length, actualBlocks.length) + 1,
               }}
@@ -168,11 +168,11 @@ export function PlanDayGrid({
           ) : null}
           <div
             className="grid h-full"
-            style={{ gridTemplateColumns: PLAN_GRID_TEMPLATE_COLUMNS }}
+            style={{ gridTemplateColumns: DAY_GRID_TEMPLATE_COLUMNS }}
           >
             <div
               className="relative border-r border-border"
-              data-testid="plan-grid-axis"
+              data-testid="day-grid-axis"
             >
               {layout.hourBoundaries.map((hour) => {
               const labelPosition =
