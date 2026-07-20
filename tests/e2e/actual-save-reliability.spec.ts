@@ -25,7 +25,7 @@ registerServiceWorker({
     value: { timeZone: "America/Los_Angeles", events: ${scenario === "planMatch" ? `[{
       kind: "timed",
       id: "matching-plan",
-      summary: "Actual",
+      summary: "Untitled",
       colorId: "8",
       start: "2026-07-15T12:00:00-07:00",
       end: "2026-07-15T12:30:00-07:00",
@@ -77,6 +77,7 @@ test("an exact Plan match is classified once and never inserted", async () => {
   const { context, page } = await openExtension(extensionPath);
   try {
     await page.getByRole("button", { name: "Add Actual" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
     await expect(page.getByTestId("actual-save-summary")).toContainText("1 matched Plan");
     await page.reload();
@@ -94,10 +95,11 @@ test("a nonmatching Actual sends the complete save input and persists success", 
   const { context, page } = await openExtension(extensionPath);
   try {
     await page.getByRole("button", { name: "Add Actual" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
     await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
-      summary: "[Actual] Actual",
+      summary: "[Actual] Untitled",
       start: {
         dateTime: "2026-07-15T12:00:00",
         timeZone: "America/Los_Angeles",
@@ -112,7 +114,7 @@ test("a nonmatching Actual sends the complete save input and persists success", 
       },
     });
     await page.reload();
-    await expect(page.getByTestId("actual-block")).toContainText("Actual");
+    await expect(page.getByTestId("actual-block")).toContainText("Untitled");
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });
@@ -124,6 +126,7 @@ test("an ambiguous insert remains unsaved and retries without a duplicate", asyn
   const { context, page } = await openExtension(extensionPath);
   try {
     await page.getByRole("button", { name: "Add Actual" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
     await expect(page.getByTestId("actual-save-summary")).toContainText("Failed 1");
     await page.reload();

@@ -5,10 +5,12 @@ import type {
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
+  calculateActualDayGridLayout,
   calculatePlanDayGridLayout,
   calculatePlanNowIndicatorTopPx,
   PLAN_EVENT_COLUMN_INSET_PX,
   PLAN_EVENT_LAYER_OFFSET_PX,
+  type ActualDayGridBlock,
   type PlanDayGridBlock,
 } from "./plan-day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
@@ -31,6 +33,7 @@ export function PlanDayGrid({
   events,
   now = readSystemTime,
   onAddActual,
+  onEditActual,
   status,
   date,
   timeZone,
@@ -40,11 +43,13 @@ export function PlanDayGrid({
   events: CalendarEvent[];
   now?: () => Date;
   onAddActual?: () => void;
+  onEditActual?: (actualId: string) => void;
   status: PlanLoadStatus;
   date: string;
   timeZone: string;
 }) {
   const [frontEventId, setFrontEventId] = useState<string | null>(null);
+  const [frontActualId, setFrontActualId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(now);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
@@ -59,6 +64,12 @@ export function PlanDayGrid({
     eligibleTimedEvents,
     date,
     timeZone,
+    defaultSettings,
+  );
+  const actualBlocks = calculateActualDayGridLayout(
+    actuals ?? [],
+    layout.startHour,
+    layout.endHour,
     defaultSettings,
   );
   const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
@@ -146,7 +157,7 @@ export function PlanDayGrid({
               style={{
                 left: PLAN_TIME_AXIS_WIDTH,
                 top: nowIndicatorTopPx,
-                zIndex: layout.blocks.length + 1,
+                zIndex: Math.max(layout.blocks.length, actualBlocks.length) + 1,
               }}
             >
               <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-now" />
@@ -231,14 +242,31 @@ export function PlanDayGrid({
                 />
               ))}
             </div>
-            <div className="relative border-l border-border" data-testid="actual-column">
-              {(actuals ?? []).map((actual) => (
-                <ActualEventBlock
-                  actual={actual}
-                  key={actual.id}
-                  startHour={layout.startHour}
-                />
-              ))}
+            <div
+              className="relative overflow-hidden border-l border-border"
+              data-testid="actual-column"
+            >
+              <div
+                className="absolute inset-x-0 top-0 overflow-hidden"
+                data-testid="actual-column-clip"
+                style={{
+                  height:
+                    (layout.endHour - layout.startHour) * hourHeightPx,
+                }}
+              >
+                {actualBlocks.map((block) => (
+                  <ActualEventBlock
+                    block={block}
+                    frontZIndex={actualBlocks.length}
+                    isFront={frontActualId === block.actual.id}
+                    key={block.actual.id}
+                    onSelect={() => {
+                      setFrontActualId(block.actual.id);
+                      onEditActual?.(block.actual.id);
+                    }}
+                  />
+                ))}
+              </div>
             </div>
           </div>
         </div>
@@ -248,32 +276,68 @@ export function PlanDayGrid({
 }
 
 function ActualEventBlock({
-  actual,
-  startHour,
+  block,
+  frontZIndex,
+  isFront,
+  onSelect,
 }: {
-  actual: ActualBlock;
-  startHour: number;
+  block: ActualDayGridBlock;
+  frontZIndex: number;
+  isFront: boolean;
+  onSelect: () => void;
 }) {
-  const color = resolveGoogleCalendarEventColor(actual.colorId);
+  const color = resolveGoogleCalendarEventColor(block.actual.colorId);
   return (
-    <div
-      className="absolute inset-x-2 overflow-hidden rounded-sm border px-2 py-1 text-xs shadow-soft"
-      data-actual-id={actual.id}
+    <button
+      className={`absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${
+        color ? "" : "border-border bg-muted"
+      }`}
+      data-actual-id={block.actual.id}
+      data-overlap-group-index={block.overlapGroupIndex}
+      data-overlap-layer-index={block.overlapLayerIndex}
       data-testid="actual-block"
+      onClick={onSelect}
       style={{
-        top: (actual.startMinutes - startHour * 60) * defaultSettings.pixelsPerMinute,
-        height: Math.max(20, actual.durationMinutes * defaultSettings.pixelsPerMinute),
+        top: block.topPx,
+        height: block.heightPx,
+        left:
+          PLAN_EVENT_COLUMN_INSET_PX +
+          block.overlapLayerIndex * PLAN_EVENT_LAYER_OFFSET_PX,
+        right: PLAN_EVENT_COLUMN_INSET_PX,
+        zIndex: isFront ? frontZIndex : block.overlapLayerIndex,
         ...(color
           ? { backgroundColor: `${color}40`, borderColor: `${color}80` }
           : {}),
       }}
+      type="button"
     >
-      <span className="font-medium">{actual.summary}</span>
-      <span className="ml-2 text-muted-foreground">
-        {formatDuration(actual.durationMinutes)}
+      <span className="flex min-w-0 items-start justify-between gap-2">
+        <span className="min-w-0 truncate font-medium">
+          {block.actual.summary}
+        </span>
+        <span className="shrink-0 text-muted-foreground">
+          {formatDuration(block.durationMinutes)}
+        </span>
       </span>
-    </div>
+      {block.showTimeRange ? (
+        <span
+          className="block truncate text-muted-foreground"
+          data-testid="actual-event-time-range"
+        >
+          {formatMinuteOfDay(block.clippedStartMinutes)} –{" "}
+          {formatMinuteOfDay(block.clippedEndMinutes)}
+        </span>
+      ) : null}
+    </button>
   );
+}
+
+function formatMinuteOfDay(minutesSinceMidnight: number) {
+  const hour = Math.floor(minutesSinceMidnight / 60) % 24;
+  const minute = minutesSinceMidnight % 60;
+  const suffix = hour >= 12 ? "PM" : "AM";
+  const clockHour = hour % 12 || 12;
+  return `${clockHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
 function formatHour(hour: number) {

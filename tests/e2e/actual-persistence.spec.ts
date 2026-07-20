@@ -40,9 +40,43 @@ registerServiceWorker({
   try {
     await page.goto(`chrome-extension://${extensionId}/index.html`);
     await page.getByRole("button", { name: "Add Actual" }).click();
+    await expect(page.getByRole("textbox", { name: "Title" })).toBeFocused();
+    await page.keyboard.type("Discarded Actual");
+    await page.keyboard.press("Escape");
+    await expect(page.getByTestId("actual-block")).toHaveCount(0);
+
+    await page.reload();
+
+    await expect(page.getByTestId("actual-block")).toHaveCount(0);
     await page.getByRole("button", { name: "Add Actual" }).click();
+    await expect(page.getByRole("textbox", { name: "Title" })).toBeFocused();
+    await page.keyboard.type("First Actual");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("button", { name: "Add Actual" }).click();
+    await page.getByRole("textbox", { name: "Title" }).fill("Second Actual");
+    await page.getByRole("spinbutton", { name: "Duration" }).fill("45");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
     const actuals = page.getByTestId("actual-block");
     await expect(actuals).toHaveCount(2);
+    await expect(actuals.filter({ hasText: "First Actual" })).toHaveCount(1);
+    await expect(actuals.filter({ hasText: "Second Actual" })).toHaveCount(1);
+    await expect(actuals.nth(0)).toHaveAttribute(
+      "data-overlap-group-index",
+      "0",
+    );
+    await expect(actuals.nth(1)).toHaveAttribute(
+      "data-overlap-group-index",
+      "0",
+    );
+    await expect
+      .poll(() =>
+        actuals.evaluateAll((blocks) =>
+          blocks
+            .map((block) => getComputedStyle(block).left)
+            .sort((left, right) => Number.parseFloat(left) - Number.parseFloat(right)),
+        ),
+      )
+      .toEqual(["12px", "24px"]);
     const actualIds = await actuals.evaluateAll((blocks) =>
       blocks.map((block) => block.getAttribute("data-actual-id")),
     );
@@ -70,9 +104,41 @@ registerServiceWorker({
         ),
       )
       .toEqual(actualIds);
-    await expect(page.getByTestId("actual-block").first()).toContainText(
-      "Actual",
-    );
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "First Actual" }),
+    ).toHaveCount(1);
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Second Actual" }),
+    ).toHaveCount(1);
+
+    await page
+      .getByTestId("actual-block")
+      .filter({ hasText: "First Actual" })
+      .click();
+    const existingTitle = page.getByRole("textbox", { name: "Title" });
+    await expect(existingTitle).toBeFocused();
+    await expect
+      .poll(() =>
+        existingTitle.evaluate((input: HTMLInputElement) => ({
+          start: input.selectionStart,
+          end: input.selectionEnd,
+        })),
+      )
+      .toEqual({
+        start: "First Actual".length,
+        end: "First Actual".length,
+      });
+    await existingTitle.fill("Edited Actual");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Edited Actual" }),
+    ).toHaveCount(1);
+
+    await page.reload();
+
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Edited Actual" }),
+    ).toHaveCount(1);
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });

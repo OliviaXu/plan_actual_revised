@@ -3,8 +3,12 @@ import { useEffect, useRef, useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { PlanDayGrid } from "./components/PlanDayGrid";
+import {
+  ActualEditDialog,
+  type ActualDraft,
+} from "./components/ActualEditDialog";
 import type { CalendarEvent, TimedCalendarEvent } from "../calendar/calendar-event";
-import type { DayRecord } from "../domain/day-record";
+import type { ActualBlock, DayRecord } from "../domain/day-record";
 import { defaultSettings } from "../domain/settings";
 import { isExactPlanMatch } from "../domain/actual-save";
 import {
@@ -35,6 +39,10 @@ type CalendarDay = {
   timeZone: string;
 };
 
+type ActualEditorState =
+  | { mode: "create"; proposedActual: ActualBlock }
+  | { mode: "edit"; targetId: string };
+
 const readSystemTime = () => new Date();
 const defaultActualDurationMinutes = 30;
 
@@ -57,6 +65,8 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
   const [calendarSaveSummary, setCalendarSaveSummary] = useState<string>();
+  const [actualEditorState, setActualEditorState] =
+    useState<ActualEditorState>();
   const dayRecordWriteQueueRef = useRef<
     ReturnType<typeof createDayRecordWriteQueue>
   >(createDayRecordWriteQueue());
@@ -67,6 +77,12 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const dayRecord =
     dayRecordState?.key === calendarDayKey ? dayRecordState.record : null;
   const actualLoadSettled = dayRecordState?.key === calendarDayKey;
+  const actualEditTarget =
+    actualEditorState?.mode === "create"
+      ? actualEditorState.proposedActual
+      : dayRecord?.actual.find(
+          (actual) => actual.id === actualEditorState?.targetId,
+        );
 
   useEffect(() => {
     void loadCalendarEvents(setCalendarState, setCalendarDay);
@@ -150,27 +166,79 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     );
     const newActual = {
       id: crypto.randomUUID(),
-      summary: "Actual",
+      summary: "Untitled",
       startMinutes: boundedStartMinutes,
       durationMinutes,
       colorId: defaultSettings.defaultActualColorId,
       saveDisposition: "unsaved" as const,
     };
-    const nextRecord: DayRecord = dayRecord
-      ? {
-          ...dayRecord,
-          actual: [...dayRecord.actual, newActual],
-          updatedAt: createdAt.toISOString(),
-        }
-      : {
-          schemaVersion: 1,
-          date: calendarDay.date,
-          timezone: calendarDay.timeZone,
-          actual: [newActual],
-          updatedAt: createdAt.toISOString(),
-        };
+    setActualEditorState({ mode: "create", proposedActual: newActual });
+  }
 
-    void saveDayRecordLocally(nextRecord);
+  function saveActualDraft(draft: ActualDraft) {
+    if (!actualEditorState || !actualEditTarget) {
+      setActualEditorState(undefined);
+      return;
+    }
+    const updatedAt = now().toISOString();
+    if (actualEditorState.mode === "create") {
+      const newActual = { ...actualEditorState.proposedActual, ...draft };
+      const nextRecord: DayRecord = dayRecord
+        ? {
+            ...dayRecord,
+            actual: [...dayRecord.actual, newActual],
+            updatedAt,
+          }
+        : {
+            schemaVersion: 1,
+            date: calendarDay.date,
+            timezone: calendarDay.timeZone,
+            actual: [newActual],
+            updatedAt,
+          };
+
+      void saveDayRecordLocally(nextRecord);
+      setActualEditorState(undefined);
+      return;
+    }
+    if (!dayRecord) {
+      setActualEditorState(undefined);
+      return;
+    }
+    if (
+      draft.summary === actualEditTarget.summary &&
+      draft.durationMinutes === actualEditTarget.durationMinutes &&
+      draft.colorId === actualEditTarget.colorId
+    ) {
+      setActualEditorState(undefined);
+      return;
+    }
+
+    void saveDayRecordLocally(
+      updateActual(dayRecord, actualEditTarget.id, draft, updatedAt),
+    );
+    setActualEditorState(undefined);
+  }
+
+  function deleteActualEditTarget() {
+    if (
+      actualEditorState?.mode !== "edit" ||
+      !dayRecord ||
+      !actualEditTarget
+    ) {
+      setActualEditorState(undefined);
+      return;
+    }
+
+    const updatedAt = now().toISOString();
+    void saveDayRecordLocally({
+      ...dayRecord,
+      actual: dayRecord.actual.filter(
+        (actual) => actual.id !== actualEditTarget.id,
+      ),
+      updatedAt,
+    });
+    setActualEditorState(undefined);
   }
 
   async function saveDayRecordLocally(record: DayRecord) {
@@ -361,6 +429,9 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           events={events}
           now={now}
           onAddActual={addActual}
+          onEditActual={(targetId) =>
+            setActualEditorState({ mode: "edit", targetId })
+          }
           status={calendarState.status === "disconnected" ? "error" : calendarState.status}
           date={calendarDay.date}
           timeZone={calendarDay.timeZone}
@@ -388,6 +459,22 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           </footer>
         ) : null}
       </section>
+      {actualEditTarget ? (
+        <ActualEditDialog
+          actual={actualEditTarget}
+          onDelete={
+            actualEditorState?.mode === "edit"
+              ? deleteActualEditTarget
+              : undefined
+          }
+          onDismiss={() => setActualEditorState(undefined)}
+          onSave={saveActualDraft}
+          paletteColorIds={defaultSettings.actualPaletteColorIds}
+          titleFocusMode={
+            actualEditorState?.mode === "create" ? "selectAll" : "caretEnd"
+          }
+        />
+      ) : null}
     </main>
   );
 }

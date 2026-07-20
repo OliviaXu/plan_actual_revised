@@ -9,6 +9,7 @@ import {
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
+import type { ActualBlock } from "../../src/domain/day-record";
 import { PlanDayGrid } from "../../src/app/components/PlanDayGrid";
 
 const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
@@ -26,6 +27,21 @@ function timedEvent(
     start,
     end,
     timeZone: "America/Los_Angeles",
+  };
+}
+
+function actualBlock(
+  id: string,
+  startMinutes: number,
+  durationMinutes: number,
+): ActualBlock {
+  return {
+    id,
+    summary: id,
+    startMinutes,
+    durationMinutes,
+    colorId: "8",
+    saveDisposition: "unsaved",
   };
 }
 
@@ -254,6 +270,86 @@ describe("PlanDayGrid", () => {
     fireEvent.click(nested);
     expect(base).toHaveStyle({ zIndex: "0" });
     expect(nested).toHaveStyle({ zIndex: "2" });
+  });
+
+  it("cascades overlapping Actuals and brings a clicked Actual to the front", () => {
+    render(
+      <PlanDayGrid
+        actuals={[
+          actualBlock("base-actual", 540, 120),
+          actualBlock("nested-actual", 570, 60),
+        ]}
+        events={[]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    const base = screen.getByText("base-actual").closest("button");
+    const nested = screen.getByText("nested-actual").closest("button");
+    expect(base).not.toBeNull();
+    expect(nested).not.toBeNull();
+    expect(base).toHaveAttribute("data-overlap-group-index", "0");
+    expect(base).toHaveAttribute("data-overlap-layer-index", "0");
+    expect(base).toHaveClass(
+      "flex",
+      "flex-col",
+      "items-stretch",
+      "justify-start",
+    );
+    expect(base).toHaveStyle({
+      left: "12px",
+      right: "12px",
+      top: "168px",
+      zIndex: "0",
+    });
+    expect(nested).toHaveAttribute("data-overlap-group-index", "0");
+    expect(nested).toHaveAttribute("data-overlap-layer-index", "1");
+    expect(nested).toHaveStyle({
+      left: "24px",
+      right: "12px",
+      top: "210px",
+      zIndex: "1",
+    });
+    expect(within(base!).getByText("2h")).toBeVisible();
+    expect(
+      within(base!).getByText("9:00 AM – 11:00 AM"),
+    ).toBeVisible();
+    expect(screen.getByTestId("actual-column")).toHaveClass("overflow-hidden");
+
+    fireEvent.click(base!);
+    expect(base).toHaveStyle({ zIndex: "2" });
+    fireEvent.click(nested!);
+    expect(base).toHaveStyle({ zIndex: "0" });
+    expect(nested).toHaveStyle({ zIndex: "2" });
+  });
+
+  it("clips a minimum-height Actual at midnight instead of the extended Plan body", () => {
+    render(
+      <PlanDayGrid
+        actuals={[actualBlock("midnight-actual", 1_435, 60)]}
+        events={[
+          timedEvent(
+            "midnight-plan",
+            "2026-07-15T23:55:00-07:00",
+            "2026-07-16T00:00:00-07:00",
+          ),
+        ]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    expect(screen.getByTestId("plan-grid-body")).toHaveStyle({
+      height: "1441px",
+    });
+    expect(screen.getByTestId("actual-column-clip")).toHaveStyle({
+      height: "1428px",
+    });
+    expect(screen.getByTestId("actual-block")).toHaveStyle({
+      top: "1421px",
+      height: "20px",
+    });
   });
 
   it("updates the visible now indicator once per minute", () => {

@@ -1,6 +1,7 @@
 import type {
   TimedCalendarEvent,
 } from "../../calendar/calendar-event";
+import type { ActualBlock } from "../../domain/day-record";
 import type { AppSettings } from "../../domain/settings";
 import {
   getCalendarDayRange,
@@ -38,6 +39,18 @@ export type PlanDayGridLayout = {
   heightPx: number;
   hourBoundaries: number[];
   blocks: PlanDayGridBlock[];
+};
+
+export type ActualDayGridBlock = {
+  actual: ActualBlock;
+  clippedStartMinutes: number;
+  clippedEndMinutes: number;
+  durationMinutes: number;
+  topPx: number;
+  heightPx: number;
+  showTimeRange: boolean;
+  overlapGroupIndex: number;
+  overlapLayerIndex: number;
 };
 
 export function calculatePlanDayGridLayout(
@@ -131,7 +144,11 @@ export function calculatePlanDayGridLayout(
       };
     },
   );
-  const blocks = assignOverlapLayers(positionedBlocks);
+  const blocks = assignOverlapLayers(positionedBlocks, (block) => ({
+    id: block.event.id,
+    start: block.clippedStart.getTime(),
+    end: block.clippedEnd.getTime(),
+  }));
   const heightPx = Math.max(
     rangeHeightPx,
     ...blocks.map(({ topPx, heightPx }) => topPx + heightPx),
@@ -144,6 +161,66 @@ export function calculatePlanDayGridLayout(
     hourBoundaries,
     blocks,
   };
+}
+
+export function calculateActualDayGridLayout(
+  actuals: ActualBlock[],
+  startHour: number,
+  endHour: number,
+  settings: PlanGridSettings,
+): ActualDayGridBlock[] {
+  const rangeStartMinutes = Math.max(0, startHour * MINUTES_PER_HOUR);
+  const rangeEndMinutes = Math.min(
+    24 * MINUTES_PER_HOUR,
+    endHour * MINUTES_PER_HOUR,
+  );
+  const positionedBlocks = actuals.flatMap((actual) => {
+    const actualEndMinutes = actual.startMinutes + actual.durationMinutes;
+    if (
+      actualEndMinutes <= rangeStartMinutes ||
+      actual.startMinutes >= rangeEndMinutes
+    ) {
+      return [];
+    }
+
+    const clippedStartMinutes = Math.max(
+      actual.startMinutes,
+      rangeStartMinutes,
+    );
+    const clippedEndMinutes = Math.min(
+      actualEndMinutes,
+      rangeEndMinutes,
+    );
+    const durationMinutes = clippedEndMinutes - clippedStartMinutes;
+    const heightPx = roundPixel(
+      Math.max(
+        MINIMUM_PLAN_BLOCK_HEIGHT_PX,
+        durationMinutes * settings.pixelsPerMinute,
+      ),
+    );
+
+    return [
+      {
+        actual,
+        clippedStartMinutes,
+        clippedEndMinutes,
+        durationMinutes,
+        topPx: roundPixel(
+          (clippedStartMinutes - rangeStartMinutes) *
+            settings.pixelsPerMinute,
+        ),
+        heightPx,
+        showTimeRange:
+          heightPx >= PLAN_BLOCK_TIME_RANGE_MINIMUM_HEIGHT_PX,
+      },
+    ];
+  });
+
+  return assignOverlapLayers(positionedBlocks, (block) => ({
+    id: block.actual.id,
+    start: block.clippedStartMinutes,
+    end: block.clippedEndMinutes,
+  }));
 }
 
 export function calculatePlanNowIndicatorTopPx(
@@ -170,22 +247,27 @@ export function calculatePlanNowIndicatorTopPx(
   );
 }
 
-function assignOverlapLayers(
-  blocks: Omit<PlanDayGridBlock, "overlapGroupIndex" | "overlapLayerIndex">[],
-): PlanDayGridBlock[] {
+function assignOverlapLayers<T>(
+  blocks: T[],
+  getInterval: (block: T) => { id: string; start: number; end: number },
+): Array<T & Pick<PlanDayGridBlock, "overlapGroupIndex" | "overlapLayerIndex">> {
   const sortedBlocks = [...blocks].sort(
-    (left, right) =>
-      left.clippedStart.getTime() - right.clippedStart.getTime() ||
-      right.clippedEnd.getTime() - left.clippedEnd.getTime() ||
-      left.event.id.localeCompare(right.event.id),
+    (left, right) => {
+      const leftInterval = getInterval(left);
+      const rightInterval = getInterval(right);
+      return (
+        leftInterval.start - rightInterval.start ||
+        rightInterval.end - leftInterval.end ||
+        leftInterval.id.localeCompare(rightInterval.id)
+      );
+    },
   );
   let overlapGroupIndex = -1;
   let overlapGroupEnd = Number.NEGATIVE_INFINITY;
   let layerOccupiedUntil: number[] = [];
 
   return sortedBlocks.map((block) => {
-    const start = block.clippedStart.getTime();
-    const end = block.clippedEnd.getTime();
+    const { start, end } = getInterval(block);
 
     if (start >= overlapGroupEnd) {
       overlapGroupIndex += 1;

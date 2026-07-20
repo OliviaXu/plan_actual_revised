@@ -133,8 +133,12 @@ without adding separate pending-durability UI.
 ### Multiple-Block Creation
 
 - Remove the one-Actual limit.
-- Add creates an `Untitled`, 30-minute, default-colored, unsaved block.
-- Immediately open the new block's dialog with its title selected.
+- Add opens a transient `Untitled`, 30-minute, default-colored draft without
+  changing or writing the `DayRecord`.
+- Immediately focus the new draft's title and select it for zero-click
+  replacement.
+- Create and persist the Actual only when Save is clicked. Escape or backdrop
+  dismissal creates nothing.
 - Start every new block at the current time snapped down to `snapMinutes`.
 - Allow new blocks to overlap existing Actuals. Overlap is unavoidable once
   dragging and Slack blocks are introduced, so creation does not maintain or
@@ -158,13 +162,17 @@ without adding separate pending-durability UI.
 - Show the configured color swatches.
 - Preserve an out-of-palette stored color until the user touches the picker.
 - Clicking the currently selected swatch clears the color selection.
-- Provide Delete and Save actions.
-- Escape or backdrop dismissal discards the dialog draft and leaves the
-  underlying block unchanged.
-- A no-op Save closes the dialog without writing or changing the block's
-  identity.
-- Delete removes only the local Actual. It never deletes Calendar or Plan
-  events.
+- Provide Save for new drafts and Delete plus Save for existing Actuals.
+- Escape or backdrop dismissal discards a new draft without creating it and
+  leaves an existing Actual unchanged.
+- A no-op Save on an existing Actual closes the dialog without writing or
+  changing the block's identity. Save on a new draft creates the Actual even
+  when the default values are unchanged.
+- Delete removes only an existing local Actual. It never deletes Calendar or
+  Plan events.
+- Keep title editing flat but visible through an underline and focus border.
+  Create mode selects the complete title; edit mode places the caret at the
+  end without selecting the title.
 
 ### Mutation Disposition Rules
 

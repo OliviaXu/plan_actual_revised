@@ -1,8 +1,10 @@
 import { describe, expect, it } from "vitest";
 
 import type { TimedCalendarEvent } from "../../src/calendar/calendar-event";
+import type { ActualBlock } from "../../src/domain/day-record";
 import { defaultSettings } from "../../src/domain/settings";
 import {
+  calculateActualDayGridLayout,
   calculatePlanDayGridLayout,
   calculatePlanNowIndicatorTopPx,
   MINIMUM_PLAN_BLOCK_HEIGHT_PX,
@@ -24,6 +26,21 @@ function timedEvent(
     start,
     end,
     timeZone: "America/Los_Angeles",
+  };
+}
+
+function actualBlock(
+  id: string,
+  startMinutes: number,
+  durationMinutes: number,
+): ActualBlock {
+  return {
+    id,
+    summary: id,
+    startMinutes,
+    durationMinutes,
+    colorId: "8",
+    saveDisposition: "unsaved",
   };
 }
 
@@ -341,6 +358,88 @@ describe("calculatePlanDayGridLayout", () => {
       { id: "longer", overlapLayerIndex: 0 },
       { id: "shorter", overlapLayerIndex: 1 },
       { id: "touching-shorter", overlapLayerIndex: 1 },
+    ]);
+  });
+});
+
+describe("calculateActualDayGridLayout", () => {
+  it("uses the same deterministic overlap groups and reusable layers as Plan", () => {
+    const blocks = calculateActualDayGridLayout(
+      [
+        actualBlock("chain-end", 600, 60),
+        actualBlock("chain-middle", 570, 60),
+        actualBlock("chain-start", 540, 60),
+        actualBlock("separate", 780, 60),
+      ],
+      7,
+      21,
+      defaultSettings,
+    );
+
+    expect(
+      blocks.map(
+        ({ actual, overlapGroupIndex, overlapLayerIndex }) => ({
+          id: actual.id,
+          overlapGroupIndex,
+          overlapLayerIndex,
+        }),
+      ),
+    ).toEqual([
+      { id: "chain-start", overlapGroupIndex: 0, overlapLayerIndex: 0 },
+      { id: "chain-middle", overlapGroupIndex: 0, overlapLayerIndex: 1 },
+      { id: "chain-end", overlapGroupIndex: 0, overlapLayerIndex: 0 },
+      { id: "separate", overlapGroupIndex: 1, overlapLayerIndex: 0 },
+    ]);
+  });
+
+  it("clips partial Actuals and omits blocks outside the Plan-derived range", () => {
+    const blocks = calculateActualDayGridLayout(
+      [
+        actualBlock("before", 300, 60),
+        actualBlock("early-clipped", 390, 60),
+        actualBlock("late-clipped", 1_425, 60),
+        actualBlock("after", 1_440, 30),
+      ],
+      7,
+      24,
+      defaultSettings,
+    );
+
+    expect(
+      blocks.map(
+        ({
+          actual,
+          clippedStartMinutes,
+          clippedEndMinutes,
+          durationMinutes,
+          topPx,
+          heightPx,
+        }) => ({
+          id: actual.id,
+          clippedStartMinutes,
+          clippedEndMinutes,
+          durationMinutes,
+          topPx,
+          heightPx,
+        }),
+      ),
+    ).toEqual([
+      {
+        id: "early-clipped",
+        clippedStartMinutes: 420,
+        clippedEndMinutes: 450,
+        durationMinutes: 30,
+        topPx: 0,
+        heightPx: 42,
+      },
+      {
+        id: "late-clipped",
+        clippedStartMinutes: 1_425,
+        clippedEndMinutes: 1_440,
+        durationMinutes: 15,
+        topPx: 1_407,
+        heightPx: 21,
+      },
     ]);
   });
 });

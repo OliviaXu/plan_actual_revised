@@ -4,6 +4,7 @@ import {
   render,
   screen,
   waitFor,
+  within,
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
@@ -311,6 +312,7 @@ describe("App Actual persistence", () => {
     const add = await screen.findByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
       "dayRecord:2026-07-15": expect.objectContaining({
@@ -349,6 +351,7 @@ describe("App Actual persistence", () => {
     const add = screen.getByRole("button", { name: "Add Actual" });
     expect(add).toBeEnabled();
     fireEvent.click(add);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findAllByTestId("actual-block")).toHaveLength(2);
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
@@ -377,6 +380,7 @@ describe("App Actual persistence", () => {
     const add = await screen.findByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
       "dayRecord:2026-07-15": expect.objectContaining({
@@ -402,6 +406,7 @@ describe("App Actual persistence", () => {
     const add = await screen.findByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
       "dayRecord:2026-07-15": expect.objectContaining({
@@ -415,7 +420,7 @@ describe("App Actual persistence", () => {
     });
   });
 
-  it("renders a new Actual optimistically while persisting it", async () => {
+  it("does not create or persist a new Actual until Save", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
@@ -429,7 +434,12 @@ describe("App Actual persistence", () => {
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
 
-    expect(await screen.findByTestId("actual-block")).toHaveTextContent("Actual");
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByTestId("actual-block")).toHaveTextContent("Untitled");
     expect(chrome.storage.local.set).toHaveBeenCalledWith({
       "dayRecord:2026-07-15": expect.objectContaining({
         schemaVersion: 1,
@@ -463,11 +473,12 @@ describe("App Actual persistence", () => {
     const add = await screen.findByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
       "Unable to save Actual locally.",
     );
-    expect(screen.getByTestId("actual-block")).toHaveTextContent("Actual");
+    expect(screen.getByTestId("actual-block")).toHaveTextContent("Untitled");
     const save = screen.getByRole("button", {
       name: "Save Actual to calendar",
     });
@@ -502,6 +513,7 @@ describe("App Actual persistence", () => {
     const add = await screen.findByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
     fireEvent.click(add);
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByTestId("actual-block")).toBeVisible();
     const save = screen.getByRole("button", {
@@ -532,7 +544,11 @@ describe("App Actual persistence", () => {
     expect(add).toBeEnabled();
     fireEvent.click(add);
 
-    expect(await screen.findByTestId("actual-block")).toHaveTextContent("Actual");
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByTestId("actual-block")).toHaveTextContent("Untitled");
     await waitFor(() =>
       expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument(),
     );
@@ -557,6 +573,289 @@ describe("App Actual persistence", () => {
     ).toBeDisabled();
     expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
     expect(chrome.storage.local.get).not.toHaveBeenCalled();
+  });
+});
+
+describe("App new Actual dialog", () => {
+  async function openNewActualDialog() {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    fireEvent.click(add);
+    return within(
+      await screen.findByRole("dialog", { name: "Edit Actual" }),
+    );
+  }
+
+  async function openExistingActualDialog() {
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual: [
+        {
+          id: "existing-actual",
+          summary: "Existing title",
+          startMinutes: 720,
+          durationMinutes: 30,
+          colorId: "8",
+          saveDisposition: "unsaved",
+        },
+      ],
+      updatedAt: "2026-07-15T19:00:00.000Z",
+    };
+
+    render(<App now={now} />);
+    const existingBlock = await screen.findByText("Existing title");
+    fireEvent.click(existingBlock.closest("button")!);
+    return within(
+      await screen.findByRole("dialog", { name: "Edit Actual" }),
+    );
+  }
+
+  it("opens on creation with the Untitled title focused and selected", async () => {
+    const dialog = await openNewActualDialog();
+    const title = dialog.getByRole("textbox", { name: "Title" });
+
+    expect(dialog.getByText("Edit Actual")).toHaveClass("sr-only");
+    expect(dialog.queryByText("Title")).not.toBeInTheDocument();
+    expect(
+      dialog.queryByRole("button", { name: "Cancel" }),
+    ).not.toBeInTheDocument();
+    expect(
+      dialog.queryByRole("button", { name: "Delete" }),
+    ).not.toBeInTheDocument();
+    expect(title).toHaveClass("cursor-text", "border-b", "caret-primary");
+    expect(title).not.toHaveClass("hover:bg-muted/50", "focus:bg-muted/50");
+    expect(
+      within(title.parentElement!).queryByTestId("title-edit-indicator"),
+    ).not.toBeInTheDocument();
+    expect(dialog.getByRole("spinbutton", { name: "Duration" })).toHaveClass(
+      "w-16",
+    );
+    expect(title).toHaveValue("Untitled");
+    expect(title).toHaveFocus();
+    expect(title).toHaveProperty("selectionStart", 0);
+    expect(title).toHaveProperty("selectionEnd", "Untitled".length);
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+
+    fireEvent.input(title, { target: { value: "Typed immediately" } });
+    expect(title).toHaveValue("Typed immediately");
+  });
+
+  it("rejects a blank title and non-whole duration without writing", async () => {
+    const dialog = await openNewActualDialog();
+    const title = dialog.getByRole("textbox", { name: "Title" });
+    const duration = dialog.getByRole("spinbutton", { name: "Duration" });
+
+    fireEvent.change(title, { target: { value: "   " } });
+    fireEvent.change(duration, { target: { value: "1.5" } });
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    expect(dialog.getByText("Title is required.")).toBeVisible();
+    expect(
+      dialog.getByText("Duration must be a positive whole number."),
+    ).toBeVisible();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("dismisses a changed new draft without creating a block", async () => {
+    const dialog = await openNewActualDialog();
+    fireEvent.change(dialog.getByRole("textbox", { name: "Title" }), {
+      target: { value: "Discarded title" },
+    });
+
+    fireEvent.keyDown(document, { key: "Escape", code: "Escape" });
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Edit Actual" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("discards a changed draft when the backdrop is clicked", async () => {
+    const dialog = await openNewActualDialog();
+    fireEvent.change(dialog.getByRole("textbox", { name: "Title" }), {
+      target: { value: "Discarded title" },
+    });
+
+    fireEvent.click(screen.getByTestId("dialog-overlay"));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Edit Actual" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("creates the default new Actual when Save is clicked without changes", async () => {
+    const dialog = await openNewActualDialog();
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Edit Actual" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(screen.getByTestId("actual-block")).toHaveTextContent("Untitled");
+    expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
+  });
+
+  it("saves title and duration while preserving an untouched out-of-palette color", async () => {
+    const dialog = await openNewActualDialog();
+    fireEvent.change(dialog.getByRole("textbox", { name: "Title" }), {
+      target: { value: "Deep work" },
+    });
+    fireEvent.change(dialog.getByRole("spinbutton", { name: "Duration" }), {
+      target: { value: "45" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1),
+    );
+    expect(chrome.storage.local.set).toHaveBeenLastCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [
+          expect.objectContaining({
+            summary: "Deep work",
+            durationMinutes: 45,
+            colorId: "8",
+          }),
+        ],
+      }),
+    });
+  });
+
+  it("clears a selected palette color when its swatch is clicked again", async () => {
+    const dialog = await openNewActualDialog();
+    const swatch = dialog.getByRole("button", { name: "Color 11" });
+
+    fireEvent.click(swatch);
+    expect(swatch).toHaveAttribute("aria-pressed", "true");
+    fireEvent.click(swatch);
+    expect(swatch).toHaveAttribute("aria-pressed", "false");
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1),
+    );
+    expect(chrome.storage.local.set).toHaveBeenLastCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [expect.objectContaining({ colorId: "" })],
+      }),
+    });
+  });
+
+  it("visibly selects and persists a different palette color", async () => {
+    const dialog = await openNewActualDialog();
+    const swatch = dialog.getByRole("button", { name: "Color 6" });
+
+    fireEvent.click(swatch);
+
+    expect(swatch).toHaveAttribute("aria-pressed", "true");
+    expect(
+      within(swatch).getByTestId("selected-color-indicator"),
+    ).toBeInTheDocument();
+
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1),
+    );
+    expect(chrome.storage.local.set).toHaveBeenLastCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [expect.objectContaining({ colorId: "6" })],
+      }),
+    });
+  });
+
+  it("opens an existing Actual and persists its edited title", async () => {
+    const dialog = await openExistingActualDialog();
+    const title = dialog.getByRole("textbox", { name: "Title" });
+
+    expect(title).toHaveFocus();
+    expect(title).toHaveProperty("selectionStart", "Existing title".length);
+    expect(title).toHaveProperty("selectionEnd", "Existing title".length);
+    fireEvent.change(title, {
+      target: { value: "Edited title" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(chrome.storage.local.set).toHaveBeenCalledWith({
+        "dayRecord:2026-07-15": expect.objectContaining({
+          actual: [
+            expect.objectContaining({
+              id: "existing-actual",
+              summary: "Edited title",
+            }),
+          ],
+        }),
+      }),
+    );
+    expect(screen.getByText("Edited title")).toBeVisible();
+  });
+
+  it("closes an unchanged existing Actual without writing", async () => {
+    const dialog = await openExistingActualDialog();
+
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    await waitFor(() =>
+      expect(
+        screen.queryByRole("dialog", { name: "Edit Actual" }),
+      ).not.toBeInTheDocument(),
+    );
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+  });
+
+  it("deletes the local block without touching Calendar", async () => {
+    const dialog = await openExistingActualDialog();
+    fireEvent.click(dialog.getByRole("button", { name: "Delete" }));
+
+    await waitFor(() =>
+      expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument(),
+    );
+    expect(chrome.storage.local.set).toHaveBeenLastCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({ actual: [] }),
+    });
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "calendar.deleteEvent" }),
+    );
   });
 });
 
