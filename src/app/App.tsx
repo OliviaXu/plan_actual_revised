@@ -7,36 +7,20 @@ import {
   ActualEditDialog,
   type ActualDraft,
 } from "./components/ActualEditDialog";
-import type { ActualEvent, PlanEvent } from "../domain/day-event";
+import type { ActualEvent } from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
-import { toPlanEvents } from "../domain/plan-event";
 import { defaultSettings } from "../domain/settings";
 import { buildEditedActual } from "../domain/actual-edit";
 import {
   runtimeCalendarEventClient,
   saveActualsToCalendar,
 } from "./save-actuals-to-calendar";
-import { sendRuntimeMessage } from "../shared/runtime-messages";
+import { useCalendarPlan } from "./use-calendar-plan";
 import {
   createDayRecordWriteQueue,
   loadDayRecord,
 } from "../storage/day-record-storage";
 import { getCalendarTime } from "../calendar/calendar-time";
-
-type CalendarState =
-  | { status: "loading" }
-  | { status: "disconnected"; errorMessage?: string }
-  | { status: "connecting" }
-  | {
-      status: "connected";
-      planEvents: PlanEvent[];
-    }
-  | { status: "error"; message: string };
-
-type CalendarDay = {
-  date: string;
-  timeZone: string;
-};
 
 type ActualEditorState =
   | { mode: "create"; proposedActual: ActualEvent }
@@ -46,16 +30,8 @@ const readSystemTime = () => new Date();
 const defaultActualDurationMinutes = 30;
 
 export function App({ now = readSystemTime }: { now?: () => Date }) {
-  const [calendarState, setCalendarState] = useState<CalendarState>({
-    status: "loading",
-  });
-  const [calendarDay, setCalendarDay] = useState<CalendarDay>(() => {
-    const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
-    return {
-      date: getCalendarTime(now(), timeZone).date,
-      timeZone,
-    };
-  });
+  const { calendarState, calendarDay, connectCalendar } =
+    useCalendarPlan(now);
   const [dayRecordState, setDayRecordState] = useState<{
     key: string;
     record: DayRecord | null;
@@ -84,10 +60,6 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         );
 
   useEffect(() => {
-    void loadCalendarEvents(setCalendarState, setCalendarDay);
-  }, []);
-
-  useEffect(() => {
     if (calendarState.status !== "connected") return;
 
     let active = true;
@@ -110,31 +82,6 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       active = false;
     };
   }, [calendarDay, calendarDayKey, calendarState.status]);
-
-  async function connectCalendar() {
-    setCalendarState({ status: "connecting" });
-
-    try {
-      const authResponse = await sendRuntimeMessage({
-        type: "auth.requestInteractiveToken",
-      });
-
-      if (!authResponse.ok) {
-        setCalendarState({
-          status: "disconnected",
-          errorMessage: authResponse.error.message,
-        });
-        return;
-      }
-
-      await loadCalendarEvents(setCalendarState, setCalendarDay);
-    } catch {
-      setCalendarState({
-        status: "disconnected",
-        errorMessage: "Unable to reach the background Calendar boundary.",
-      });
-    }
-  }
 
   function addActual() {
     if (
@@ -418,46 +365,4 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       ) : null}
     </main>
   );
-}
-
-async function loadCalendarEvents(
-  setCalendarState: (state: CalendarState) => void,
-  setCalendarDay: (day: CalendarDay) => void,
-) {
-  setCalendarState({ status: "loading" });
-
-  try {
-    const response = await sendRuntimeMessage({
-      type: "calendar.listEvents",
-    });
-
-    if (response.ok) {
-      setCalendarDay({
-        date: response.value.date,
-        timeZone: response.value.timeZone,
-      });
-      setCalendarState({
-        status: "connected",
-        planEvents: toPlanEvents(
-          response.value.events,
-          response.value.date,
-          response.value.timeZone,
-          defaultSettings.hiddenPlanColorIds,
-        ),
-      });
-      return;
-    }
-
-    if (response.error.code === "AUTH_NOT_CONNECTED") {
-      setCalendarState({ status: "disconnected" });
-      return;
-    }
-
-    setCalendarState({ status: "error", message: response.error.message });
-  } catch {
-    setCalendarState({
-      status: "error",
-      message: "Unable to reach the background Calendar boundary.",
-    });
-  }
 }
