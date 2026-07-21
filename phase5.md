@@ -13,6 +13,10 @@ Actuals never expand the Plan-derived grid range. Partially visible Actuals
 are clipped to the Actual column, and completely out-of-range Actuals are not
 rendered.
 
+The grid body remains exactly the Plan-derived range. Plan and Actual blocks
+share the same clipping behavior when a minimum visual height would extend
+past the final boundary.
+
 ## Working Agreement
 
 Implementation is split into small functional slices. Each slice follows:
@@ -216,6 +220,9 @@ deletion to prove persistence through the real extension storage boundary.
 - Keep the shared grid range determined solely by eligible Plan events and the
   configured defaults.
 - Do not include Actual start or end bounds when calculating the grid range.
+- Keep the grid body at that exact range height; do not expand it to fit a
+  minimum-height block at the final boundary.
+- Clip visual overflow in both the Plan and Actual columns.
 - Clip Actuals that partially intersect the Plan-derived range.
 - Omit Actuals that are completely outside the range.
 - Existing crossing-midnight records remain loadable and are clipped, but must
@@ -256,6 +263,7 @@ Playwright reloads after resizing to prove canonical persistence.
   mutation-disabled state.
 - Keep the persisted `ActualEvent` shape unchanged.
 - Keep `DayRecord.schemaVersion` unchanged.
+- Keep `DayGridBlock<T>` geometry transient and shared across columns.
 - Keep queue, dialog draft, error display, and resize-preview state transient.
 - Add `@radix-ui/react-dialog` and a local shadcn-style Dialog primitive.
 - Preserve the existing uncommitted Luxon and timezone work.

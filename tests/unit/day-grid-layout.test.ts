@@ -3,10 +3,10 @@ import { describe, expect, it } from "vitest";
 import type { ActualEvent, PlanEvent } from "../../src/domain/day-event";
 import { defaultSettings } from "../../src/domain/settings";
 import {
-  calculateActualDayGridLayout,
-  calculatePlanDayGridLayout,
-  calculatePlanNowIndicatorTopPx,
-  MINIMUM_PLAN_BLOCK_HEIGHT_PX,
+  calculateDayGridBlocks,
+  calculateDayGridNowIndicatorTopPx,
+  calculateDayGridRange,
+  MINIMUM_DAY_GRID_BLOCK_HEIGHT_PX,
 } from "../../src/app/components/day-grid-layout";
 
 const date = "2026-07-15";
@@ -41,41 +41,23 @@ function actualEvent(
   };
 }
 
-describe("calculatePlanDayGridLayout", () => {
-  it("positions normalized day-relative events", () => {
-    const layout = calculatePlanDayGridLayout(
-      [planEvent("morning", 600, 60)],
-      defaultSettings,
-    );
-
-    expect(layout.blocks[0]).toMatchObject({
-      durationMinutes: 60,
-      topPx: 252,
-    });
-  });
-
+describe("calculateDayGridRange", () => {
   it("uses the configured range and exact time geometry by default", () => {
-    const layout = calculatePlanDayGridLayout(
+    const range = calculateDayGridRange(
       [planEvent("design-review", 540, 60)],
       defaultSettings,
     );
 
-    expect(layout.startHour).toBe(7);
-    expect(layout.endHour).toBe(21);
-    expect(layout.heightPx).toBe(1_176);
-    expect(layout.hourBoundaries).toEqual([
+    expect(range.startHour).toBe(7);
+    expect(range.endHour).toBe(21);
+    expect(range.heightPx).toBe(1_176);
+    expect(range.hourBoundaries).toEqual([
       7, 8, 9, 10, 11, 12, 13, 14, 15, 16, 17, 18, 19, 20, 21,
     ]);
-    expect(layout.blocks[0]).toMatchObject({
-      durationMinutes: 60,
-      topPx: 168,
-      heightPx: 84,
-      showTimeRange: true,
-    });
   });
 
   it("expands and rounds the range to whole-hour boundaries", () => {
-    const layout = calculatePlanDayGridLayout(
+    const range = calculateDayGridRange(
       [
         planEvent("early", 390, 30),
         planEvent("late", 1_275, 15),
@@ -83,62 +65,32 @@ describe("calculatePlanDayGridLayout", () => {
       defaultSettings,
     );
 
-    expect(layout.startHour).toBe(6);
-    expect(layout.endHour).toBe(22);
-    expect(layout.blocks.map(({ topPx, heightPx }) => ({ topPx, heightPx })))
-      .toEqual([
-        { topPx: 42, heightPx: 42 },
-        { topPx: 1_281, heightPx: 21 },
-      ]);
+    expect(range.startHour).toBe(6);
+    expect(range.endHour).toBe(22);
+    expect(range.heightPx).toBe(1_344);
   });
 
   it("does not expand an event ending exactly at the configured end hour", () => {
-    const layout = calculatePlanDayGridLayout(
+    const range = calculateDayGridRange(
       [planEvent("ends-at-nine", 1_230, 30)],
       defaultSettings,
     );
 
-    expect(layout.endHour).toBe(21);
+    expect(range.endHour).toBe(21);
   });
 
-  it("positions event starts at minute precision", () => {
-    const layout = calculatePlanDayGridLayout(
-      [planEvent("minute-start", 540, 60)],
-      defaultSettings,
-    );
-
-    expect(layout.blocks[0]).toMatchObject({ topPx: 168 });
-  });
-
-  it("applies the named minimum height and the time-range threshold", () => {
-    const belowThreshold = calculatePlanDayGridLayout(
-      [planEvent("short", 600, 5)],
-      defaultSettings,
-    ).blocks[0];
-    const atThreshold = calculatePlanDayGridLayout(
-      [planEvent("threshold", 600, 20)],
-      { ...defaultSettings, pixelsPerMinute: 2 },
-    ).blocks[0];
-
-    expect(belowThreshold?.heightPx).toBe(MINIMUM_PLAN_BLOCK_HEIGHT_PX);
-    expect(belowThreshold?.showTimeRange).toBe(false);
-    expect(atThreshold?.heightPx).toBe(40);
-    expect(atThreshold?.showTimeRange).toBe(true);
-  });
-
-  it("allows enough bottom space to show a minimum-height boundary block", () => {
-    const layout = calculatePlanDayGridLayout(
+  it("keeps its exact range height when a minimum-height block would overflow", () => {
+    const range = calculateDayGridRange(
       [planEvent("ends-at-boundary", 1_255, 5)],
       defaultSettings,
     );
 
-    expect(layout.endHour).toBe(21);
-    expect(layout.heightPx).toBe(1_189);
-    expect(layout.blocks[0]).toMatchObject({ topPx: 1_169, heightPx: 20 });
+    expect(range.endHour).toBe(21);
+    expect(range.heightPx).toBe(1_176);
   });
 
-  it("positions events normalized at both local-midnight boundaries", () => {
-    const layout = calculatePlanDayGridLayout(
+  it("derives the complete-day range from crossing-midnight Plan events", () => {
+    const range = calculateDayGridRange(
       [
         planEvent("from-yesterday", -30, 60),
         planEvent("into-tomorrow", 1_410, 60),
@@ -146,9 +98,60 @@ describe("calculatePlanDayGridLayout", () => {
       defaultSettings,
     );
 
-    expect(layout.startHour).toBe(0);
-    expect(layout.endHour).toBe(24);
-    expect(layout.blocks.map((block) => ({
+    expect(range.startHour).toBe(0);
+    expect(range.endHour).toBe(24);
+  });
+});
+
+describe("calculateDayGridBlocks", () => {
+  it("positions Plan events using a separately calculated range", () => {
+    const blocks = calculateDayGridBlocks(
+      [planEvent("design-review", 540, 60)],
+      7,
+      21,
+      defaultSettings,
+    );
+
+    expect(blocks[0]).toMatchObject({
+      durationMinutes: 60,
+      topPx: 168,
+      heightPx: 84,
+      showTimeRange: true,
+    });
+  });
+
+  it("applies the named minimum height and the time-range threshold", () => {
+    const belowThreshold = calculateDayGridBlocks(
+      [planEvent("short", 600, 5)],
+      7,
+      21,
+      defaultSettings,
+    )[0];
+    const atThreshold = calculateDayGridBlocks(
+      [planEvent("threshold", 600, 20)],
+      7,
+      21,
+      { ...defaultSettings, pixelsPerMinute: 2 },
+    )[0];
+
+    expect(belowThreshold?.heightPx).toBe(MINIMUM_DAY_GRID_BLOCK_HEIGHT_PX);
+    expect(belowThreshold?.showTimeRange).toBe(false);
+    expect(atThreshold?.heightPx).toBe(40);
+    expect(atThreshold?.showTimeRange).toBe(true);
+  });
+
+  it("clips crossing-midnight Plan events to the supplied range", () => {
+    const blocks = calculateDayGridBlocks(
+      [
+        planEvent("from-yesterday", -30, 60),
+        planEvent("into-tomorrow", 1_410, 60),
+      ],
+      0,
+      24,
+      defaultSettings,
+    );
+
+    expect(blocks.map((block) => ({
       id: block.event.id,
       startMinutes: block.clippedStartMinutes,
       endMinutes: block.clippedEndMinutes,
@@ -176,18 +179,20 @@ describe("calculatePlanDayGridLayout", () => {
   });
 
   it("assigns deterministic layers within transitive overlap groups", () => {
-    const layout = calculatePlanDayGridLayout(
+    const blocks = calculateDayGridBlocks(
       [
         planEvent("chain-end", 600, 60),
         planEvent("chain-middle", 570, 60),
         planEvent("chain-start", 540, 60),
         planEvent("separate", 780, 60),
       ],
+      7,
+      21,
       defaultSettings,
     );
 
     expect(
-      layout.blocks.map(({ event, overlapGroupIndex, overlapLayerIndex }) => ({
+      blocks.map(({ event, overlapGroupIndex, overlapLayerIndex }) => ({
         id: event.id,
         overlapGroupIndex,
         overlapLayerIndex,
@@ -201,16 +206,18 @@ describe("calculatePlanDayGridLayout", () => {
   });
 
   it("orders same-start nested events deterministically and reuses touching layers", () => {
-    const layout = calculatePlanDayGridLayout(
+    const blocks = calculateDayGridBlocks(
       [
         planEvent("shorter", 540, 60),
         planEvent("longer", 540, 120),
         planEvent("touching-shorter", 600, 30),
       ],
+      7,
+      21,
       defaultSettings,
     );
 
-    expect(layout.blocks.map(({ event, overlapLayerIndex }) => ({
+    expect(blocks.map(({ event, overlapLayerIndex }) => ({
       id: event.id,
       overlapLayerIndex,
     }))).toEqual([
@@ -219,11 +226,29 @@ describe("calculatePlanDayGridLayout", () => {
       { id: "touching-shorter", overlapLayerIndex: 1 },
     ]);
   });
-});
 
-describe("calculateActualDayGridLayout", () => {
+  it("uses the same geometry for Plan and Actual events", () => {
+    const planBlock = calculateDayGridBlocks(
+      [planEvent("plan", 540, 60)],
+      7,
+      21,
+      defaultSettings,
+    )[0];
+    const actualBlock = calculateDayGridBlocks(
+      [actualEvent("actual", 540, 60)],
+      7,
+      21,
+      defaultSettings,
+    )[0];
+
+    expect({ ...actualBlock, event: undefined }).toEqual({
+      ...planBlock,
+      event: undefined,
+    });
+  });
+
   it("uses the same deterministic overlap groups and reusable layers as Plan", () => {
-    const blocks = calculateActualDayGridLayout(
+    const blocks = calculateDayGridBlocks(
       [
         actualEvent("chain-end", 600, 60),
         actualEvent("chain-middle", 570, 60),
@@ -237,8 +262,8 @@ describe("calculateActualDayGridLayout", () => {
 
     expect(
       blocks.map(
-        ({ actual, overlapGroupIndex, overlapLayerIndex }) => ({
-          id: actual.id,
+        ({ event, overlapGroupIndex, overlapLayerIndex }) => ({
+          id: event.id,
           overlapGroupIndex,
           overlapLayerIndex,
         }),
@@ -252,7 +277,7 @@ describe("calculateActualDayGridLayout", () => {
   });
 
   it("clips partial Actuals and omits blocks outside the Plan-derived range", () => {
-    const blocks = calculateActualDayGridLayout(
+    const blocks = calculateDayGridBlocks(
       [
         actualEvent("before", 300, 60),
         actualEvent("early-clipped", 390, 60),
@@ -267,14 +292,14 @@ describe("calculateActualDayGridLayout", () => {
     expect(
       blocks.map(
         ({
-          actual,
+          event,
           clippedStartMinutes,
           clippedEndMinutes,
           durationMinutes,
           topPx,
           heightPx,
         }) => ({
-          id: actual.id,
+          id: event.id,
           clippedStartMinutes,
           clippedEndMinutes,
           durationMinutes,
@@ -303,10 +328,10 @@ describe("calculateActualDayGridLayout", () => {
   });
 });
 
-describe("calculatePlanNowIndicatorTopPx", () => {
+describe("calculateDayGridNowIndicatorTopPx", () => {
   it("positions local time on the grid scale and excludes other days or hours", () => {
     expect(
-      calculatePlanNowIndicatorTopPx(
+      calculateDayGridNowIndicatorTopPx(
         new Date(2026, 6, 15, 12, 30),
         date,
         timeZone,
@@ -316,7 +341,7 @@ describe("calculatePlanNowIndicatorTopPx", () => {
       ),
     ).toBe(462);
     expect(
-      calculatePlanNowIndicatorTopPx(
+      calculateDayGridNowIndicatorTopPx(
         new Date(2026, 6, 15, 6, 59),
         date,
         timeZone,
@@ -326,7 +351,7 @@ describe("calculatePlanNowIndicatorTopPx", () => {
       ),
     ).toBeNull();
     expect(
-      calculatePlanNowIndicatorTopPx(
+      calculateDayGridNowIndicatorTopPx(
         new Date(2026, 6, 16, 12, 30),
         date,
         timeZone,

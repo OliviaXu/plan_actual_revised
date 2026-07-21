@@ -86,6 +86,36 @@ describe("DayGrid", () => {
     expect(within(block).getByText("9:00 AM – 10:00 AM")).toBeVisible();
   });
 
+  it("renders shared event content and appearance in Plan and Actual", () => {
+    render(
+      <DayGrid
+        actuals={[
+          { ...actualEvent("actual-empty", 540, 60), summary: "" },
+        ]}
+        planEvents={[
+          planEvent("plan-empty", 540, 60, {
+            summary: "",
+            colorId: "8",
+          }),
+        ]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    const planBlock = screen.getByTestId("plan-event-plan-empty");
+    const actualBlock = screen.getByTestId("actual-block");
+    for (const block of [planBlock, actualBlock]) {
+      expect(within(block).getByText("Untitled event")).toBeVisible();
+      expect(within(block).getByText("1h")).toBeVisible();
+      expect(within(block).getByText("9:00 AM – 10:00 AM")).toBeVisible();
+      expect(block).toHaveStyle({
+        backgroundColor: "#61616140",
+        borderColor: "#61616180",
+      });
+    }
+  });
+
   it("hides the time range below 40px and shows it above 40px", () => {
     render(
       <DayGrid
@@ -110,7 +140,7 @@ describe("DayGrid", () => {
     ).toBeVisible();
   });
 
-  it("keeps a minimum-height block visible at the final boundary", () => {
+  it("clips a minimum-height Plan block at the final grid boundary", () => {
     render(
       <DayGrid
         planEvents={[
@@ -122,8 +152,9 @@ describe("DayGrid", () => {
     );
 
     expect(screen.getByTestId("day-grid-body")).toHaveStyle({
-      height: "1189px",
+      height: "1176px",
     });
+    expect(screen.getByTestId("plan-column")).toHaveClass("overflow-hidden");
     expect(screen.getByTestId("plan-event-Final five minutes")).toHaveStyle({
       top: "1169px",
       height: "20px",
@@ -260,7 +291,7 @@ describe("DayGrid", () => {
     expect(nested).toHaveStyle({ zIndex: "2" });
   });
 
-  it("clips a minimum-height Actual at midnight instead of the extended Plan body", () => {
+  it("clips minimum-height Plan and Actual blocks at midnight", () => {
     render(
       <DayGrid
         actuals={[actualEvent("midnight-actual", 1_435, 60)]}
@@ -273,11 +304,12 @@ describe("DayGrid", () => {
     );
 
     expect(screen.getByTestId("day-grid-body")).toHaveStyle({
-      height: "1441px",
-    });
-    expect(screen.getByTestId("actual-column-clip")).toHaveStyle({
       height: "1428px",
     });
+    expect(screen.getByTestId("plan-column")).toHaveClass("overflow-hidden");
+    expect(screen.getByTestId("actual-column")).toHaveClass(
+      "overflow-hidden",
+    );
     expect(screen.getByTestId("actual-block")).toHaveStyle({
       top: "1421px",
       height: "20px",

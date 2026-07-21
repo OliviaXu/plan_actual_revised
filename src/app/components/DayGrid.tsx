@@ -1,16 +1,19 @@
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
-  calculateActualDayGridLayout,
-  calculatePlanDayGridLayout,
-  calculatePlanNowIndicatorTopPx,
-  PLAN_EVENT_COLUMN_INSET_PX,
-  PLAN_EVENT_LAYER_OFFSET_PX,
-  type ActualDayGridBlock,
-  type PlanDayGridBlock,
+  calculateDayGridBlocks,
+  calculateDayGridNowIndicatorTopPx,
+  calculateDayGridRange,
+  DAY_GRID_COLUMN_INSET_PX,
+  DAY_GRID_LAYER_OFFSET_PX,
+  type DayGridBlock,
 } from "./day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
-import type { ActualEvent, PlanEvent } from "../../domain/day-event";
+import type {
+  ActualEvent,
+  DayEvent,
+  PlanEvent,
+} from "../../domain/day-event";
 import { getCalendarTime } from "../../calendar/calendar-time";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
@@ -44,29 +47,35 @@ export function DayGrid({
   date: string;
   timeZone: string;
 }) {
-  const [frontEventId, setFrontEventId] = useState<string | null>(null);
+  const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
   const [frontActualId, setFrontActualId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(now);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
-  const layout = calculatePlanDayGridLayout(
+  const gridRange = calculateDayGridRange(
     planEvents,
     defaultSettings,
   );
-  const actualBlocks = calculateActualDayGridLayout(
+  const planBlocks = calculateDayGridBlocks(
+    planEvents,
+    gridRange.startHour,
+    gridRange.endHour,
+    defaultSettings,
+  );
+  const actualBlocks = calculateDayGridBlocks(
     actuals ?? [],
-    layout.startHour,
-    layout.endHour,
+    gridRange.startHour,
+    gridRange.endHour,
     defaultSettings,
   );
   const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
-  const nowIndicatorTopPx = calculatePlanNowIndicatorTopPx(
+  const nowIndicatorTopPx = calculateDayGridNowIndicatorTopPx(
     currentTime,
     date,
     timeZone,
-    layout.startHour,
-    layout.endHour,
+    gridRange.startHour,
+    gridRange.endHour,
     defaultSettings.pixelsPerMinute,
   );
 
@@ -99,7 +108,7 @@ export function DayGrid({
   return (
     <section
       className="overflow-hidden rounded-md border border-border bg-white shadow-soft"
-      aria-label="Plan day grid"
+      aria-label="Day grid"
     >
       <div
         className="relative h-[calc(100vh-10rem)] min-h-80 overflow-y-auto [scrollbar-gutter:stable]"
@@ -133,10 +142,10 @@ export function DayGrid({
         </div>
         <div
           className="relative"
-          data-end-hour={layout.endHour}
-          data-start-hour={layout.startHour}
+          data-end-hour={gridRange.endHour}
+          data-start-hour={gridRange.startHour}
           data-testid="day-grid-body"
-          style={{ height: layout.heightPx }}
+          style={{ height: gridRange.heightPx }}
         >
           {nowIndicatorTopPx !== null ? (
             <div
@@ -145,7 +154,7 @@ export function DayGrid({
               style={{
                 left: DAY_TIME_AXIS_WIDTH,
                 top: nowIndicatorTopPx,
-                zIndex: Math.max(layout.blocks.length, actualBlocks.length) + 1,
+                zIndex: Math.max(planBlocks.length, actualBlocks.length) + 1,
               }}
             >
               <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-now" />
@@ -162,37 +171,42 @@ export function DayGrid({
               className="relative border-r border-border"
               data-testid="day-grid-axis"
             >
-              {layout.hourBoundaries.map((hour) => {
-              const labelPosition =
-                hour === layout.startHour
-                  ? ""
-                  : hour === layout.endHour
-                    ? "-translate-y-full"
-                    : "-translate-y-1/2";
+              {gridRange.hourBoundaries.map((hour) => {
+                const labelPosition =
+                  hour === gridRange.startHour
+                    ? ""
+                    : hour === gridRange.endHour
+                      ? "-translate-y-full"
+                      : "-translate-y-1/2";
 
-              return (
-                <div
-                  className="pointer-events-none absolute inset-x-0"
-                  data-testid={`plan-hour-marker-${hour}`}
-                  key={hour}
-                  style={{ top: (hour - layout.startHour) * hourHeightPx }}
-                >
-                  <span
-                    className={`absolute right-0 top-0 w-2 border-t border-border ${
-                      hour === layout.endHour ? "-translate-y-px" : ""
-                    }`}
-                    data-testid="plan-hour-tick"
-                  />
-                  <span
-                    className={`absolute right-3 text-xs text-muted-foreground ${labelPosition}`}
+                return (
+                  <div
+                    className="pointer-events-none absolute inset-x-0"
+                    data-testid={`plan-hour-marker-${hour}`}
+                    key={hour}
+                    style={{
+                      top: (hour - gridRange.startHour) * hourHeightPx,
+                    }}
                   >
-                    {formatHour(hour)}
-                  </span>
-                </div>
-              );
+                    <span
+                      className={`absolute right-0 top-0 w-2 border-t border-border ${
+                        hour === gridRange.endHour ? "-translate-y-px" : ""
+                      }`}
+                      data-testid="plan-hour-tick"
+                    />
+                    <span
+                      className={`absolute right-3 text-xs text-muted-foreground ${labelPosition}`}
+                    >
+                      {formatHour(hour)}
+                    </span>
+                  </div>
+                );
               })}
             </div>
-            <div className="relative" data-testid="plan-column">
+            <div
+              className="relative overflow-hidden"
+              data-testid="plan-column"
+            >
               {status === "loading" ? (
                 <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
                   Loading today&apos;s plan
@@ -211,7 +225,7 @@ export function DayGrid({
                   Unable to load today&apos;s plan
                 </p>
               ) : null}
-              {status === "connected" && layout.blocks.length === 0 ? (
+              {status === "connected" && planBlocks.length === 0 ? (
                 <p
                   className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
                   data-testid="plan-empty"
@@ -219,13 +233,13 @@ export function DayGrid({
                   No timed events today
                 </p>
               ) : null}
-              {layout.blocks.map((block) => (
-                <PlanEventBlock
+              {planBlocks.map((block) => (
+                <PlanGridBlock
                   block={block}
-                  frontZIndex={layout.blocks.length}
-                  isFront={frontEventId === block.event.id}
+                  frontZIndex={planBlocks.length}
+                  isFront={frontPlanId === block.event.id}
                   key={block.event.id}
-                  onBringToFront={() => setFrontEventId(block.event.id)}
+                  onBringToFront={() => setFrontPlanId(block.event.id)}
                 />
               ))}
             </div>
@@ -233,27 +247,18 @@ export function DayGrid({
               className="relative overflow-hidden border-l border-border"
               data-testid="actual-column"
             >
-              <div
-                className="absolute inset-x-0 top-0 overflow-hidden"
-                data-testid="actual-column-clip"
-                style={{
-                  height:
-                    (layout.endHour - layout.startHour) * hourHeightPx,
-                }}
-              >
-                {actualBlocks.map((block) => (
-                  <ActualEventBlock
-                    block={block}
-                    frontZIndex={actualBlocks.length}
-                    isFront={frontActualId === block.actual.id}
-                    key={block.actual.id}
-                    onSelect={() => {
-                      setFrontActualId(block.actual.id);
-                      onEditActual?.(block.actual.id);
-                    }}
-                  />
-                ))}
-              </div>
+              {actualBlocks.map((block) => (
+                <ActualGridBlock
+                  block={block}
+                  frontZIndex={actualBlocks.length}
+                  isFront={frontActualId === block.event.id}
+                  key={block.event.id}
+                  onSelect={() => {
+                    setFrontActualId(block.event.id);
+                    onEditActual?.(block.event.id);
+                  }}
+                />
+              ))}
             </div>
           </div>
         </div>
@@ -262,59 +267,38 @@ export function DayGrid({
   );
 }
 
-function ActualEventBlock({
+function ActualGridBlock({
   block,
   frontZIndex,
   isFront,
   onSelect,
 }: {
-  block: ActualDayGridBlock;
+  block: DayGridBlock<ActualEvent>;
   frontZIndex: number;
   isFront: boolean;
   onSelect: () => void;
 }) {
-  const color = resolveGoogleCalendarEventColor(block.actual.colorId);
+  const appearance = getDayGridBlockAppearance(
+    block,
+    isFront,
+    frontZIndex,
+  );
+
   return (
     <button
-      className={`absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${
-        color ? "" : "border-border bg-muted"
-      }`}
-      data-actual-id={block.actual.id}
+      className={appearance.className}
+      data-actual-id={block.event.id}
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
       data-testid="actual-block"
       onClick={onSelect}
-      style={{
-        top: block.topPx,
-        height: block.heightPx,
-        left:
-          PLAN_EVENT_COLUMN_INSET_PX +
-          block.overlapLayerIndex * PLAN_EVENT_LAYER_OFFSET_PX,
-        right: PLAN_EVENT_COLUMN_INSET_PX,
-        zIndex: isFront ? frontZIndex : block.overlapLayerIndex,
-        ...(color
-          ? { backgroundColor: `${color}40`, borderColor: `${color}80` }
-          : {}),
-      }}
+      style={appearance.style}
       type="button"
     >
-      <span className="flex min-w-0 items-start justify-between gap-2">
-        <span className="min-w-0 truncate font-medium">
-          {block.actual.summary}
-        </span>
-        <span className="shrink-0 text-muted-foreground">
-          {formatDuration(block.durationMinutes)}
-        </span>
-      </span>
-      {block.showTimeRange ? (
-        <span
-          className="block truncate text-muted-foreground"
-          data-testid="actual-event-time-range"
-        >
-          {formatMinuteOfDay(block.clippedStartMinutes)} –{" "}
-          {formatMinuteOfDay(block.clippedEndMinutes)}
-        </span>
-      ) : null}
+      <DayGridBlockContent
+        block={block}
+        timeRangeTestId="actual-event-time-range"
+      />
     </button>
   );
 }
@@ -334,50 +318,58 @@ function formatHour(hour: number) {
   return `${clockHour} ${suffix}`;
 }
 
-function PlanEventBlock({
+function PlanGridBlock({
   block,
   frontZIndex,
   isFront,
   onBringToFront,
 }: {
-  block: PlanDayGridBlock;
+  block: DayGridBlock<PlanEvent>;
   frontZIndex: number;
   isFront: boolean;
   onBringToFront: () => void;
 }) {
-  const eventColor = resolveGoogleCalendarEventColor(block.event.colorId);
+  const appearance = getDayGridBlockAppearance(
+    block,
+    isFront,
+    frontZIndex,
+  );
 
   return (
     <button
-      className={`absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${
-        eventColor ? "" : "border-border bg-muted"
-      }`}
+      className={appearance.className}
       data-calendar-event-id={block.event.id}
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
       data-testid={`plan-event-${block.event.id}`}
       onClick={onBringToFront}
-      style={{
-        top: block.topPx,
-        height: block.heightPx,
-        left:
-          PLAN_EVENT_COLUMN_INSET_PX +
-          block.overlapLayerIndex * PLAN_EVENT_LAYER_OFFSET_PX,
-        right: PLAN_EVENT_COLUMN_INSET_PX,
-        zIndex: isFront ? frontZIndex : block.overlapLayerIndex,
-        ...(eventColor
-          ? {
-              backgroundColor: `${eventColor}40`,
-              borderColor: `${eventColor}80`,
-            }
-          : {}),
-      }}
+      style={appearance.style}
       type="button"
     >
+      <DayGridBlockContent
+        block={block}
+        timeRangeTestId="plan-event-time-range"
+        titleTestId="plan-event-title"
+      />
+    </button>
+  );
+}
+
+function DayGridBlockContent({
+  block,
+  timeRangeTestId,
+  titleTestId,
+}: {
+  block: DayGridBlock<DayEvent>;
+  timeRangeTestId: string;
+  titleTestId?: string;
+}) {
+  return (
+    <>
       <span className="flex min-w-0 items-start justify-between gap-2">
         <span
           className="min-w-0 truncate font-medium"
-          data-testid="plan-event-title"
+          data-testid={titleTestId}
         >
           {block.event.summary || "Untitled event"}
         </span>
@@ -388,14 +380,40 @@ function PlanEventBlock({
       {block.showTimeRange ? (
         <span
           className="block truncate text-muted-foreground"
-          data-testid="plan-event-time-range"
+          data-testid={timeRangeTestId}
         >
           {formatMinuteOfDay(block.clippedStartMinutes)} –{" "}
           {formatMinuteOfDay(block.clippedEndMinutes)}
         </span>
       ) : null}
-    </button>
+    </>
   );
+}
+
+function getDayGridBlockAppearance(
+  block: DayGridBlock<DayEvent>,
+  isFront: boolean,
+  frontZIndex: number,
+) {
+  const color = resolveGoogleCalendarEventColor(block.event.colorId);
+
+  return {
+    className: `absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${
+      color ? "" : "border-border bg-muted"
+    }`,
+    style: {
+      top: block.topPx,
+      height: block.heightPx,
+      left:
+        DAY_GRID_COLUMN_INSET_PX +
+        block.overlapLayerIndex * DAY_GRID_LAYER_OFFSET_PX,
+      right: DAY_GRID_COLUMN_INSET_PX,
+      zIndex: isFront ? frontZIndex : block.overlapLayerIndex,
+      ...(color
+        ? { backgroundColor: `${color}40`, borderColor: `${color}80` }
+        : {}),
+    },
+  };
 }
 
 function formatDuration(durationMinutes: number) {

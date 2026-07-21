@@ -135,7 +135,7 @@ describe("App Plan loading", () => {
     expect(
       screen.getByRole("button", { name: "Connect Calendar" }),
     ).toBeVisible();
-    expect(screen.getByRole("region", { name: "Plan day grid" })).toBeVisible();
+    expect(screen.getByRole("region", { name: "Day grid" })).toBeVisible();
     expect(
       screen.queryByText(
         "Sign in to load today's events into this read-only column.",

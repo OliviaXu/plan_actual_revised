@@ -95,7 +95,7 @@ test("a disconnected user can connect and populate Plan", async () => {
       page.getByText("Connect Google Calendar to show today's plan"),
     ).toBeVisible();
     await expect(
-      page.getByRole("region", { name: "Plan day grid" }),
+      page.getByRole("region", { name: "Day grid" }),
     ).toBeVisible();
     await expect(
       page.getByRole("heading", { name: "Actual", exact: true }),

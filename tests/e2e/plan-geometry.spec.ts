@@ -118,7 +118,11 @@ test("renders the default range and exact block geometry", async () => {
     });
     await expect(page.getByTestId("day-grid-body")).toHaveCSS(
       "height",
-      "1189px",
+      "1176px",
+    );
+    await expect(page.getByTestId("plan-column")).toHaveCSS(
+      "overflow",
+      "hidden",
     );
   } finally {
     await context.close();
