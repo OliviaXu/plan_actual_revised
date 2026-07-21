@@ -477,7 +477,7 @@ describe("App Actual persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
-      "Unable to save Actual locally.",
+      "Unable to save local changes.",
     );
     expect(screen.getByTestId("actual-block")).toHaveTextContent("Untitled");
     const save = screen.getByRole("button", {
@@ -539,7 +539,7 @@ describe("App Actual persistence", () => {
     render(<App now={now} />);
 
     expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
-      "Unable to load Actuals from local storage.",
+      "Unable to load local changes.",
     );
     const add = screen.getByRole("button", { name: "Add Actual" });
     expect(add).toBeEnabled();

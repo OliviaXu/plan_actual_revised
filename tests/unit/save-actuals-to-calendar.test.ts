@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { saveActualsToCalendar } from "../../src/app/save-actuals-to-calendar";
+import { saveActualsToCalendar } from "../../src/app/workflows/save-actuals-to-calendar";
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import type { ActualEvent } from "../../src/domain/day-event";
 import type { DayRecord } from "../../src/domain/day-record";

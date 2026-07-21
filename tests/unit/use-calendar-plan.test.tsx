@@ -1,7 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useCalendarPlan } from "../../src/app/use-calendar-plan";
+import { useCalendarPlan } from "../../src/app/hooks/use-calendar-plan";
 
 const calendarResponse = {
   ok: true as const,

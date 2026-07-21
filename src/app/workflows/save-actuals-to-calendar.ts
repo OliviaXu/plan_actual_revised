@@ -1,17 +1,17 @@
 import {
   mapActualToCalendarEvent,
   type ActualCalendarEventInput,
-} from "../calendar/actual-calendar-event";
+} from "../../calendar/actual-calendar-event";
 import type {
   CalendarEvent,
   CalendarInsertEvent,
-} from "../calendar/calendar-event";
-import type { DayRecord } from "../domain/day-record";
-import { isExactPlanMatch } from "../domain/actual-save";
-import { toPlanEvents } from "../domain/plan-event";
-import { defaultSettings } from "../domain/settings";
-import type { Result } from "../shared/result";
-import { sendRuntimeMessage } from "../shared/runtime-messages";
+} from "../../calendar/calendar-event";
+import type { DayRecord } from "../../domain/day-record";
+import { isExactPlanMatch } from "../../domain/actual-save";
+import { toPlanEvents } from "../../domain/plan-event";
+import { defaultSettings } from "../../domain/settings";
+import type { Result } from "../../shared/result";
+import { sendRuntimeMessage } from "../../shared/runtime-messages";
 
 type CalendarEventClient = {
   listCalendarEvents: () => Promise<Result<{ events: CalendarEvent[] }>>;

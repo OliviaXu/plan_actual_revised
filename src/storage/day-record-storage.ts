@@ -25,7 +25,7 @@ export async function loadDayRecord(date: string): Promise<DayRecord | null> {
   } catch {
     throw new DayRecordStorageError(
       "DAY_RECORD_READ_FAILED",
-      "Unable to load Actuals from local storage.",
+      "Unable to load local changes.",
     );
   }
 
@@ -48,7 +48,7 @@ export async function saveDayRecord(record: DayRecord): Promise<void> {
   } catch {
     throw new DayRecordStorageError(
       "DAY_RECORD_WRITE_FAILED",
-      "Unable to save Actual locally.",
+      "Unable to save local changes.",
     );
   }
 }

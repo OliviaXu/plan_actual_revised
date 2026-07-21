@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import { useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { DayGrid } from "./components/DayGrid";
@@ -14,12 +14,9 @@ import { buildEditedActual } from "../domain/actual-edit";
 import {
   runtimeCalendarEventClient,
   saveActualsToCalendar,
-} from "./save-actuals-to-calendar";
-import { useCalendarPlan } from "./use-calendar-plan";
-import {
-  createDayRecordWriteQueue,
-  loadDayRecord,
-} from "../storage/day-record-storage";
+} from "./workflows/save-actuals-to-calendar";
+import { useCalendarPlan } from "./hooks/use-calendar-plan";
+import { useDayRecord } from "./hooks/use-day-record";
 import { getCalendarTime } from "../calendar/calendar-time";
 
 type ActualEditorState =
@@ -32,26 +29,20 @@ const defaultActualDurationMinutes = 30;
 export function App({ now = readSystemTime }: { now?: () => Date }) {
   const { calendarState, calendarDay, connectCalendar } =
     useCalendarPlan(now);
-  const [dayRecordState, setDayRecordState] = useState<{
-    key: string;
-    record: DayRecord | null;
-  }>();
-  const [actualStorageError, setActualStorageError] = useState<string>();
+  const calendarConnected = calendarState.status === "connected";
+  const canonicalCalendarDay = calendarConnected ? calendarDay : undefined;
+  const {
+    dayRecord,
+    loadSettled: actualLoadSettled,
+    storageError: actualStorageError,
+    persistDayRecord,
+  } = useDayRecord(canonicalCalendarDay);
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
   const [calendarSaveSummary, setCalendarSaveSummary] = useState<string>();
   const [actualEditorState, setActualEditorState] =
     useState<ActualEditorState>();
-  const dayRecordWriteQueueRef = useRef<
-    ReturnType<typeof createDayRecordWriteQueue>
-  >(createDayRecordWriteQueue());
-  const latestDayRecordWriteIdRef = useRef(0);
-
   const currentDate = now();
-  const calendarDayKey = `${calendarDay.date}:${calendarDay.timeZone}`;
-  const dayRecord =
-    dayRecordState?.key === calendarDayKey ? dayRecordState.record : null;
-  const actualLoadSettled = dayRecordState?.key === calendarDayKey;
   const actualEditTarget =
     actualEditorState?.mode === "create"
       ? actualEditorState.proposedActual
@@ -59,33 +50,9 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           (actual) => actual.id === actualEditorState?.targetId,
         );
 
-  useEffect(() => {
-    if (calendarState.status !== "connected") return;
-
-    let active = true;
-    void loadDayRecord(calendarDay.date)
-      .then((record) => {
-        if (!active) return;
-        setDayRecordState({ key: calendarDayKey, record });
-        setActualStorageError(undefined);
-      })
-      .catch((error: unknown) => {
-        if (!active) return;
-        setActualStorageError(
-          error instanceof Error
-            ? error.message
-            : "Unable to load Actuals from local storage.",
-        );
-        setDayRecordState({ key: calendarDayKey, record: null });
-      });
-    return () => {
-      active = false;
-    };
-  }, [calendarDay, calendarDayKey, calendarState.status]);
-
   function addActual() {
     if (
-      calendarState.status !== "connected" ||
+      !calendarConnected ||
       !actualLoadSettled ||
       isSavingActualsToCalendar
     ) {
@@ -196,30 +163,6 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     setActualEditorState(undefined);
   }
 
-  async function persistDayRecord(record: DayRecord) {
-    const writeId = ++latestDayRecordWriteIdRef.current;
-    setDayRecordState({
-      key: `${record.date}:${record.timezone}`,
-      record,
-    });
-    setActualStorageError(undefined);
-
-    try {
-      await dayRecordWriteQueueRef.current(record);
-      if (writeId === latestDayRecordWriteIdRef.current) {
-        setActualStorageError(undefined);
-      }
-    } catch (error) {
-      if (writeId === latestDayRecordWriteIdRef.current) {
-        setActualStorageError(
-          error instanceof Error
-            ? error.message
-            : "Unable to save Actual locally.",
-        );
-      }
-    }
-  }
-
   async function handleSaveActualsToCalendar() {
     if (!dayRecord || isSavingActualsToCalendar) return;
 
@@ -310,7 +253,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         <DayGrid
           actuals={dayRecord?.actual ?? []}
           canAddActual={
-            calendarState.status === "connected" &&
+            calendarConnected &&
             actualLoadSettled &&
             !isSavingActualsToCalendar
           }
@@ -330,7 +273,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             <Button
               disabled={
                 isSavingActualsToCalendar ||
-                calendarState.status !== "connected"
+                !calendarConnected
               }
               onClick={() => void handleSaveActualsToCalendar()}
               type="button"

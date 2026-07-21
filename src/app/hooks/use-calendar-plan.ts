@@ -1,10 +1,10 @@
 import { useEffect, useState } from "react";
 
-import { getCalendarTime } from "../calendar/calendar-time";
-import type { PlanEvent } from "../domain/day-event";
-import { toPlanEvents } from "../domain/plan-event";
-import { defaultSettings } from "../domain/settings";
-import { sendRuntimeMessage } from "../shared/runtime-messages";
+import { getCalendarTime } from "../../calendar/calendar-time";
+import type { PlanEvent } from "../../domain/day-event";
+import { toPlanEvents } from "../../domain/plan-event";
+import { defaultSettings } from "../../domain/settings";
+import { sendRuntimeMessage } from "../../shared/runtime-messages";
 
 export type CalendarState =
   | { status: "loading" }
