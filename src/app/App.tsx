@@ -7,19 +7,15 @@ import {
   ActualEditDialog,
   type ActualDraft,
 } from "./components/ActualEditDialog";
-import type { CalendarEvent } from "../calendar/calendar-event";
 import type { ActualEvent, PlanEvent } from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
 import { toPlanEvents } from "../domain/plan-event";
 import { defaultSettings } from "../domain/settings";
 import { buildEditedActual } from "../domain/actual-edit";
-import { isExactPlanMatch } from "../domain/actual-save";
 import {
-  mapActualToCalendarEvent,
-  type ActualCalendarEventInput,
-} from "../calendar/actual-calendar-event";
-import type { CalendarInsertEvent } from "../calendar/calendar-event";
-import type { Result } from "../shared/result";
+  runtimeCalendarEventClient,
+  saveActualsToCalendar,
+} from "./save-actuals-to-calendar";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
 import {
   createDayRecordWriteQueue,
@@ -200,7 +196,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
             updatedAt,
           };
 
-      void saveDayRecordLocally(nextRecord);
+      void persistDayRecord(nextRecord);
       setActualEditorState(undefined);
       return;
     }
@@ -222,7 +218,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       draft,
       () => crypto.randomUUID(),
     );
-    void saveDayRecordLocally({
+    void persistDayRecord({
       ...dayRecord,
       actual: dayRecord.actual.map((actual) =>
         actual.id === actualEditTarget.id ? editedActual : actual,
@@ -243,7 +239,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     }
 
     const updatedAt = now().toISOString();
-    void saveDayRecordLocally({
+    void persistDayRecord({
       ...dayRecord,
       actual: dayRecord.actual.filter(
         (actual) => actual.id !== actualEditTarget.id,
@@ -253,7 +249,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     setActualEditorState(undefined);
   }
 
-  async function saveDayRecordLocally(record: DayRecord) {
+  async function persistDayRecord(record: DayRecord) {
     const writeId = ++latestDayRecordWriteIdRef.current;
     setDayRecordState({
       key: `${record.date}:${record.timezone}`,
@@ -277,89 +273,20 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     }
   }
 
-  async function saveActualsToCalendar() {
+  async function handleSaveActualsToCalendar() {
     if (!dayRecord || isSavingActualsToCalendar) return;
-    const unsaved = dayRecord.actual.filter(
-      (actual) => (actual.saveDisposition ?? "unsaved") === "unsaved",
-    );
-    if (unsaved.length === 0) {
-      setCalendarSaveSummary("Nothing new to save");
-      return;
-    }
 
     setIsSavingActualsToCalendar(true);
     setCalendarSaveSummary(undefined);
-    let workingRecord = dayRecord;
-    let savedCount = 0;
-    let matchedCount = 0;
-    let failedCount = 0;
 
     try {
-      const planResponse = await requestFreshCalendarEvents();
-      if (!planResponse.ok) {
-        setCalendarSaveSummary(
-          `Failed ${unsaved.length}: ${planResponse.error.message}`,
-        );
-        return;
-      }
-
-      const planEvents = toPlanEvents(
-        planResponse.value.events,
-        workingRecord.date,
-        workingRecord.timezone,
-        defaultSettings.hiddenPlanColorIds,
-      );
-
-      for (const actual of unsaved) {
-        const attemptedAt = now().toISOString();
-        if (
-          planEvents.some((plan) =>
-            isExactPlanMatch(actual, plan),
-          )
-        ) {
-          workingRecord = updateActual(workingRecord, actual.id, {
-            saveDisposition: "planMatched",
-            lastSaveAttemptAt: attemptedAt,
-            lastSaveError: undefined,
-          }, attemptedAt);
-          await saveDayRecordLocally(workingRecord);
-          matchedCount += 1;
-          continue;
-        }
-
-        const input: ActualCalendarEventInput = {
-          actual,
-          date: workingRecord.date,
-          timezone: workingRecord.timezone,
-          summaryPrefix: defaultSettings.actualEventPrefix,
-          defaultColorId: defaultSettings.defaultActualColorId,
-        };
-        const response = await insertCalendarEvent(mapActualToCalendarEvent(input));
-
-        if (response.ok) {
-          workingRecord = updateActual(workingRecord, actual.id, {
-            saveDisposition: "calendarSaved",
-            calendarEventId: response.value.eventId,
-            lastSaveAttemptAt: attemptedAt,
-            lastSaveError: undefined,
-          }, attemptedAt);
-          savedCount += 1;
-        } else {
-          workingRecord = updateActual(workingRecord, actual.id, {
-            saveDisposition: "unsaved",
-            lastSaveAttemptAt: attemptedAt,
-            lastSaveError: response.error,
-          }, attemptedAt);
-          failedCount += 1;
-        }
-        await saveDayRecordLocally(workingRecord);
-      }
-
-      const parts = [];
-      if (savedCount) parts.push(`Saved ${savedCount}`);
-      if (matchedCount) parts.push(`${matchedCount} matched Plan`);
-      if (failedCount) parts.push(`Failed ${failedCount}`);
-      setCalendarSaveSummary(parts.join(", ") || "Nothing new to save");
+      const result = await saveActualsToCalendar({
+        record: dayRecord,
+        now,
+        persistDayRecord,
+        ...runtimeCalendarEventClient,
+      });
+      setCalendarSaveSummary(result.summary);
     } finally {
       setIsSavingActualsToCalendar(false);
     }
@@ -458,7 +385,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
                 isSavingActualsToCalendar ||
                 calendarState.status !== "connected"
               }
-              onClick={() => void saveActualsToCalendar()}
+              onClick={() => void handleSaveActualsToCalendar()}
               type="button"
             >
               {isSavingActualsToCalendar
@@ -491,51 +418,6 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       ) : null}
     </main>
   );
-}
-
-async function requestFreshCalendarEvents(): Promise<
-  Result<{ events: CalendarEvent[] }>
-> {
-  try {
-    return await sendRuntimeMessage({ type: "calendar.listEvents" });
-  } catch {
-    return calendarBoundaryUnavailable();
-  }
-}
-
-async function insertCalendarEvent(
-  event: CalendarInsertEvent,
-): Promise<Result<{ eventId: string }>> {
-  try {
-    return await sendRuntimeMessage({ type: "calendar.insertEvent", event });
-  } catch {
-    return calendarBoundaryUnavailable();
-  }
-}
-
-function calendarBoundaryUnavailable(): Result<never> {
-  return {
-    ok: false,
-    error: {
-      code: "CALENDAR_BOUNDARY_UNAVAILABLE",
-      message: "Unable to reach the background Calendar boundary.",
-    },
-  };
-}
-
-function updateActual(
-  record: DayRecord,
-  actualId: string,
-  changes: Partial<DayRecord["actual"][number]>,
-  updatedAt: string,
-): DayRecord {
-  return {
-    ...record,
-    actual: record.actual.map((actual) =>
-      actual.id === actualId ? { ...actual, ...changes } : actual,
-    ),
-    updatedAt,
-  };
 }
 
 async function loadCalendarEvents(
