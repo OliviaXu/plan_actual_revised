@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-test("multiple created Actuals survive a full extension-page reload", async () => {
+test("Actual creation, editing, resizing, and deletion survive reloads", async () => {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "actual-persistence-extension-"),
   );
@@ -111,10 +111,7 @@ registerServiceWorker({
       page.getByTestId("actual-block").filter({ hasText: "Second Actual" }),
     ).toHaveCount(1);
 
-    await page
-      .getByTestId("actual-block")
-      .filter({ hasText: "First Actual" })
-      .click();
+    await page.getByRole("button", { name: "Edit First Actual" }).click();
     const existingTitle = page.getByRole("textbox", { name: "Title" });
     await expect(existingTitle).toBeFocused();
     await expect
@@ -138,6 +135,38 @@ registerServiceWorker({
 
     await expect(
       page.getByTestId("actual-block").filter({ hasText: "Edited Actual" }),
+    ).toHaveCount(1);
+
+    const resizeHandle = page.getByRole("button", {
+      name: "Resize Edited Actual",
+    });
+    const resizeHandleBox = await resizeHandle.boundingBox();
+    if (!resizeHandleBox) throw new Error("Resize handle is not visible");
+    const resizeX = resizeHandleBox.x + resizeHandleBox.width / 2;
+    const resizeY = resizeHandleBox.y + resizeHandleBox.height / 2;
+    await page.mouse.move(resizeX, resizeY);
+    await page.mouse.down();
+    await page.mouse.move(resizeX, resizeY + 21);
+    await page.mouse.up();
+
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Edited Actual" }),
+    ).toContainText("45m");
+
+    await page.reload();
+
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Edited Actual" }),
+    ).toContainText("45m");
+    await page.getByRole("button", { name: "Edit Edited Actual" }).click();
+    await page.getByRole("button", { name: "Delete" }).click();
+    await expect(page.getByTestId("actual-block")).toHaveCount(1);
+
+    await page.reload();
+
+    await expect(page.getByTestId("actual-block")).toHaveCount(1);
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Second Actual" }),
     ).toHaveCount(1);
   } finally {
     await context.close();

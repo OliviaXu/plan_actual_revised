@@ -163,6 +163,30 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     setActualEditorState(undefined);
   }
 
+  function persistResizedActual(actualId: string, durationMinutes: number) {
+    if (!dayRecord || isSavingActualsToCalendar) return;
+
+    const actual = dayRecord.actual.find((event) => event.id === actualId);
+    if (!actual || actual.durationMinutes === durationMinutes) return;
+
+    const resizedActual = buildEditedActual(
+      actual,
+      {
+        summary: actual.summary,
+        durationMinutes,
+        colorId: actual.colorId,
+      },
+      () => crypto.randomUUID(),
+    );
+    void persistDayRecord({
+      ...dayRecord,
+      actual: dayRecord.actual.map((event) =>
+        event.id === actualId ? resizedActual : event,
+      ),
+      updatedAt: now().toISOString(),
+    });
+  }
+
   async function handleSaveActualsToCalendar() {
     if (!dayRecord || isSavingActualsToCalendar) return;
 
@@ -252,6 +276,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
 
         <DayGrid
           actuals={dayRecord?.actual ?? []}
+          actualMutationsDisabled={isSavingActualsToCalendar}
           canAddActual={
             calendarConnected &&
             actualLoadSettled &&
@@ -263,6 +288,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           onEditActual={(targetId) =>
             setActualEditorState({ mode: "edit", targetId })
           }
+          onActualResizeEnd={persistResizedActual}
           status={calendarState.status === "disconnected" ? "error" : calendarState.status}
           date={calendarDay.date}
           timeZone={calendarDay.timeZone}

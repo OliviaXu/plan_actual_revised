@@ -252,13 +252,20 @@ describe("DayGrid", () => {
       />,
     );
 
-    const base = screen.getByText("base-actual").closest("button");
-    const nested = screen.getByText("nested-actual").closest("button");
-    expect(base).not.toBeNull();
-    expect(nested).not.toBeNull();
+    const blocks = screen.getAllByTestId("actual-block");
+    const base = blocks.find(
+      (block) => block.getAttribute("data-actual-id") === "base-actual",
+    );
+    const nested = blocks.find(
+      (block) => block.getAttribute("data-actual-id") === "nested-actual",
+    );
+    expect(base).toBeDefined();
+    expect(nested).toBeDefined();
     expect(base).toHaveAttribute("data-overlap-group-index", "0");
     expect(base).toHaveAttribute("data-overlap-layer-index", "0");
-    expect(base).toHaveClass(
+    expect(
+      within(base!).getByRole("button", { name: "Edit base-actual" }),
+    ).toHaveClass(
       "flex",
       "flex-col",
       "items-stretch",
@@ -284,11 +291,79 @@ describe("DayGrid", () => {
     ).toBeVisible();
     expect(screen.getByTestId("actual-column")).toHaveClass("overflow-hidden");
 
-    fireEvent.click(base!);
+    fireEvent.click(
+      within(base!).getByRole("button", { name: "Edit base-actual" }),
+    );
     expect(base).toHaveStyle({ zIndex: "2" });
-    fireEvent.click(nested!);
+    fireEvent.click(
+      within(nested!).getByRole("button", { name: "Edit nested-actual" }),
+    );
     expect(base).toHaveStyle({ zIndex: "0" });
     expect(nested).toHaveStyle({ zIndex: "2" });
+  });
+
+  it("previews a snapped Actual resize and commits once on pointer release", () => {
+    const onEditActual = vi.fn();
+    const onActualResizeEnd = vi.fn();
+    render(
+      <DayGrid
+        actuals={[actualEvent("resized-actual", 540, 30)]}
+        onEditActual={onEditActual}
+        onActualResizeEnd={onActualResizeEnd}
+        planEvents={[]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    const handle = screen.getByRole("button", {
+      name: "Resize resized-actual",
+    });
+    fireEvent.pointerDown(handle, { clientY: 100, pointerId: 1 });
+    fireEvent.pointerMove(window, { clientY: 121, pointerId: 1 });
+
+    const preview = screen.getByTestId("actual-block");
+    expect(preview).toHaveStyle({ height: "63px" });
+    expect(within(preview).getByText("45m")).toBeVisible();
+    expect(within(preview).getByText("9:00 AM – 9:45 AM")).toBeVisible();
+    expect(onActualResizeEnd).not.toHaveBeenCalled();
+    expect(onEditActual).not.toHaveBeenCalled();
+
+    fireEvent.pointerUp(window, { clientY: 121, pointerId: 1 });
+
+    expect(onActualResizeEnd).toHaveBeenCalledOnce();
+    expect(onActualResizeEnd).toHaveBeenCalledWith("resized-actual", 45);
+    expect(onEditActual).not.toHaveBeenCalled();
+  });
+
+  it("enforces the minimum resize duration and restores on cancellation", () => {
+    const onActualResizeEnd = vi.fn();
+    render(
+      <DayGrid
+        actuals={[actualEvent("cancelled-actual", 540, 30)]}
+        onActualResizeEnd={onActualResizeEnd}
+        planEvents={[]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    const handle = screen.getByRole("button", {
+      name: "Resize cancelled-actual",
+    });
+    fireEvent.pointerDown(handle, { clientY: 100, pointerId: 2 });
+    fireEvent.pointerMove(window, { clientY: 0, pointerId: 2 });
+
+    const preview = screen.getByTestId("actual-block");
+    expect(preview).toHaveStyle({ height: "20px" });
+    expect(within(preview).getByText("5m")).toBeVisible();
+
+    fireEvent.pointerCancel(window, { pointerId: 2 });
+
+    expect(screen.getByTestId("actual-block")).toHaveStyle({ height: "42px" });
+    expect(within(screen.getByTestId("actual-block")).getByText("30m"))
+      .toBeVisible();
+    expect(onActualResizeEnd).not.toHaveBeenCalled();
   });
 
   it("clips minimum-height Plan and Actual blocks at midnight", () => {

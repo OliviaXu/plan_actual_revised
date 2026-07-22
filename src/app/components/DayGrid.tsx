@@ -15,6 +15,7 @@ import type {
   PlanEvent,
 } from "../../domain/day-event";
 import { getCalendarTime } from "../../calendar/calendar-time";
+import { useActualResize } from "../hooks/use-actual-resize";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const DAY_GRID_TEMPLATE_COLUMNS = `${DAY_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
@@ -28,21 +29,25 @@ type DayGridStatus =
 
 export function DayGrid({
   actuals,
+  actualMutationsDisabled,
   canAddActual,
   planEvents,
   now = readSystemTime,
   onAddActual,
   onEditActual,
+  onActualResizeEnd,
   status,
   date,
   timeZone,
 }: {
   actuals?: ActualEvent[];
+  actualMutationsDisabled?: boolean;
   canAddActual?: boolean;
   planEvents: PlanEvent[];
   now?: () => Date;
   onAddActual?: () => void;
   onEditActual?: (actualId: string) => void;
+  onActualResizeEnd?: (actualId: string, durationMinutes: number) => void;
   status: DayGridStatus;
   date: string;
   timeZone: string;
@@ -53,6 +58,12 @@ export function DayGrid({
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
+  const { displayedActuals, startActualResize } = useActualResize({
+    actuals: actuals ?? [],
+    disabled: actualMutationsDisabled,
+    onResizeEnd: onActualResizeEnd,
+    settings: defaultSettings,
+  });
   const gridRange = calculateDayGridRange(
     planEvents,
     defaultSettings,
@@ -64,7 +75,7 @@ export function DayGrid({
     defaultSettings,
   );
   const actualBlocks = calculateDayGridBlocks(
-    actuals ?? [],
+    displayedActuals,
     gridRange.startHour,
     gridRange.endHour,
     defaultSettings,
@@ -253,6 +264,11 @@ export function DayGrid({
                   frontZIndex={actualBlocks.length}
                   isFront={frontActualId === block.event.id}
                   key={block.event.id}
+                  mutationsDisabled={actualMutationsDisabled}
+                  onResizeStart={(actual, pointer) => {
+                    setFrontActualId(actual.id);
+                    startActualResize(actual, pointer);
+                  }}
                   onSelect={() => {
                     setFrontActualId(block.event.id);
                     onEditActual?.(block.event.id);
@@ -271,11 +287,15 @@ function ActualGridBlock({
   block,
   frontZIndex,
   isFront,
+  mutationsDisabled,
+  onResizeStart,
   onSelect,
 }: {
   block: DayGridBlock<ActualEvent>;
   frontZIndex: number;
   isFront: boolean;
+  mutationsDisabled?: boolean;
+  onResizeStart: (actual: ActualEvent, pointer: PointerEvent) => void;
   onSelect: () => void;
 }) {
   const appearance = getDayGridBlockAppearance(
@@ -285,21 +305,44 @@ function ActualGridBlock({
   );
 
   return (
-    <button
+    <div
       className={appearance.className}
       data-actual-id={block.event.id}
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
       data-testid="actual-block"
-      onClick={onSelect}
       style={appearance.style}
-      type="button"
     >
-      <DayGridBlockContent
-        block={block}
-        timeRangeTestId="actual-event-time-range"
-      />
-    </button>
+      <button
+        aria-label={`Edit ${block.event.summary || "Untitled event"}`}
+        className="flex h-full w-full flex-col items-stretch justify-start px-2 py-px pb-2 text-left text-xs leading-4 disabled:cursor-default"
+        disabled={mutationsDisabled}
+        onClick={onSelect}
+        type="button"
+      >
+        <DayGridBlockContent
+          block={block}
+          timeRangeTestId="actual-event-time-range"
+        />
+      </button>
+      <button
+        aria-label={`Resize ${block.event.summary || "Untitled event"}`}
+        className="absolute inset-x-0 bottom-0 z-10 flex h-2 cursor-ns-resize touch-none items-end justify-center disabled:cursor-default"
+        disabled={mutationsDisabled}
+        onClick={(event) => event.stopPropagation()}
+        onPointerDown={(event) => {
+          event.preventDefault();
+          event.stopPropagation();
+          onResizeStart(block.event, event.nativeEvent);
+        }}
+        type="button"
+      >
+        <span
+          aria-hidden="true"
+          className="mb-px h-px w-8 bg-current opacity-30"
+        />
+      </button>
+    </div>
   );
 }
 
@@ -337,7 +380,7 @@ function PlanGridBlock({
 
   return (
     <button
-      className={appearance.className}
+      className={`${appearance.className} flex flex-col items-stretch justify-start px-2 py-px text-left text-xs leading-4`}
       data-calendar-event-id={block.event.id}
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
@@ -398,7 +441,7 @@ function getDayGridBlockAppearance(
   const color = resolveGoogleCalendarEventColor(block.event.colorId);
 
   return {
-    className: `absolute flex flex-col items-stretch justify-start overflow-hidden rounded-sm border px-2 py-px text-left text-xs leading-4 shadow-soft ${
+    className: `absolute overflow-hidden rounded-sm border text-xs leading-4 shadow-soft ${
       color ? "" : "border-border bg-muted"
     }`,
     style: {

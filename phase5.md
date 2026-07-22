@@ -225,15 +225,15 @@ deletion to prove persistence through the real extension storage boundary.
 - Clip visual overflow in both the Plan and Actual columns.
 - Clip Actuals that partially intersect the Plan-derived range.
 - Omit Actuals that are completely outside the range.
-- Existing crossing-midnight records remain loadable and are clipped, but must
-  be shortened before they can be edited.
+- Existing crossing-midnight records remain loadable and are visually clipped.
 
 ### Resize Interaction
 
 - Preview duration continuously while the pointer moves.
 - Snap the preview to `snapMinutes`.
 - Enforce the configured minimum duration.
-- Cap the block at midnight.
+- Allow the duration to extend past midnight; the shared grid boundary clips
+  the visual overflow.
 - Persist exactly once on pointer release.
 - Restore the original duration on pointer cancellation.
 - Resizing a block follows the same disposition and UUID rules as editing it.
@@ -247,7 +247,7 @@ Unit and component coverage includes:
 - continuous preview;
 - snapping;
 - minimum duration;
-- midnight cap;
+- crossing-midnight clipping;
 - one write on release;
 - cancellation rollback;
 - resize disposition and UUID transitions;

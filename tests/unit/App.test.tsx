@@ -882,6 +882,72 @@ describe("App new Actual dialog", () => {
     );
   });
 
+  it("persists a released Calendar-saved resize once with a fresh identity", async () => {
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual: [
+        {
+          id: "calendar-saved-actual",
+          summary: "Resizable Actual",
+          startMinutes: 540,
+          durationMinutes: 30,
+          colorId: "8",
+          saveDisposition: "calendarSaved",
+          calendarEventId: "calendar-event-id",
+          lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
+        },
+      ],
+      updatedAt: "2026-07-15T19:00:00.000Z",
+    };
+    vi.stubGlobal("crypto", { randomUUID: () => "resized-actual-id" });
+
+    render(<App now={now} />);
+    const handle = await screen.findByRole("button", {
+      name: "Resize Resizable Actual",
+    });
+    fireEvent.pointerDown(handle, { clientY: 100, pointerId: 3 });
+    fireEvent.pointerMove(window, { clientY: 121, pointerId: 3 });
+
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(screen.queryByRole("dialog", { name: "Edit Actual" }))
+      .not.toBeInTheDocument();
+
+    fireEvent.pointerUp(window, { clientY: 121, pointerId: 3 });
+
+    await waitFor(() =>
+      expect(chrome.storage.local.set).toHaveBeenCalledTimes(1),
+    );
+    expect(chrome.storage.local.set).toHaveBeenLastCalledWith({
+      "dayRecord:2026-07-15": expect.objectContaining({
+        actual: [
+          {
+            id: "resized-actual-id",
+            summary: "Resizable Actual",
+            startMinutes: 540,
+            durationMinutes: 45,
+            colorId: "8",
+            saveDisposition: "unsaved",
+          },
+        ],
+      }),
+    });
+  });
+
   it("deletes the local block without touching Calendar", async () => {
     const dialog = await openExistingActualDialog();
     fireEvent.click(dialog.getByRole("button", { name: "Delete" }));
@@ -942,12 +1008,17 @@ describe("App Actual Calendar saving", () => {
 
     render(<App now={now} />);
     const add = await screen.findByRole("button", { name: "Add Actual" });
+    const resize = await screen.findByRole("button", {
+      name: "Resize Design review",
+    });
     await waitFor(() => expect(add).toBeEnabled());
+    expect(resize).toBeEnabled();
     fireEvent.click(
       screen.getByRole("button", { name: "Save Actual to calendar" }),
     );
 
     expect(add).toBeDisabled();
+    expect(resize).toBeDisabled();
     finishCalendarRefresh?.({
       ok: true,
       value: {
@@ -961,6 +1032,7 @@ describe("App Actual Calendar saving", () => {
       "1 matched Plan",
     );
     await waitFor(() => expect(add).toBeEnabled());
+    expect(resize).toBeEnabled();
   });
 
   it("permanently classifies an exact Plan match without inserting", async () => {
