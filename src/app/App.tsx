@@ -73,15 +73,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           });
           return;
         }
-        const message = formatCatchUpSummary(response.value);
-        setCatchUpFeedback(
-          message
-            ? {
-                message,
-                warning: hasCatchUpWarning(response.value),
-              }
-            : undefined,
-        );
+        setCatchUpFeedback(getCatchUpFeedback(response.value));
       })
       .catch(() => {
         if (!active) return;
@@ -396,31 +388,30 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   );
 }
 
-function formatCatchUpSummary(summary: CatchUpRunResult) {
-  const parts: string[] = [];
-  if (summary.saved) parts.push(`saved ${summary.saved}`);
-  if (summary.matched) parts.push(`${summary.matched} matched Plan`);
-  if (summary.failed) parts.push(`${summary.failed} pending`);
-  if (summary.discarded) parts.push(`${summary.discarded} discarded`);
-  if (summary.invalidRecordCount) {
-    parts.push(`${summary.invalidRecordCount} invalid local record preserved`);
+function getCatchUpFeedback(
+  result: CatchUpRunResult,
+): { message: string; warning: boolean } | undefined {
+  const clauses: string[] = [];
+  if (result.saved) {
+    clauses.push(
+      `saved ${result.saved} ${result.saved === 1 ? "Actual" : "Actuals"} to Calendar`,
+    );
   }
-  if (summary.storageErrorCount) {
-    parts.push(`${summary.storageErrorCount} local storage error`);
+  if (result.failed) {
+    clauses.push(
+      `${result.failed} ${result.failed === 1 ? "Actual" : "Actuals"} ` +
+        "couldn't be saved and will be retried next time",
+    );
   }
-  if (parts.length === 0) return undefined;
-
-  const daySuffix = summary.affectedDayCount
-    ? ` from ${summary.affectedDayCount} past ${summary.affectedDayCount === 1 ? "day" : "days"}`
-    : "";
-  return `Catch-up: ${parts.join(", ")}${daySuffix}`;
-}
-
-function hasCatchUpWarning(summary: CatchUpRunResult) {
-  return Boolean(
-    summary.failed ||
-    summary.discarded ||
-    summary.invalidRecordCount ||
-    summary.storageErrorCount,
-  );
+  if (result.discarded) {
+    clauses.push(
+      `${result.discarded} older ` +
+        `${result.discarded === 1 ? "Actual was" : "Actuals were"} discarded`,
+    );
+  }
+  if (clauses.length === 0) return undefined;
+  return {
+    message: `Catch-up: ${clauses.join("; ")}.`,
+    warning: Boolean(result.failed || result.discarded),
+  };
 }

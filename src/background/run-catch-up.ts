@@ -30,14 +30,14 @@ export async function runCatchUp(
 ): Promise<CatchUpRunResult> {
   const inventory = await dependencies.listDayRecords();
   const selection = selectCatchUpRecords(inventory.records, today);
+  let affectedDayCount = 0;
+  let matched = 0;
+  const invalidRecordCount = inventory.invalidKeys.length;
+  let storageErrorCount = 0;
   const summary: CatchUpRunResult = {
-    affectedDayCount: 0,
     saved: 0,
-    matched: 0,
     failed: 0,
     discarded: 0,
-    invalidRecordCount: inventory.invalidKeys.length,
-    storageErrorCount: 0,
   };
 
   for (const record of selection.deletable) {
@@ -45,7 +45,7 @@ export async function runCatchUp(
       record.date,
       dependencies.deleteDayRecord,
     );
-    if (!deleted) summary.storageErrorCount += 1;
+    if (!deleted) storageErrorCount += 1;
   }
 
   const selectedRecords = [
@@ -62,11 +62,11 @@ export async function runCatchUp(
         record.date,
         dependencies.deleteDayRecord,
       );
-      if (!deleted) summary.storageErrorCount += 1;
+      if (!deleted) storageErrorCount += 1;
       continue;
     }
 
-    summary.affectedDayCount += 1;
+    affectedDayCount += 1;
     let persistenceFailed = false;
     const result = await syncDayActualsToCalendar({
       record,
@@ -78,12 +78,12 @@ export async function runCatchUp(
           await dependencies.saveDayRecord(nextRecord);
         } catch {
           persistenceFailed = true;
-          summary.storageErrorCount += 1;
+          storageErrorCount += 1;
         }
       },
     });
     summary.saved += result.saved;
-    summary.matched += result.matched;
+    matched += result.matched;
     if (result.status === "planLookupFailed") {
       summary.failed += result.failed;
       continue;
@@ -98,7 +98,7 @@ export async function runCatchUp(
         record.date,
         dependencies.deleteDayRecord,
       );
-      if (!deleted) summary.storageErrorCount += 1;
+      if (!deleted) storageErrorCount += 1;
       if (deleted) summary.discarded += result.failed;
       else summary.failed += result.failed;
     } else if (result.failed > 0) {
@@ -108,10 +108,23 @@ export async function runCatchUp(
         record.date,
         dependencies.deleteDayRecord,
       );
-      if (!deleted) summary.storageErrorCount += 1;
+      if (!deleted) storageErrorCount += 1;
     }
   }
 
+  if (
+    affectedDayCount ||
+    matched ||
+    invalidRecordCount ||
+    storageErrorCount
+  ) {
+    console.info("calendar-catch-up-diagnostics", {
+      affectedDayCount,
+      matched,
+      invalidRecordCount,
+      storageErrorCount,
+    });
+  }
   return summary;
 }
 

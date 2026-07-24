@@ -33,13 +33,9 @@ function mockRuntime(
   catchUpHandler: RuntimeHandler = async () => ({
     ok: true,
     value: {
-      affectedDayCount: 0,
       saved: 0,
-      matched: 0,
       failed: 0,
       discarded: 0,
-      invalidRecordCount: 0,
-      storageErrorCount: 0,
     },
   }),
 ) {
@@ -392,19 +388,16 @@ describe("App catch-up", () => {
     finishCatchUp?.({
       ok: true,
       value: {
-        affectedDayCount: 2,
         saved: 2,
-        matched: 1,
         failed: 1,
         discarded: 0,
-        invalidRecordCount: 0,
-        storageErrorCount: 0,
       },
     });
 
     expect(await screen.findByTestId("catch-up-summary")).toHaveTextContent(
-      "Catch-up: saved 2, 1 matched Plan, 1 pending from 2 past days",
+      "Catch-up: saved 2 Actuals to Calendar; 1 Actual couldn't be saved and will be retried next time.",
     );
+    expect(screen.getByTestId("catch-up-summary")).toHaveRole("alert");
     expect(add).toBeEnabled();
   });
 

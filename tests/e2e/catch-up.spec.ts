@@ -140,7 +140,7 @@ test("saves yesterday and removes it without retrying terminal blocks", async ()
 
   try {
     await expect(page.getByTestId("catch-up-summary")).toHaveText(
-      "Catch-up: saved 1 from 1 past day",
+      "Catch-up: saved 1 Actual to Calendar.",
     );
     expect(await readStorage(page, yesterdayKey)).toBeUndefined();
     const attempts = await readStorage(
@@ -170,7 +170,7 @@ test("keeps a retained failure and retries it after refresh", async () => {
 
   try {
     await expect(page.getByTestId("catch-up-summary")).toHaveText(
-      "Catch-up: 1 pending from 1 past day",
+      "Catch-up: 1 Actual couldn't be saved and will be retried next time.",
     );
     expect(await readStorage(page, yesterdayKey)).toMatchObject({
       actual: [{
@@ -182,7 +182,7 @@ test("keeps a retained failure and retries it after refresh", async () => {
 
     await page.reload();
     await expect(page.getByTestId("catch-up-summary")).toHaveText(
-      "Catch-up: saved 1 from 1 past day",
+      "Catch-up: saved 1 Actual to Calendar.",
     );
     expect(await readStorage(page, yesterdayKey)).toBeUndefined();
     expect(Object.values(
@@ -205,7 +205,7 @@ test("processes an expired record once, deletes it, and reports discarded work",
 
   try {
     await expect(page.getByTestId("catch-up-summary")).toHaveText(
-      "Catch-up: saved 2, 1 discarded from 3 past days",
+      "Catch-up: saved 2 Actuals to Calendar; 1 older Actual was discarded.",
     );
     for (const key of Object.keys(records)) {
       expect(await readStorage(page, key)).toBeUndefined();

@@ -1,4 +1,4 @@
-import { describe, expect, it, vi } from "vitest";
+import { afterEach, describe, expect, it, vi } from "vitest";
 
 import type {
   CalendarEvent,
@@ -14,6 +14,8 @@ import type { CatchUpRunResult } from "../../src/shared/catch-up-run-result";
 
 const today = "2026-07-15";
 const now = () => new Date("2026-07-15T19:00:00.000Z");
+
+afterEach(() => vi.restoreAllMocks());
 
 function actual(
   id: string,
@@ -78,10 +80,8 @@ describe("runCatchUp", () => {
     const current = record(today, [actual("today")]);
     const deps = dependencies([empty, terminal, current]);
 
-    await expect(runCatchUp(today, deps)).resolves.toMatchObject({
-      affectedDayCount: 0,
+    await expect(runCatchUp(today, deps)).resolves.toEqual({
       saved: 0,
-      matched: 0,
       failed: 0,
       discarded: 0,
     });
@@ -94,6 +94,7 @@ describe("runCatchUp", () => {
   });
 
   it("saves, matches, and persists each retained block outcome immediately", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const historical = record("2026-07-14", [
       actual("matching"),
       actual("inserting"),
@@ -116,12 +117,18 @@ describe("runCatchUp", () => {
       },
     });
 
-    await expect(runCatchUp(today, deps)).resolves.toMatchObject({
-      affectedDayCount: 1,
+    const result = await runCatchUp(today, deps);
+
+    expect(result).toEqual({
       saved: 1,
-      matched: 1,
       failed: 0,
       discarded: 0,
+    });
+    expect(info).toHaveBeenCalledWith("calendar-catch-up-diagnostics", {
+      affectedDayCount: 1,
+      matched: 1,
+      invalidRecordCount: 0,
+      storageErrorCount: 0,
     });
     expect(deps.listCalendarEvents).toHaveBeenCalledOnce();
     expect(deps.insertCalendarEvent).toHaveBeenCalledOnce();
@@ -234,39 +241,60 @@ describe("runCatchUp", () => {
     expect(deps.insertCalendarEvent).toHaveBeenCalledOnce();
   });
 
-  it("reports invalid records without deleting them", async () => {
+  it("logs invalid records without returning them or deleting them", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const deps = dependencies([]);
     deps.listDayRecords.mockResolvedValueOnce({
       records: [],
       invalidKeys: ["dayRecord:invalid"],
     });
 
-    await expect(runCatchUp(today, deps)).resolves.toMatchObject({
+    const result = await runCatchUp(today, deps);
+
+    expect(result).not.toHaveProperty("invalidRecordCount");
+    expect(info).toHaveBeenCalledWith("calendar-catch-up-diagnostics", {
+      affectedDayCount: 0,
+      matched: 0,
       invalidRecordCount: 1,
+      storageErrorCount: 0,
     });
     expect(deps.deleteDayRecord).not.toHaveBeenCalled();
   });
 
-  it("reports a failed disposition write and preserves the record", async () => {
+  it("logs a failed disposition write and preserves the record", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const deps = dependencies([
       record("2026-07-14", [actual("saved-externally")]),
     ]);
     deps.saveDayRecord.mockRejectedValueOnce(new Error("write unavailable"));
 
-    await expect(runCatchUp(today, deps)).resolves.toMatchObject({
-      saved: 1,
+    const result = await runCatchUp(today, deps);
+
+    expect(result).toMatchObject({ saved: 1 });
+    expect(result).not.toHaveProperty("storageErrorCount");
+    expect(info).toHaveBeenCalledWith("calendar-catch-up-diagnostics", {
+      affectedDayCount: 1,
+      matched: 0,
+      invalidRecordCount: 0,
       storageErrorCount: 1,
     });
     expect(deps.deleteDayRecord).not.toHaveBeenCalled();
   });
 
-  it("reports a failed cleanup without claiming the record was removed", async () => {
+  it("logs a failed cleanup without claiming the record was removed", async () => {
+    const info = vi.spyOn(console, "info").mockImplementation(() => undefined);
     const deps = dependencies([
       record("2026-07-14", [actual("terminal", "calendarSaved")]),
     ]);
     deps.deleteDayRecord.mockRejectedValueOnce(new Error("delete unavailable"));
 
-    await expect(runCatchUp(today, deps)).resolves.toMatchObject({
+    const result = await runCatchUp(today, deps);
+
+    expect(result).not.toHaveProperty("storageErrorCount");
+    expect(info).toHaveBeenCalledWith("calendar-catch-up-diagnostics", {
+      affectedDayCount: 0,
+      matched: 0,
+      invalidRecordCount: 0,
       storageErrorCount: 1,
     });
   });

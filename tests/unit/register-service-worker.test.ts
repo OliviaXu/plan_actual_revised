@@ -26,13 +26,9 @@ function installServiceWorker(
     today: string,
     dependencies: CatchUpDependencies,
   ) => Promise<CatchUpRunResult> = vi.fn(async () => ({
-    affectedDayCount: 0,
     saved: 0,
-    matched: 0,
     failed: 0,
     discarded: 0,
-    invalidRecordCount: 0,
-    storageErrorCount: 0,
   })),
 ) {
   let actionListener: (() => void) | undefined;
@@ -128,13 +124,9 @@ describe("registerServiceWorker", () => {
 
   it("coalesces all overlapping catch-up requests into one worker run", async () => {
     let finishCatchUp: ((value: {
-      affectedDayCount: number;
       saved: number;
-      matched: number;
       failed: number;
       discarded: number;
-      invalidRecordCount: number;
-      storageErrorCount: number;
     }) => void) | undefined;
     const catchUpRunner = vi.fn((
       _today: string,
@@ -163,13 +155,9 @@ describe("registerServiceWorker", () => {
     expect(catchUpRunner).toHaveBeenCalledOnce();
 
     finishCatchUp?.({
-      affectedDayCount: 1,
       saved: 1,
-      matched: 0,
       failed: 0,
       discarded: 0,
-      invalidRecordCount: 0,
-      storageErrorCount: 0,
     });
     await vi.waitFor(() => expect(secondResponse).toHaveBeenCalled());
     expect(firstResponse).toHaveBeenCalledWith({
@@ -190,13 +178,9 @@ describe("registerServiceWorker", () => {
     ) => {
       receivedDependencies = dependencies;
       return {
-        affectedDayCount: 0,
         saved: 0,
-        matched: 0,
         failed: 0,
         discarded: 0,
-        invalidRecordCount: 0,
-        storageErrorCount: 0,
       };
     });
     const { dependencies, messageListener } = installServiceWorker(
@@ -233,13 +217,9 @@ describe("registerServiceWorker", () => {
         updatedAt: "2026-07-14T18:00:00.000Z",
       });
       return {
-        affectedDayCount: 0,
         saved: 0,
-        matched: 0,
         failed: 0,
         discarded: 0,
-        invalidRecordCount: 0,
-        storageErrorCount: 0,
       };
     });
     const { dependencies, messageListener } = installServiceWorker(
