@@ -18,6 +18,10 @@ export default defineConfig({
           __dirname,
           "src/background/register-service-worker.ts",
         ),
+        "background/compose-service-worker": path.resolve(
+          __dirname,
+          "src/background/compose-service-worker.ts",
+        ),
       },
       output: {
         entryFileNames: "[name].js",

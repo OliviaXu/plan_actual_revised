@@ -30,10 +30,11 @@ async function createHappyPathExtension() {
     path.join(extensionPath, "background/service-worker.js"),
     `
 import registerServiceWorker from "./register-service-worker.js";
+import { createServiceWorkerOperations } from "./compose-service-worker.js";
 
 let token;
 
-registerServiceWorker({
+registerServiceWorker(createServiceWorkerOperations({
   openAppPage: () => chrome.tabs.create({
     url: chrome.runtime.getURL("index.html"),
   }),
@@ -59,7 +60,7 @@ registerServiceWorker({
       }],
     },
   }),
-}, () => new Date("2026-07-15T19:00:00.000Z"));
+}, () => new Date("2026-07-15T19:00:00.000Z")));
 `,
   );
 

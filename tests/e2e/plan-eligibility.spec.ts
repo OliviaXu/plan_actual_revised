@@ -60,8 +60,9 @@ async function createSeededExtension(events: SeededEvent[]) {
     path.join(extensionPath, "background/service-worker.js"),
     `
 import registerServiceWorker from "./register-service-worker.js";
+import { createServiceWorkerOperations } from "./compose-service-worker.js";
 
-registerServiceWorker({
+registerServiceWorker(createServiceWorkerOperations({
   openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
   requestCachedToken: async () => ({ ok: true, value: "test-token" }),
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
@@ -69,7 +70,7 @@ registerServiceWorker({
     ok: true,
     value: { timeZone: "America/Los_Angeles", events: ${JSON.stringify(events)} },
   }),
-}, () => new Date("2026-07-15T19:00:00.000Z"));
+}, () => new Date("2026-07-15T19:00:00.000Z")));
 `,
   );
   return extensionPath;

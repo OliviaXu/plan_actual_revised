@@ -1,17 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
 import registerServiceWorker from "../../src/background/register-service-worker";
-import type {
-  CatchUpDependencies,
-} from "../../src/background/run-catch-up";
-import type { CatchUpRunResult } from "../../src/shared/catch-up-run-result";
-
-const fixedNow = new Date(2026, 6, 15, 12);
-const range = {
-  timeMin: new Date(2026, 6, 15).toISOString(),
-  timeMax: new Date(2026, 6, 16).toISOString(),
-};
-const now = () => new Date(fixedNow);
 
 type MessageListener = (
   message: { type?: string; event?: unknown; todayDate?: string },
@@ -19,18 +8,7 @@ type MessageListener = (
   sendResponse: (response: unknown) => void,
 ) => boolean;
 
-function installServiceWorker(
-  overrides: Record<string, unknown> = {},
-  clock: () => Date = now,
-  catchUpRunner: (
-    today: string,
-    dependencies: CatchUpDependencies,
-  ) => Promise<CatchUpRunResult> = vi.fn(async () => ({
-    saved: 0,
-    failed: 0,
-    discarded: 0,
-  })),
-) {
+function installServiceWorker(overrides: Record<string, unknown> = {}) {
   let actionListener: (() => void) | undefined;
   let messageListener: MessageListener | undefined;
 
@@ -51,488 +29,124 @@ function installServiceWorker(
     },
   });
 
-  const dependencies = {
+  const operations = {
     openAppPage: vi.fn(async () => undefined),
-    requestCachedToken: vi.fn(async () => ({
+    connectCalendar: vi.fn(async () => ({
       ok: true as const,
-      value: "token-123",
+      value: { status: "connected" as const },
     })),
-    requestInteractiveToken: vi.fn(async () => ({
+    listCurrentCalendarEvents: vi.fn(async () => ({
       ok: true as const,
-      value: "token-123",
+      value: {
+        events: [],
+        date: "2026-07-15",
+        timeZone: "America/Los_Angeles",
+      },
     })),
-    listPrimaryCalendarEvents: vi.fn(async () => ({
-      ok: true as const,
-      value: { events: [], timeZone: "America/Los_Angeles" },
-    })),
-    insertPrimaryCalendarEvent: vi.fn(async () => ({
+    insertCalendarEvent: vi.fn(async () => ({
       ok: true as const,
       value: { eventId: "calendar-actual-id" },
     })),
-    listDayRecords: vi.fn(async () => ({ records: [], invalidKeys: [] })),
-    saveDayRecord: vi.fn(async () => undefined),
-    deleteDayRecord: vi.fn(async () => undefined),
+    runCatchUp: vi.fn(async () => ({
+      ok: true as const,
+      value: { saved: 0, failed: 0, discarded: 0 },
+    })),
     ...overrides,
   };
 
-  registerServiceWorker(
-    dependencies,
-    clock,
-    () => "America/Los_Angeles",
-    catchUpRunner,
-  );
+  registerServiceWorker(operations);
 
   if (!actionListener || !messageListener) {
     throw new Error("Service-worker listeners were not installed.");
   }
 
-  return { actionListener, catchUpRunner, dependencies, messageListener };
+  return { actionListener, messageListener, operations };
 }
 
-async function sendMessage(listener: MessageListener, type: string) {
-  const sendResponse = vi.fn();
-  const keepsChannelOpen = listener({ type }, undefined, sendResponse);
-
-  if (keepsChannelOpen) {
-    await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
-  }
-
-  return { keepsChannelOpen, response: sendResponse.mock.calls[0]?.[0] };
-}
-
-async function sendMessageWithEvent(
+async function sendMessage(
   listener: MessageListener,
-  type: string,
-  event: unknown,
+  message: { type?: string; event?: unknown; todayDate?: string },
 ) {
   const sendResponse = vi.fn();
-  const keepsChannelOpen = listener({ type, event }, undefined, sendResponse);
+  const keepsChannelOpen = listener(message, undefined, sendResponse);
+
   if (keepsChannelOpen) {
     await vi.waitFor(() => expect(sendResponse).toHaveBeenCalled());
   }
+
   return { keepsChannelOpen, response: sendResponse.mock.calls[0]?.[0] };
 }
 
 describe("registerServiceWorker", () => {
   it("opens the app from the extension action", () => {
-    const { actionListener, dependencies } = installServiceWorker();
+    const { actionListener, operations } = installServiceWorker();
 
     actionListener();
 
-    expect(dependencies.openAppPage).toHaveBeenCalledOnce();
+    expect(operations.openAppPage).toHaveBeenCalledOnce();
   });
 
-  it("coalesces all overlapping catch-up requests into one worker run", async () => {
-    let finishCatchUp: ((value: {
-      saved: number;
-      failed: number;
-      discarded: number;
-    }) => void) | undefined;
-    const catchUpRunner = vi.fn((
-      _today: string,
-      _dependencies: CatchUpDependencies,
-    ) => new Promise<CatchUpRunResult>((resolve) => {
-      finishCatchUp = resolve;
-    }));
-    const { messageListener } = installServiceWorker(
-      {},
-      now,
-      catchUpRunner,
-    );
-    const firstResponse = vi.fn();
-    const secondResponse = vi.fn();
-
-    expect(messageListener(
-      { type: "catchUp.run", todayDate: "2026-07-16" },
-      undefined,
-      firstResponse,
-    )).toBe(true);
-    expect(messageListener(
-      { type: "catchUp.run", todayDate: "2026-07-15" },
-      undefined,
-      secondResponse,
-    )).toBe(true);
-    expect(catchUpRunner).toHaveBeenCalledOnce();
-
-    finishCatchUp?.({
-      saved: 1,
-      failed: 0,
-      discarded: 0,
-    });
-    await vi.waitFor(() => expect(secondResponse).toHaveBeenCalled());
-    expect(firstResponse).toHaveBeenCalledWith({
-      ok: true,
-      value: expect.objectContaining({ saved: 1 }),
-    });
-    expect(secondResponse).toHaveBeenCalledWith({
-      ok: true,
-      value: expect.objectContaining({ saved: 1 }),
-    });
-  });
-
-  it("composes catch-up with its supplied storage dependencies", async () => {
-    let receivedDependencies: CatchUpDependencies | undefined;
-    const catchUpRunner = vi.fn(async (
-      _today: string,
-      dependencies: CatchUpDependencies,
-    ) => {
-      receivedDependencies = dependencies;
-      return {
-        saved: 0,
-        failed: 0,
-        discarded: 0,
-      };
-    });
-    const { dependencies, messageListener } = installServiceWorker(
-      {},
-      now,
-      catchUpRunner,
-    );
-
-    const response = vi.fn();
-    messageListener(
-      { type: "catchUp.run", todayDate: "2026-07-15" },
-      undefined,
-      response,
-    );
-    await vi.waitFor(() => expect(response).toHaveBeenCalled());
-
-    expect(receivedDependencies).toMatchObject({
-      listDayRecords: dependencies.listDayRecords,
-      saveDayRecord: dependencies.saveDayRecord,
-      deleteDayRecord: dependencies.deleteDayRecord,
-    });
-  });
-
-  it("gives catch-up a historical Calendar client using the record day", async () => {
-    const catchUpRunner = vi.fn(async (
-      _todayDate: string,
-      catchUpDependencies: CatchUpDependencies,
-    ) => {
-      await catchUpDependencies.listCalendarEvents({
-        schemaVersion: 1,
-        date: "2026-07-14",
-        timezone: "America/Los_Angeles",
-        actual: [],
-        updatedAt: "2026-07-14T18:00:00.000Z",
-      });
-      return {
-        saved: 0,
-        failed: 0,
-        discarded: 0,
-      };
-    });
-    const { dependencies, messageListener } = installServiceWorker(
-      {},
-      now,
-      catchUpRunner,
-    );
-
-    const response = vi.fn();
-    messageListener(
-      { type: "catchUp.run", todayDate: "2026-07-15" },
-      undefined,
-      response,
-    );
-    await vi.waitFor(() => expect(response).toHaveBeenCalled());
-
-    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledWith(
-      "token-123",
-      {
-        timeMin: "2026-07-14T07:00:00.000Z",
-        timeMax: "2026-07-15T07:00:00.000Z",
-      },
-    );
-  });
-
-  it("uses interactive auth only for the explicit connect message", async () => {
-    const { dependencies, messageListener } = installServiceWorker();
-
-    await expect(
-      sendMessage(messageListener, "auth.requestInteractiveToken"),
-    ).resolves.toMatchObject({
-      keepsChannelOpen: true,
-      response: { ok: true, value: { status: "connected" } },
-    });
-    expect(dependencies.requestInteractiveToken).toHaveBeenCalledOnce();
-  });
-
-  it("forwards an interactive auth failure", async () => {
+  it("routes interactive authentication and forwards its response", async () => {
     const authFailure = {
       ok: false as const,
       error: { code: "AUTH_TOKEN_UNAVAILABLE", message: "Access denied." },
     };
-    const { messageListener } = installServiceWorker({
-      requestInteractiveToken: vi.fn(async () => authFailure),
+    const { messageListener, operations } = installServiceWorker({
+      connectCalendar: vi.fn(async () => authFailure),
     });
 
     await expect(
-      sendMessage(messageListener, "auth.requestInteractiveToken"),
-    ).resolves.toMatchObject({
+      sendMessage(messageListener, {
+        type: "auth.requestInteractiveToken",
+      }),
+    ).resolves.toEqual({
       keepsChannelOpen: true,
       response: authFailure,
     });
+    expect(operations.connectCalendar).toHaveBeenCalledOnce();
   });
 
-  it("lists today's Calendar events with a silently cached token", async () => {
-    const { dependencies, messageListener } = installServiceWorker();
+  it("routes current Calendar reads", async () => {
+    const { messageListener, operations } = installServiceWorker();
 
     await expect(
-      sendMessage(messageListener, "calendar.listEvents"),
+      sendMessage(messageListener, { type: "calendar.listEvents" }),
     ).resolves.toMatchObject({
       keepsChannelOpen: true,
       response: { ok: true, value: { events: [] } },
     });
-    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledWith(
-      "token-123",
-      range,
-    );
+    expect(operations.listCurrentCalendarEvents).toHaveBeenCalledOnce();
   });
 
-  it("uses the primary Calendar timezone for its date and day range", async () => {
-    const clock = () => new Date("2026-07-15T01:00:00.000Z");
-    const { dependencies, messageListener } = installServiceWorker(
-      {
-        listPrimaryCalendarEvents: vi.fn(async () => ({
-          ok: true as const,
-          value: { events: [], timeZone: "Asia/Tokyo" },
-        })),
-      },
-      clock,
-    );
-
-    await expect(
-      sendMessage(messageListener, "calendar.listEvents"),
-    ).resolves.toMatchObject({
-      response: {
-        ok: true,
-        value: { events: [], timeZone: "Asia/Tokyo", date: "2026-07-15" },
-      },
-    });
-    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledTimes(2);
-    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenLastCalledWith(
-      "token-123",
-      {
-        timeMin: "2026-07-14T15:00:00.000Z",
-        timeMax: "2026-07-15T15:00:00.000Z",
-      },
-    );
-  });
-
-  it("reads the clock once when deriving a Calendar request range", async () => {
-    const clock = vi.fn(now);
-    const { messageListener } = installServiceWorker({}, clock);
-
-    await sendMessage(messageListener, "calendar.listEvents");
-
-    expect(clock).toHaveBeenCalledOnce();
-  });
-
-  it("derives a new local-day range for a later request after midnight", async () => {
-    const clock = vi
-      .fn()
-      .mockReturnValueOnce(new Date(2026, 6, 15, 23, 59))
-      .mockReturnValueOnce(new Date(2026, 6, 16, 0, 1));
-    const { dependencies, messageListener } = installServiceWorker({}, clock);
-
-    await sendMessage(messageListener, "calendar.listEvents");
-    await sendMessage(messageListener, "calendar.listEvents");
-
-    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenNthCalledWith(
-      1,
-      "token-123",
-      {
-        timeMin: new Date(2026, 6, 15).toISOString(),
-        timeMax: new Date(2026, 6, 16).toISOString(),
-      },
-    );
-    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenNthCalledWith(
-      2,
-      "token-123",
-      {
-        timeMin: new Date(2026, 6, 16).toISOString(),
-        timeMax: new Date(2026, 6, 17).toISOString(),
-      },
-    );
-  });
-
-  it("logs Calendar load stats without a constant request reason", async () => {
-    const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
-    const { messageListener } = installServiceWorker();
-
-    await sendMessage(messageListener, "calendar.listEvents");
-
-    expect(log.mock.calls[0]?.[1]).not.toHaveProperty("reason");
-    log.mockRestore();
-  });
-
-  it.each([
-    { events: [], renderedTimedEventCount: 0 },
-    {
-      events: [
-        {
-          kind: "timed" as const,
-          id: "private-event-id",
-          summary: "Private meeting",
-          colorId: null,
-          start: "2026-07-15T09:00:00-07:00",
-          end: "2026-07-15T10:00:00-07:00",
-          timeZone: "America/Los_Angeles",
-        },
-      ],
-      renderedTimedEventCount: 1,
-    },
-  ])(
-    "logs one complete privacy-safe summary for %# event set",
-    async ({ events, renderedTimedEventCount }) => {
-      const log = vi.spyOn(console, "info").mockImplementation(() => undefined);
-      const { messageListener } = installServiceWorker({
-        listPrimaryCalendarEvents: vi.fn(async () => ({
-          ok: true as const,
-          value: {
-            events,
-            timeZone: "America/Los_Angeles",
-            stats: {
-              pageCount: 2,
-              rawEventCount: 3,
-              calendarHttpAndJsonDurationMs: 4,
-              normalizationDurationMs: 5,
-            },
-          },
-        })),
-      });
-
-      await sendMessage(messageListener, "calendar.listEvents");
-
-      expect(log).toHaveBeenCalledOnce();
-      expect(log).toHaveBeenCalledWith("calendar-plan-load", {
-        ok: true,
-        renderedTimedEventCount,
-        pageCount: 2,
-        rawEventCount: 3,
-        calendarHttpAndJsonDurationMs: 4,
-        normalizationDurationMs: 5,
-        cachedAuthDurationMs: expect.any(Number),
-        backgroundTotalDurationMs: expect.any(Number),
-      });
-      const summary = log.mock.calls[0]?.[1] as Record<string, unknown>;
-      for (const durationName of [
-        "calendarHttpAndJsonDurationMs",
-        "normalizationDurationMs",
-        "cachedAuthDurationMs",
-        "backgroundTotalDurationMs",
-      ]) {
-        const duration = summary[durationName];
-        expect(typeof duration).toBe("number");
-        expect(Number.isFinite(duration)).toBe(true);
-        expect(duration).toBeGreaterThanOrEqual(0);
-      }
-      const serializedLog = JSON.stringify(log.mock.calls);
-      expect(serializedLog).not.toContain("token-123");
-      expect(serializedLog).not.toContain("private-event-id");
-      expect(serializedLog).not.toContain("Private meeting");
-      log.mockRestore();
-    },
-  );
-
-  it("coalesces simultaneous reads for the same local day", async () => {
-    let resolveCalendar: ((value: unknown) => void) | undefined;
-    const listPrimaryCalendarEvents = vi.fn(
-      () => new Promise((resolve) => { resolveCalendar = resolve; }),
-    );
-    const { messageListener } = installServiceWorker({ listPrimaryCalendarEvents });
-    const first = sendMessage(messageListener, "calendar.listEvents");
-    const second = sendMessage(messageListener, "calendar.listEvents");
-
-    await vi.waitFor(() => expect(listPrimaryCalendarEvents).toHaveBeenCalledOnce());
-    resolveCalendar?.({
-      ok: true,
-      value: { events: [], timeZone: "America/Los_Angeles" },
-    });
-
-    await expect(Promise.all([first, second])).resolves.toEqual([
-      expect.objectContaining({ response: expect.objectContaining({ ok: true, value: expect.objectContaining({ events: [] }) }) }),
-      expect.objectContaining({ response: expect.objectContaining({ ok: true, value: expect.objectContaining({ events: [] }) }) }),
-    ]);
-  });
-
-  it("forwards a Calendar API failure", async () => {
-    const calendarFailure = {
-      ok: false as const,
-      error: { code: "CALENDAR_LIST_FAILED", message: "Calendar failed." },
-    };
-    const { messageListener } = installServiceWorker({
-      listPrimaryCalendarEvents: vi.fn(async () => calendarFailure),
-    });
-
-    await expect(
-      sendMessage(messageListener, "calendar.listEvents"),
-    ).resolves.toMatchObject({
-      keepsChannelOpen: true,
-      response: calendarFailure,
-    });
-  });
-
-  it("does not call Calendar when no cached token is available", async () => {
-    const requestCachedToken = vi.fn(async () => ({
-      ok: false as const,
-      error: { code: "AUTH_TOKEN_UNAVAILABLE", message: "No cached token." },
-    }));
-    const { dependencies, messageListener } = installServiceWorker({
-      requestCachedToken,
-    });
-
-    await expect(
-      sendMessage(messageListener, "calendar.listEvents"),
-    ).resolves.toMatchObject({
-      keepsChannelOpen: true,
-      response: {
-        ok: false,
-        error: {
-          code: "AUTH_NOT_CONNECTED",
-          message: "Connect Calendar before requesting events.",
-        },
-      },
-    });
-    expect(dependencies.listPrimaryCalendarEvents).not.toHaveBeenCalled();
-  });
-
-  it("inserts a Calendar event through cached auth", async () => {
+  it("routes Calendar inserts with their event", async () => {
     const event = { id: "calendar-event-id" };
-    const { dependencies, messageListener } = installServiceWorker();
+    const { messageListener, operations } = installServiceWorker();
 
-    await expect(
-      sendMessageWithEvent(messageListener, "calendar.insertEvent", event),
-    ).resolves.toMatchObject({
-      keepsChannelOpen: true,
-      response: { ok: true, value: { eventId: "calendar-actual-id" } },
-    });
-    expect(dependencies.insertPrimaryCalendarEvent).toHaveBeenCalledWith(
-      "token-123",
+    await sendMessage(messageListener, {
+      type: "calendar.insertEvent",
       event,
-    );
+    });
+
+    expect(operations.insertCalendarEvent).toHaveBeenCalledWith(event);
   });
 
-  it("does not insert a Calendar event without cached auth", async () => {
-    const { dependencies, messageListener } = installServiceWorker({
-      requestCachedToken: vi.fn(async () => ({
-        ok: false as const,
-        error: { code: "AUTH_TOKEN_UNAVAILABLE", message: "missing" },
-      })),
+  it("routes catch-up with its requested date", async () => {
+    const { messageListener, operations } = installServiceWorker();
+
+    await sendMessage(messageListener, {
+      type: "catchUp.run",
+      todayDate: "2026-07-15",
     });
 
-    await expect(
-      sendMessageWithEvent(messageListener, "calendar.insertEvent", {}),
-    ).resolves.toMatchObject({
-      response: { ok: false, error: { code: "AUTH_NOT_CONNECTED" } },
-    });
-    expect(dependencies.insertPrimaryCalendarEvent).not.toHaveBeenCalled();
+    expect(operations.runCatchUp).toHaveBeenCalledWith("2026-07-15");
   });
 
   it("ignores messages outside its contract", async () => {
     const { messageListener } = installServiceWorker();
 
-    await expect(sendMessage(messageListener, "unknown")).resolves.toEqual({
+    await expect(
+      sendMessage(messageListener, { type: "unknown" }),
+    ).resolves.toEqual({
       keepsChannelOpen: false,
       response: undefined,
     });
