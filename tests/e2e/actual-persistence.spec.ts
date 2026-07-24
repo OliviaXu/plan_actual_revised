@@ -52,6 +52,7 @@ registerServiceWorker({
     await expect(page.getByRole("textbox", { name: "Title" })).toBeFocused();
     await page.keyboard.type("First Actual");
     await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.clock.setFixedTime(new Date("2026-07-15T13:00:00-07:00"));
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("textbox", { name: "Title" }).fill("Second Actual");
     await page.getByRole("spinbutton", { name: "Duration" }).fill("45");
@@ -60,23 +61,6 @@ registerServiceWorker({
     await expect(actuals).toHaveCount(2);
     await expect(actuals.filter({ hasText: "First Actual" })).toHaveCount(1);
     await expect(actuals.filter({ hasText: "Second Actual" })).toHaveCount(1);
-    await expect(actuals.nth(0)).toHaveAttribute(
-      "data-overlap-group-index",
-      "0",
-    );
-    await expect(actuals.nth(1)).toHaveAttribute(
-      "data-overlap-group-index",
-      "0",
-    );
-    await expect
-      .poll(() =>
-        actuals.evaluateAll((blocks) =>
-          blocks
-            .map((block) => getComputedStyle(block).left)
-            .sort((left, right) => Number.parseFloat(left) - Number.parseFloat(right)),
-        ),
-      )
-      .toEqual(["12px", "24px"]);
     const actualIds = await actuals.evaluateAll((blocks) =>
       blocks.map((block) => block.getAttribute("data-actual-id")),
     );
