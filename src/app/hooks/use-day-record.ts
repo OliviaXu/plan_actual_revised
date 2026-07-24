@@ -12,8 +12,14 @@ type DayRecordState = {
   record: DayRecord | null;
 };
 
+type DayRecordLoadState = {
+  key: string;
+  status: "loaded" | "failed";
+};
+
 export function useDayRecord(calendarDay?: CalendarDay) {
   const [dayRecordState, setDayRecordState] = useState<DayRecordState>();
+  const [loadState, setLoadState] = useState<DayRecordLoadState>();
   const [storageError, setStorageError] = useState<string>();
   const writeQueueRef = useRef<
     ReturnType<typeof createDayRecordWriteQueue>
@@ -23,13 +29,16 @@ export function useDayRecord(calendarDay?: CalendarDay) {
   const calendarDayKey = calendarDay
     ? `${calendarDay.date}:${calendarDay.timeZone}`
     : undefined;
-  const dayRecord =
-    calendarDayKey && dayRecordState?.key === calendarDayKey
-      ? dayRecordState.record
-      : null;
-  const loadSettled = Boolean(
-    calendarDayKey && dayRecordState?.key === calendarDayKey,
-  );
+  const activeDayRecordState =
+    calendarDayKey &&
+    dayRecordState?.key === calendarDayKey
+      ? dayRecordState
+      : undefined;
+  const dayRecord = activeDayRecordState?.record ?? null;
+  const loadStatus =
+    calendarDayKey && loadState?.key === calendarDayKey
+      ? loadState.status
+      : "loading";
 
   useEffect(() => {
     if (!calendarDate || !calendarDayKey) return;
@@ -38,7 +47,11 @@ export function useDayRecord(calendarDay?: CalendarDay) {
     void loadDayRecord(calendarDate)
       .then((record) => {
         if (!active) return;
-        setDayRecordState({ key: calendarDayKey, record });
+        setDayRecordState({
+          key: calendarDayKey,
+          record,
+        });
+        setLoadState({ key: calendarDayKey, status: "loaded" });
         setStorageError(undefined);
       })
       .catch((error: unknown) => {
@@ -48,7 +61,11 @@ export function useDayRecord(calendarDay?: CalendarDay) {
             ? error.message
             : "Unable to load local changes.",
         );
-        setDayRecordState({ key: calendarDayKey, record: null });
+        setDayRecordState({
+          key: calendarDayKey,
+          record: null,
+        });
+        setLoadState({ key: calendarDayKey, status: "failed" });
       });
 
     return () => {
@@ -58,10 +75,8 @@ export function useDayRecord(calendarDay?: CalendarDay) {
 
   async function persistDayRecord(record: DayRecord) {
     const writeId = ++latestWriteIdRef.current;
-    setDayRecordState({
-      key: `${record.date}:${record.timezone}`,
-      record,
-    });
+    const recordKey = `${record.date}:${record.timezone}`;
+    setDayRecordState({ key: recordKey, record });
     setStorageError(undefined);
 
     try {
@@ -82,7 +97,7 @@ export function useDayRecord(calendarDay?: CalendarDay) {
 
   return {
     dayRecord,
-    loadSettled,
+    loadStatus,
     storageError,
     persistDayRecord,
   };

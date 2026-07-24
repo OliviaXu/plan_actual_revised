@@ -1,0 +1,155 @@
+import { describe, expect, it, vi } from "vitest";
+
+import { syncDayActualsToCalendar } from "../../src/workflows/sync-day-actuals-to-calendar";
+import type { CalendarEvent } from "../../src/calendar/calendar-event";
+import type { ActualEvent } from "../../src/domain/day-event";
+import type { DayRecord } from "../../src/domain/day-record";
+
+const now = () => new Date("2026-07-15T19:00:00.000Z");
+
+function actual(
+  id: string,
+  summary: string,
+  startMinutes: number,
+  saveDisposition: ActualEvent["saveDisposition"] = "unsaved",
+): ActualEvent {
+  return {
+    id,
+    summary,
+    startMinutes,
+    durationMinutes: 60,
+    colorId: "9",
+    saveDisposition,
+  };
+}
+
+function dayRecord(actuals: ActualEvent[]): DayRecord {
+  return {
+    schemaVersion: 1,
+    date: "2026-07-15",
+    timezone: "America/Los_Angeles",
+    actual: actuals,
+    updatedAt: "2026-07-15T18:00:00.000Z",
+  };
+}
+
+function timedPlanEvent(): CalendarEvent {
+  return {
+    kind: "timed",
+    id: "plan-match",
+    summary: "Plan match",
+    colorId: "9",
+    start: "2026-07-15T09:00:00-07:00",
+    end: "2026-07-15T10:00:00-07:00",
+    timeZone: "America/Los_Angeles",
+  };
+}
+
+describe("syncDayActualsToCalendar", () => {
+  it("owns filtering, matching, insertion, and ordered per-block persistence", async () => {
+    const record = dayRecord([
+      actual("matched", "Plan match", 540),
+      actual("saved", "Calendar insert", 660),
+      actual("failed", "Failed insert", 780),
+      actual("terminal", "Already saved", 840, "calendarSaved"),
+    ]);
+    const persisted: DayRecord[] = [];
+    const listCalendarEvents = vi.fn().mockResolvedValue({
+      ok: true,
+      value: { events: [timedPlanEvent()] },
+    });
+    const insertCalendarEvent = vi
+      .fn()
+      .mockResolvedValueOnce({
+        ok: true,
+        value: { eventId: "calendar-saved" },
+      })
+      .mockResolvedValueOnce({
+        ok: false,
+        error: { code: "INSERT_FAILED", message: "Response lost." },
+      });
+
+    const result = await syncDayActualsToCalendar({
+      record,
+      now,
+      listCalendarEvents,
+      insertCalendarEvent,
+      persistDayRecord: async (nextRecord) => {
+        persisted.push(structuredClone(nextRecord));
+      },
+    });
+
+    expect(listCalendarEvents).toHaveBeenCalledWith();
+    expect(result).toMatchObject({
+      status: "completed",
+      saved: 1,
+      matched: 1,
+      failed: 1,
+    });
+    expect(insertCalendarEvent).toHaveBeenCalledTimes(2);
+    expect(persisted.map((snapshot) =>
+      snapshot.actual.map((event) => event.saveDisposition)
+    )).toEqual([
+      ["planMatched", "unsaved", "unsaved", "calendarSaved"],
+      ["planMatched", "calendarSaved", "unsaved", "calendarSaved"],
+      ["planMatched", "calendarSaved", "unsaved", "calendarSaved"],
+    ]);
+  });
+
+  it("persists a Plan lookup failure on every eligible block", async () => {
+    const record = dayRecord([
+      actual("first", "First", 540),
+      actual("second", "Second", 600),
+    ]);
+    const persisted: DayRecord[] = [];
+
+    const result = await syncDayActualsToCalendar({
+      record,
+      now,
+      listCalendarEvents: vi.fn().mockResolvedValue({
+        ok: false,
+        error: { code: "LIST_FAILED", message: "Calendar unavailable." },
+      }),
+      insertCalendarEvent: vi.fn(),
+      persistDayRecord: async (nextRecord) => {
+        persisted.push(structuredClone(nextRecord));
+      },
+    });
+
+    expect(result).toMatchObject({
+      status: "planLookupFailed",
+      failed: 2,
+      error: { code: "LIST_FAILED", message: "Calendar unavailable." },
+    });
+    expect(persisted).toHaveLength(2);
+    expect(persisted[1]?.actual).toMatchObject([
+      { lastSaveError: { code: "LIST_FAILED" } },
+      { lastSaveError: { code: "LIST_FAILED" } },
+    ]);
+  });
+
+  it("returns without Calendar or persistence work when the day has no unsaved blocks", async () => {
+    const record = dayRecord([
+      actual("saved", "Saved", 540, "calendarSaved"),
+      actual("matched", "Matched", 600, "planMatched"),
+    ]);
+    const listCalendarEvents = vi.fn();
+    const persistDayRecord = vi.fn();
+
+    await expect(syncDayActualsToCalendar({
+      record,
+      now,
+      listCalendarEvents,
+      insertCalendarEvent: vi.fn(),
+      persistDayRecord,
+    })).resolves.toMatchObject({
+      status: "nothingToSync",
+      record,
+      saved: 0,
+      matched: 0,
+      failed: 0,
+    });
+    expect(listCalendarEvents).not.toHaveBeenCalled();
+    expect(persistDayRecord).not.toHaveBeenCalled();
+  });
+});

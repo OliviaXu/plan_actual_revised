@@ -28,10 +28,30 @@ const timedEvent = {
 };
 const now = () => new Date("2026-07-15T12:00:00-07:00");
 
-function mockRuntime(handler: RuntimeHandler) {
+function mockRuntime(
+  handler: RuntimeHandler,
+  catchUpHandler: RuntimeHandler = async () => ({
+    ok: true,
+    value: {
+      affectedDayCount: 0,
+      saved: 0,
+      matched: 0,
+      failed: 0,
+      discarded: 0,
+      invalidRecordCount: 0,
+      storageErrorCount: 0,
+    },
+  }),
+) {
   const stored: Record<string, unknown> = {};
   vi.stubGlobal("chrome", {
-    runtime: { sendMessage: vi.fn(handler) },
+    runtime: {
+      sendMessage: vi.fn((message: RuntimeMessage) =>
+        message.type === "catchUp.run"
+          ? catchUpHandler(message)
+          : handler(message),
+      ),
+    },
     storage: {
       local: {
         get: vi.fn(async (key: string) => ({ [key]: stored[key] })),
@@ -91,7 +111,10 @@ describe("App Plan loading", () => {
     fireEvent.focus(window);
     fireEvent(document, new Event("visibilitychange"));
 
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(1);
+    expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.filter(
+      ([message]) =>
+        (message as unknown as RuntimeMessage).type === "calendar.listEvents",
+    )).toHaveLength(1);
   });
 
   it("starts a fresh Calendar request when a new app page mounts", async () => {
@@ -109,7 +132,10 @@ describe("App Plan loading", () => {
     render(<App now={now} />);
     await screen.findByText("Design review");
 
-    expect(chrome.runtime.sendMessage).toHaveBeenCalledTimes(2);
+    expect(vi.mocked(chrome.runtime.sendMessage).mock.calls.filter(
+      ([message]) =>
+        (message as unknown as RuntimeMessage).type === "calendar.listEvents",
+    )).toHaveLength(2);
   });
 
   it("shows Connect without an error when cached auth is unavailable", async () => {
@@ -264,6 +290,145 @@ describe("App Plan loading", () => {
       "Unable to load today's plan",
     );
     expect(screen.queryByTestId("plan-empty")).not.toBeInTheDocument();
+  });
+});
+
+describe("App catch-up", () => {
+  it("starts catch-up after Calendar and canonical local storage load succeed", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+
+    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
+      type: "catchUp.run",
+      todayDate: "2026-07-15",
+    }));
+  });
+
+  it("does not run catch-up when the initial Calendar load fails", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: false,
+          error: { code: "CALENDAR_LIST_FAILED", message: "Calendar failed." },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+    await screen.findByTestId("calendar-error");
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "catchUp.run" }),
+    );
+  });
+
+  it("does not run catch-up when the canonical local read fails", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(
+      new Error("read failed"),
+    );
+
+    render(<App now={now} />);
+    await screen.findByTestId("actual-storage-error");
+
+    expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
+      expect.objectContaining({ type: "catchUp.run" }),
+    );
+  });
+
+  it("keeps Actual interactive while catch-up runs and shows its result", async () => {
+    let finishCatchUp: ((value: unknown) => void) | undefined;
+    mockRuntime(
+      async (message) => {
+        if (message.type === "calendar.listEvents") {
+          return {
+            ok: true,
+            value: {
+              events: [],
+              date: "2026-07-15",
+              timeZone: "America/Los_Angeles",
+            },
+          };
+        }
+        return unexpectedMessage(message);
+      },
+      async () => new Promise((resolve) => {
+        finishCatchUp = resolve;
+      }),
+    );
+
+    render(<App now={now} />);
+
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    expect(screen.queryByTestId("catch-up-summary")).not.toBeInTheDocument();
+
+    finishCatchUp?.({
+      ok: true,
+      value: {
+        affectedDayCount: 2,
+        saved: 2,
+        matched: 1,
+        failed: 1,
+        discarded: 0,
+        invalidRecordCount: 0,
+        storageErrorCount: 0,
+      },
+    });
+
+    expect(await screen.findByTestId("catch-up-summary")).toHaveTextContent(
+      "Catch-up: saved 2, 1 matched Plan, 1 pending from 2 past days",
+    );
+    expect(add).toBeEnabled();
+  });
+
+  it("keeps a no-op catch-up silent", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+    await waitFor(() => expect(chrome.runtime.sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ type: "catchUp.run" }),
+    ));
+
+    expect(screen.queryByTestId("catch-up-summary")).not.toBeInTheDocument();
   });
 });
 

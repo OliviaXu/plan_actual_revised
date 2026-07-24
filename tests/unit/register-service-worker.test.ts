@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
 import registerServiceWorker from "../../src/background/register-service-worker";
+import type {
+  CatchUpDependencies,
+} from "../../src/background/run-catch-up";
+import type { CatchUpRunResult } from "../../src/shared/catch-up-run-result";
 
 const fixedNow = new Date(2026, 6, 15, 12);
 const range = {
@@ -10,7 +14,7 @@ const range = {
 const now = () => new Date(fixedNow);
 
 type MessageListener = (
-  message: { type?: string; event?: unknown },
+  message: { type?: string; event?: unknown; todayDate?: string },
   sender: unknown,
   sendResponse: (response: unknown) => void,
 ) => boolean;
@@ -18,6 +22,18 @@ type MessageListener = (
 function installServiceWorker(
   overrides: Record<string, unknown> = {},
   clock: () => Date = now,
+  catchUpRunner: (
+    today: string,
+    dependencies: CatchUpDependencies,
+  ) => Promise<CatchUpRunResult> = vi.fn(async () => ({
+    affectedDayCount: 0,
+    saved: 0,
+    matched: 0,
+    failed: 0,
+    discarded: 0,
+    invalidRecordCount: 0,
+    storageErrorCount: 0,
+  })),
 ) {
   let actionListener: (() => void) | undefined;
   let messageListener: MessageListener | undefined;
@@ -57,16 +73,24 @@ function installServiceWorker(
       ok: true as const,
       value: { eventId: "calendar-actual-id" },
     })),
+    listDayRecords: vi.fn(async () => ({ records: [], invalidKeys: [] })),
+    saveDayRecord: vi.fn(async () => undefined),
+    deleteDayRecord: vi.fn(async () => undefined),
     ...overrides,
   };
 
-  registerServiceWorker(dependencies, clock);
+  registerServiceWorker(
+    dependencies,
+    clock,
+    () => "America/Los_Angeles",
+    catchUpRunner,
+  );
 
   if (!actionListener || !messageListener) {
     throw new Error("Service-worker listeners were not installed.");
   }
 
-  return { actionListener, dependencies, messageListener };
+  return { actionListener, catchUpRunner, dependencies, messageListener };
 }
 
 async function sendMessage(listener: MessageListener, type: string) {
@@ -100,6 +124,145 @@ describe("registerServiceWorker", () => {
     actionListener();
 
     expect(dependencies.openAppPage).toHaveBeenCalledOnce();
+  });
+
+  it("coalesces all overlapping catch-up requests into one worker run", async () => {
+    let finishCatchUp: ((value: {
+      affectedDayCount: number;
+      saved: number;
+      matched: number;
+      failed: number;
+      discarded: number;
+      invalidRecordCount: number;
+      storageErrorCount: number;
+    }) => void) | undefined;
+    const catchUpRunner = vi.fn((
+      _today: string,
+      _dependencies: CatchUpDependencies,
+    ) => new Promise<CatchUpRunResult>((resolve) => {
+      finishCatchUp = resolve;
+    }));
+    const { messageListener } = installServiceWorker(
+      {},
+      now,
+      catchUpRunner,
+    );
+    const firstResponse = vi.fn();
+    const secondResponse = vi.fn();
+
+    expect(messageListener(
+      { type: "catchUp.run", todayDate: "2026-07-16" },
+      undefined,
+      firstResponse,
+    )).toBe(true);
+    expect(messageListener(
+      { type: "catchUp.run", todayDate: "2026-07-15" },
+      undefined,
+      secondResponse,
+    )).toBe(true);
+    expect(catchUpRunner).toHaveBeenCalledOnce();
+
+    finishCatchUp?.({
+      affectedDayCount: 1,
+      saved: 1,
+      matched: 0,
+      failed: 0,
+      discarded: 0,
+      invalidRecordCount: 0,
+      storageErrorCount: 0,
+    });
+    await vi.waitFor(() => expect(secondResponse).toHaveBeenCalled());
+    expect(firstResponse).toHaveBeenCalledWith({
+      ok: true,
+      value: expect.objectContaining({ saved: 1 }),
+    });
+    expect(secondResponse).toHaveBeenCalledWith({
+      ok: true,
+      value: expect.objectContaining({ saved: 1 }),
+    });
+  });
+
+  it("composes catch-up with its supplied storage dependencies", async () => {
+    let receivedDependencies: CatchUpDependencies | undefined;
+    const catchUpRunner = vi.fn(async (
+      _today: string,
+      dependencies: CatchUpDependencies,
+    ) => {
+      receivedDependencies = dependencies;
+      return {
+        affectedDayCount: 0,
+        saved: 0,
+        matched: 0,
+        failed: 0,
+        discarded: 0,
+        invalidRecordCount: 0,
+        storageErrorCount: 0,
+      };
+    });
+    const { dependencies, messageListener } = installServiceWorker(
+      {},
+      now,
+      catchUpRunner,
+    );
+
+    const response = vi.fn();
+    messageListener(
+      { type: "catchUp.run", todayDate: "2026-07-15" },
+      undefined,
+      response,
+    );
+    await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+    expect(receivedDependencies).toMatchObject({
+      listDayRecords: dependencies.listDayRecords,
+      saveDayRecord: dependencies.saveDayRecord,
+      deleteDayRecord: dependencies.deleteDayRecord,
+    });
+  });
+
+  it("gives catch-up a historical Calendar client using the record day", async () => {
+    const catchUpRunner = vi.fn(async (
+      _todayDate: string,
+      catchUpDependencies: CatchUpDependencies,
+    ) => {
+      await catchUpDependencies.listCalendarEvents({
+        schemaVersion: 1,
+        date: "2026-07-14",
+        timezone: "America/Los_Angeles",
+        actual: [],
+        updatedAt: "2026-07-14T18:00:00.000Z",
+      });
+      return {
+        affectedDayCount: 0,
+        saved: 0,
+        matched: 0,
+        failed: 0,
+        discarded: 0,
+        invalidRecordCount: 0,
+        storageErrorCount: 0,
+      };
+    });
+    const { dependencies, messageListener } = installServiceWorker(
+      {},
+      now,
+      catchUpRunner,
+    );
+
+    const response = vi.fn();
+    messageListener(
+      { type: "catchUp.run", todayDate: "2026-07-15" },
+      undefined,
+      response,
+    );
+    await vi.waitFor(() => expect(response).toHaveBeenCalled());
+
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledWith(
+      "token-123",
+      {
+        timeMin: "2026-07-14T07:00:00.000Z",
+        timeMax: "2026-07-15T07:00:00.000Z",
+      },
+    );
   });
 
   it("uses interactive auth only for the explicit connect message", async () => {

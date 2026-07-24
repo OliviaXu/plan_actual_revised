@@ -1,17 +1,11 @@
-import {
-  mapActualToCalendarEvent,
-  type ActualCalendarEventInput,
-} from "../../calendar/actual-calendar-event";
 import type {
   CalendarEvent,
   CalendarInsertEvent,
 } from "../../calendar/calendar-event";
 import type { DayRecord } from "../../domain/day-record";
-import { isExactPlanMatch } from "../../domain/actual-save";
-import { toPlanEvents } from "../../domain/plan-event";
-import { defaultSettings } from "../../domain/settings";
 import type { Result } from "../../shared/result";
 import { sendRuntimeMessage } from "../../shared/runtime-messages";
+import { syncDayActualsToCalendar } from "../../workflows/sync-day-actuals-to-calendar";
 
 type CalendarEventClient = {
   listCalendarEvents: () => Promise<Result<{ events: CalendarEvent[] }>>;
@@ -36,97 +30,30 @@ export async function saveActualsToCalendar({
   record: DayRecord;
   summary: string;
 }> {
-  const unsaved = record.actual.filter(
-    (actual) => (actual.saveDisposition ?? "unsaved") === "unsaved",
-  );
-  if (unsaved.length === 0) {
-    return { record, summary: "Nothing new to save" };
+  const result = await syncDayActualsToCalendar({
+    record,
+    now,
+    persistDayRecord,
+    listCalendarEvents,
+    insertCalendarEvent,
+  });
+  if (result.status === "nothingToSync") {
+    return { record: result.record, summary: "Nothing new to save" };
   }
-
-  const planResponse = await listCalendarEvents();
-  if (!planResponse.ok) {
+  if (result.status === "planLookupFailed") {
     return {
-      record,
-      summary: `Failed ${unsaved.length}: ${planResponse.error.message}`,
+      record: result.record,
+      summary: `Failed ${result.failed}: ${result.error?.message ?? "Unable to load Calendar."}`,
     };
-  }
-
-  const planEvents = toPlanEvents(
-    planResponse.value.events,
-    record.date,
-    record.timezone,
-    defaultSettings.hiddenPlanColorIds,
-  );
-  let workingRecord = record;
-  let savedCount = 0;
-  let matchedCount = 0;
-  let failedCount = 0;
-
-  for (const actual of unsaved) {
-    const attemptedAt = now().toISOString();
-    if (planEvents.some((plan) => isExactPlanMatch(actual, plan))) {
-      workingRecord = updateActual(
-        workingRecord,
-        actual.id,
-        {
-          saveDisposition: "planMatched",
-          lastSaveAttemptAt: attemptedAt,
-          lastSaveError: undefined,
-        },
-        attemptedAt,
-      );
-      await persistDayRecord(workingRecord);
-      matchedCount += 1;
-      continue;
-    }
-
-    const input: ActualCalendarEventInput = {
-      actual,
-      date: workingRecord.date,
-      timezone: workingRecord.timezone,
-      summaryPrefix: defaultSettings.actualEventPrefix,
-      defaultColorId: defaultSettings.defaultActualColorId,
-    };
-    const response = await insertCalendarEvent(
-      mapActualToCalendarEvent(input),
-    );
-
-    if (response.ok) {
-      workingRecord = updateActual(
-        workingRecord,
-        actual.id,
-        {
-          saveDisposition: "calendarSaved",
-          calendarEventId: response.value.eventId,
-          lastSaveAttemptAt: attemptedAt,
-          lastSaveError: undefined,
-        },
-        attemptedAt,
-      );
-      savedCount += 1;
-    } else {
-      workingRecord = updateActual(
-        workingRecord,
-        actual.id,
-        {
-          saveDisposition: "unsaved",
-          lastSaveAttemptAt: attemptedAt,
-          lastSaveError: response.error,
-        },
-        attemptedAt,
-      );
-      failedCount += 1;
-    }
-    await persistDayRecord(workingRecord);
   }
 
   const summaryParts = [];
-  if (savedCount) summaryParts.push(`Saved ${savedCount}`);
-  if (matchedCount) summaryParts.push(`${matchedCount} matched Plan`);
-  if (failedCount) summaryParts.push(`Failed ${failedCount}`);
+  if (result.saved) summaryParts.push(`Saved ${result.saved}`);
+  if (result.matched) summaryParts.push(`${result.matched} matched Plan`);
+  if (result.failed) summaryParts.push(`Failed ${result.failed}`);
 
   return {
-    record: workingRecord,
+    record: result.record,
     summary: summaryParts.join(", ") || "Nothing new to save",
   };
 }
@@ -155,20 +82,5 @@ function calendarBoundaryUnavailable(): Result<never> {
       code: "CALENDAR_BOUNDARY_UNAVAILABLE",
       message: "Unable to reach the background Calendar boundary.",
     },
-  };
-}
-
-function updateActual(
-  record: DayRecord,
-  actualId: string,
-  changes: Partial<DayRecord["actual"][number]>,
-  updatedAt: string,
-): DayRecord {
-  return {
-    ...record,
-    actual: record.actual.map((actual) =>
-      actual.id === actualId ? { ...actual, ...changes } : actual,
-    ),
-    updatedAt,
   };
 }

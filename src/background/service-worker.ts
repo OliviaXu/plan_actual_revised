@@ -4,6 +4,11 @@ import {
   insertPrimaryCalendarEvent,
   listPrimaryCalendarEvents,
 } from "../calendar/google-calendar-client";
+import {
+  deleteDayRecord,
+  listDayRecords,
+  saveDayRecord,
+} from "../storage/day-record-storage";
 
 registerServiceWorker({
   openAppPage: () =>
@@ -12,4 +17,7 @@ registerServiceWorker({
   requestInteractiveToken,
   listPrimaryCalendarEvents,
   insertPrimaryCalendarEvent,
+  listDayRecords,
+  saveDayRecord,
+  deleteDayRecord,
 });

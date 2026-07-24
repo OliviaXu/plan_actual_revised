@@ -1,5 +1,5 @@
 import { CalendarDays } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { DayGrid } from "./components/DayGrid";
@@ -18,6 +18,8 @@ import {
 import { useCalendarPlan } from "./hooks/use-calendar-plan";
 import { useDayRecord } from "./hooks/use-day-record";
 import { getCalendarTime } from "../calendar/calendar-time";
+import type { CatchUpRunResult } from "../shared/catch-up-run-result";
+import { sendRuntimeMessage } from "../shared/runtime-messages";
 
 type ActualEditorState =
   | { mode: "create"; proposedActual: ActualEvent }
@@ -33,13 +35,17 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const canonicalCalendarDay = calendarConnected ? calendarDay : undefined;
   const {
     dayRecord,
-    loadSettled: actualLoadSettled,
+    loadStatus: actualLoadStatus,
     storageError: actualStorageError,
     persistDayRecord,
   } = useDayRecord(canonicalCalendarDay);
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
   const [calendarSaveSummary, setCalendarSaveSummary] = useState<string>();
+  const [catchUpFeedback, setCatchUpFeedback] = useState<{
+    message: string;
+    warning: boolean;
+  }>();
   const [actualEditorState, setActualEditorState] =
     useState<ActualEditorState>();
   const currentDate = now();
@@ -50,10 +56,50 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           (actual) => actual.id === actualEditorState?.targetId,
         );
 
+  useEffect(() => {
+    if (!calendarConnected || actualLoadStatus !== "loaded") return;
+
+    let active = true;
+    void sendRuntimeMessage({
+      type: "catchUp.run",
+      todayDate: calendarDay.date,
+    })
+      .then((response) => {
+        if (!active) return;
+        if (!response.ok) {
+          setCatchUpFeedback({
+            message: `Catch-up unavailable: ${response.error.message}`,
+            warning: true,
+          });
+          return;
+        }
+        const message = formatCatchUpSummary(response.value);
+        setCatchUpFeedback(
+          message
+            ? {
+                message,
+                warning: hasCatchUpWarning(response.value),
+              }
+            : undefined,
+        );
+      })
+      .catch(() => {
+        if (!active) return;
+        setCatchUpFeedback({
+          message: "Catch-up unavailable: unable to reach the background service.",
+          warning: true,
+        });
+      });
+
+    return () => {
+      active = false;
+    };
+  }, [actualLoadStatus, calendarConnected, calendarDay.date]);
+
   function addActual() {
     if (
       !calendarConnected ||
-      !actualLoadSettled ||
+      actualLoadStatus === "loading" ||
       isSavingActualsToCalendar
     ) {
       return;
@@ -274,12 +320,26 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           </p>
         ) : null}
 
+        {catchUpFeedback ? (
+          <p
+            className={
+              catchUpFeedback.warning
+                ? "rounded-md border border-destructive bg-white px-4 py-3 text-sm font-medium text-destructive"
+                : "rounded-md border border-border bg-white px-4 py-3 text-sm text-muted-foreground"
+            }
+            data-testid="catch-up-summary"
+            role={catchUpFeedback.warning ? "alert" : "status"}
+          >
+            {catchUpFeedback.message}
+          </p>
+        ) : null}
+
         <DayGrid
           actuals={dayRecord?.actual ?? []}
           actualMutationsDisabled={isSavingActualsToCalendar}
           canAddActual={
             calendarConnected &&
-            actualLoadSettled &&
+            actualLoadStatus !== "loading" &&
             !isSavingActualsToCalendar
           }
           planEvents={planEvents}
@@ -333,5 +393,34 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         />
       ) : null}
     </main>
+  );
+}
+
+function formatCatchUpSummary(summary: CatchUpRunResult) {
+  const parts: string[] = [];
+  if (summary.saved) parts.push(`saved ${summary.saved}`);
+  if (summary.matched) parts.push(`${summary.matched} matched Plan`);
+  if (summary.failed) parts.push(`${summary.failed} pending`);
+  if (summary.discarded) parts.push(`${summary.discarded} discarded`);
+  if (summary.invalidRecordCount) {
+    parts.push(`${summary.invalidRecordCount} invalid local record preserved`);
+  }
+  if (summary.storageErrorCount) {
+    parts.push(`${summary.storageErrorCount} local storage error`);
+  }
+  if (parts.length === 0) return undefined;
+
+  const daySuffix = summary.affectedDayCount
+    ? ` from ${summary.affectedDayCount} past ${summary.affectedDayCount === 1 ? "day" : "days"}`
+    : "";
+  return `Catch-up: ${parts.join(", ")}${daySuffix}`;
+}
+
+function hasCatchUpWarning(summary: CatchUpRunResult) {
+  return Boolean(
+    summary.failed ||
+    summary.discarded ||
+    summary.invalidRecordCount ||
+    summary.storageErrorCount,
   );
 }

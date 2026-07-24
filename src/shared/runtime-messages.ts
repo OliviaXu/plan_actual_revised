@@ -1,4 +1,5 @@
 import type { CalendarEvent, CalendarInsertEvent } from "../calendar/calendar-event";
+import type { CatchUpRunResult } from "./catch-up-run-result";
 import type { Result } from "./result";
 
 type RuntimeMessageMap = {
@@ -14,6 +15,10 @@ type RuntimeMessageMap = {
     request: { type: "calendar.insertEvent"; event: CalendarInsertEvent };
     response: Result<{ eventId: string }>;
   };
+  "catchUp.run": {
+    request: { type: "catchUp.run"; todayDate: string };
+    response: Result<CatchUpRunResult>;
+  };
 };
 
 export type RuntimeMessage = RuntimeMessageMap[keyof RuntimeMessageMap]["request"];
@@ -27,6 +32,9 @@ export function sendRuntimeMessage(
 export function sendRuntimeMessage(
   message: RuntimeMessageMap["calendar.insertEvent"]["request"],
 ): Promise<RuntimeMessageMap["calendar.insertEvent"]["response"]>;
+export function sendRuntimeMessage(
+  message: RuntimeMessageMap["catchUp.run"]["request"],
+): Promise<RuntimeMessageMap["catchUp.run"]["response"]>;
 export function sendRuntimeMessage(message: RuntimeMessage) {
   return chrome.runtime.sendMessage(message);
 }

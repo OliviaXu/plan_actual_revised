@@ -102,7 +102,7 @@ describe("saveActualsToCalendar", () => {
     ]);
   });
 
-  it("reports a Plan refresh failure without mutating or persisting", async () => {
+  it("reports a Plan refresh failure after persisting its attempt details", async () => {
     const record = dayRecord([actual("unsaved", "Unsaved", 540)]);
     const persistDayRecord = vi.fn();
 
@@ -117,10 +117,19 @@ describe("saveActualsToCalendar", () => {
       persistDayRecord,
     });
 
-    expect(result).toEqual({
-      record,
+    expect(result).toMatchObject({
+      record: {
+        actual: [{
+          id: "unsaved",
+          saveDisposition: "unsaved",
+          lastSaveError: {
+            code: "LIST_FAILED",
+            message: "Calendar unavailable.",
+          },
+        }],
+      },
       summary: "Failed 1: Calendar unavailable.",
     });
-    expect(persistDayRecord).not.toHaveBeenCalled();
+    expect(persistDayRecord).toHaveBeenCalledOnce();
   });
 });

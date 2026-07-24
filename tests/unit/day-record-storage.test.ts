@@ -4,6 +4,8 @@ import {
   DayRecordStorageError,
   createDayRecordWriteQueue,
   dayRecordStorageKey,
+  deleteDayRecord,
+  listDayRecords,
   loadDayRecord,
   saveDayRecord,
 } from "../../src/storage/day-record-storage";
@@ -27,12 +29,17 @@ const record: DayRecord = {
 
 function mockStorage(initial: Record<string, unknown> = {}) {
   const values = { ...initial };
-  const get = vi.fn(async (key: string) => ({ [key]: values[key] }));
+  const get = vi.fn(async (key: string | null) =>
+    key === null ? { ...values } : { [key]: values[key] },
+  );
   const set = vi.fn(async (items: Record<string, unknown>) => {
     Object.assign(values, items);
   });
-  vi.stubGlobal("chrome", { storage: { local: { get, set } } });
-  return { get, set, values };
+  const remove = vi.fn(async (key: string) => {
+    delete values[key];
+  });
+  vi.stubGlobal("chrome", { storage: { local: { get, set, remove } } });
+  return { get, remove, set, values };
 }
 
 afterEach(() => vi.unstubAllGlobals());
@@ -79,6 +86,48 @@ describe("day record storage", () => {
     storage.set.mockRejectedValueOnce(new Error("quota exceeded"));
     await expect(saveDayRecord(record)).rejects.toMatchObject({
       code: "DAY_RECORD_WRITE_FAILED",
+    });
+  });
+
+  it("lists valid daily records while isolating malformed day-record keys", async () => {
+    const malformedKey = "dayRecord:2026-07-14";
+    mockStorage({
+      [malformedKey]: { ...record, date: "not-a-date" },
+      [dayRecordStorageKey(record.date)]: record,
+      "unrelated:key": { untouched: true },
+    });
+
+    await expect(listDayRecords()).resolves.toEqual({
+      records: [record],
+      invalidKeys: [malformedKey],
+    });
+  });
+
+  it("does not mistake a failed inventory read for an empty inventory", async () => {
+    const storage = mockStorage();
+    storage.get.mockRejectedValueOnce(new Error("read unavailable"));
+
+    await expect(listDayRecords()).rejects.toMatchObject({
+      code: "DAY_RECORD_READ_FAILED",
+    });
+  });
+
+  it("deletes only the requested daily record", async () => {
+    const key = dayRecordStorageKey(record.date);
+    const storage = mockStorage({ [key]: record, "unrelated:key": true });
+
+    await deleteDayRecord(record.date);
+
+    expect(storage.remove).toHaveBeenCalledWith(key);
+    expect(storage.values).toEqual({ "unrelated:key": true });
+  });
+
+  it("surfaces failed deletes through the storage boundary", async () => {
+    const storage = mockStorage();
+    storage.remove.mockRejectedValueOnce(new Error("delete unavailable"));
+
+    await expect(deleteDayRecord(record.date)).rejects.toMatchObject({
+      code: "DAY_RECORD_DELETE_FAILED",
     });
   });
 

@@ -10,8 +10,17 @@ import {
   getCalendarDayRange,
   getCalendarTime,
 } from "../calendar/calendar-time";
+import type { DayRecord } from "../domain/day-record";
+import type { CatchUpRunResult } from "../shared/catch-up-run-result";
+import {
+  runCatchUp,
+  type CatchUpDependencies,
+} from "./run-catch-up";
 
-type ServiceWorkerDependencies = {
+type ServiceWorkerDependencies = Pick<
+  CatchUpDependencies,
+  "listDayRecords" | "saveDayRecord" | "deleteDayRecord"
+> & {
   openAppPage: () => Promise<unknown>;
   requestCachedToken: () => Promise<Result<string>>;
   requestInteractiveToken: () => Promise<Result<string>>;
@@ -40,8 +49,13 @@ export default function registerServiceWorker(
   now: () => Date = () => new Date(),
   readBrowserTimezone: () => string = () =>
     Intl.DateTimeFormat().resolvedOptions().timeZone,
+  catchUpRunner: (
+    today: string,
+    dependencies: CatchUpDependencies,
+  ) => Promise<CatchUpRunResult> = runCatchUp,
 ) {
   let inFlightRead: Promise<CalendarResult> | undefined;
+  let inFlightCatchUp: Promise<Result<CatchUpRunResult>> | undefined;
   let primaryCalendarTimezone: string | undefined;
   chrome.action.onClicked.addListener(() => {
     void dependencies.openAppPage();
@@ -62,7 +76,7 @@ export default function registerServiceWorker(
     if (message?.type === "calendar.listEvents") {
       if (!inFlightRead) {
         const requestedAt = now();
-        inFlightRead = loadCalendarEvents(
+        inFlightRead = loadCurrentCalendarDayEvents(
           dependencies,
           requestedAt,
           primaryCalendarTimezone ?? readBrowserTimezone(),
@@ -83,8 +97,80 @@ export default function registerServiceWorker(
       return true;
     }
 
+    if (message?.type === "catchUp.run") {
+      if (!inFlightCatchUp) {
+        const startedAt = performance.now();
+        const catchUp = catchUpRunner(
+          message.todayDate,
+          {
+            listDayRecords: dependencies.listDayRecords,
+            saveDayRecord: dependencies.saveDayRecord,
+            deleteDayRecord: dependencies.deleteDayRecord,
+            now,
+            listCalendarEvents: (record) =>
+              listCalendarEventsForDayRecord(dependencies, record),
+            insertCalendarEvent: (event) => insertEvent(dependencies, event),
+          },
+        )
+          .then((summary) => {
+            console.info("calendar-catch-up", {
+              ok: true,
+              ...summary,
+              totalDurationMs: performance.now() - startedAt,
+            });
+            return { ok: true as const, value: summary };
+          })
+          .catch(() => {
+            console.info("calendar-catch-up", {
+              ok: false,
+              totalDurationMs: performance.now() - startedAt,
+            });
+            return {
+              ok: false as const,
+              error: {
+                code: "CATCH_UP_FAILED",
+                message: "Unable to catch up historical Actuals.",
+              },
+            };
+          });
+        inFlightCatchUp = catchUp;
+        void catchUp.finally(() => {
+          if (inFlightCatchUp === catchUp) {
+            inFlightCatchUp = undefined;
+          }
+        });
+      }
+      void inFlightCatchUp.then(sendResponse);
+      return true;
+    }
+
     return false;
   });
+}
+
+async function listCalendarEventsForDayRecord(
+  dependencies: ServiceWorkerDependencies,
+  record: DayRecord,
+): Promise<Result<{ events: CalendarEvent[] }>> {
+  const authResult = await dependencies.requestCachedToken();
+  if (!authResult.ok) {
+    return {
+      ok: false,
+      error: {
+        code: "AUTH_NOT_CONNECTED",
+        message: "Connect Calendar before catching up Actuals.",
+      },
+    };
+  }
+
+  const range = getCalendarDayRange(record.date, record.timezone);
+  const result = await dependencies.listPrimaryCalendarEvents(
+    authResult.value,
+    { timeMin: range.timeMin, timeMax: range.timeMax },
+  );
+  return result.ok
+    ? { ok: true, value: { events: result.value.events } }
+    : result;
 }
 
 async function insertEvent(
@@ -104,7 +190,7 @@ async function insertEvent(
   return dependencies.insertPrimaryCalendarEvent(authResult.value, event);
 }
 
-async function loadCalendarEvents(
+async function loadCurrentCalendarDayEvents(
   dependencies: ServiceWorkerDependencies,
   requestedAt: Date,
   assumedTimezone: string,
