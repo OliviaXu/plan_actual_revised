@@ -158,6 +158,32 @@ describe("createCalendarOperations", () => {
     );
   });
 
+  it("remembers the primary Calendar timezone for the next read", async () => {
+    const clock = () => new Date("2026-07-15T01:00:00.000Z");
+    const { dependencies, operations } = installCalendarOperations(
+      {
+        listPrimaryCalendarEvents: vi.fn(async () => ({
+          ok: true as const,
+          value: { events: [], timeZone: "Asia/Tokyo" },
+        })),
+      },
+      clock,
+    );
+
+    await operations.listCurrentDayEvents();
+    await operations.listCurrentDayEvents();
+
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledTimes(3);
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenNthCalledWith(
+      3,
+      "token-123",
+      {
+        timeMin: "2026-07-14T15:00:00.000Z",
+        timeMax: "2026-07-15T15:00:00.000Z",
+      },
+    );
+  });
+
   it("reads the clock once when deriving a Calendar request range", async () => {
     const clock = vi.fn(now);
     const { operations } = installCalendarOperations({}, clock);

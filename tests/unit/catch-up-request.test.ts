@@ -5,7 +5,7 @@ import type { CatchUpDependencies } from "../../src/background/run-catch-up";
 import type { CatchUpRunResult } from "../../src/shared/catch-up-run-result";
 
 describe("createCatchUpRequestHandler", () => {
-  it("coalesces overlapping catch-up requests into one worker run", async () => {
+  it("lets overlapping dates share the first catch-up run", async () => {
     let finishCatchUp: ((result: CatchUpRunResult) => void) | undefined;
     const catchUpRunner = vi.fn(
       (_today: string, _dependencies: CatchUpDependencies) =>
@@ -29,6 +29,10 @@ describe("createCatchUpRequestHandler", () => {
     const second = runCatchUpRequest("2026-07-15");
 
     expect(catchUpRunner).toHaveBeenCalledOnce();
+    expect(catchUpRunner).toHaveBeenCalledWith(
+      "2026-07-16",
+      expect.anything(),
+    );
     finishCatchUp?.({ saved: 1, failed: 0, discarded: 0 });
     await expect(Promise.all([first, second])).resolves.toEqual([
       { ok: true, value: { saved: 1, failed: 0, discarded: 0 } },
