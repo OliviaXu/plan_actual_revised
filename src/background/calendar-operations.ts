@@ -53,7 +53,7 @@ export function createCalendarOperations(
   function listCurrentDayEvents() {
     if (!inFlightRead) {
       const requestedAt = now();
-      inFlightRead = loadCurrentCalendarDayEvents(
+      const read = loadCurrentCalendarDayEvents(
         dependencies,
         requestedAt,
         primaryCalendarTimezone ?? readBrowserTimezone(),
@@ -61,9 +61,12 @@ export function createCalendarOperations(
         if (result.ok) primaryCalendarTimezone = result.value.timeZone;
         return result;
       });
-      void inFlightRead.finally(() => {
-        inFlightRead = undefined;
+      const trackedRead = read.finally(() => {
+        if (inFlightRead === trackedRead) {
+          inFlightRead = undefined;
+        }
       });
+      inFlightRead = trackedRead;
     }
     return inFlightRead;
   }

@@ -106,6 +106,61 @@ describe("registerServiceWorker", () => {
     expect(operations.connectCalendar).toHaveBeenCalledOnce();
   });
 
+  it("does not log expected operation failures as internal errors", async () => {
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const expectedFailure = {
+      ok: false as const,
+      error: { code: "CALENDAR_LIST_FAILED", message: "Calendar failed." },
+    };
+    const { messageListener } = installServiceWorker({
+      listCurrentCalendarEvents: vi.fn(async () => expectedFailure),
+    });
+
+    try {
+      await expect(
+        sendMessage(messageListener, { type: "calendar.listEvents" }),
+      ).resolves.toEqual({
+        keepsChannelOpen: true,
+        response: expectedFailure,
+      });
+      expect(log).not.toHaveBeenCalled();
+    } finally {
+      log.mockRestore();
+    }
+  });
+
+  it("logs unexpected operation failures and returns an internal error", async () => {
+    const failure = new Error("Calendar client crashed.");
+    const log = vi.spyOn(console, "error").mockImplementation(() => undefined);
+    const { messageListener } = installServiceWorker({
+      listCurrentCalendarEvents: vi.fn(async () => {
+        throw failure;
+      }),
+    });
+
+    try {
+      await expect(
+        sendMessage(messageListener, { type: "calendar.listEvents" }),
+      ).resolves.toEqual({
+        keepsChannelOpen: true,
+        response: {
+          ok: false,
+          error: {
+            code: "INTERNAL_ERROR",
+            message: "An unexpected background error occurred.",
+          },
+        },
+      });
+      expect(log).toHaveBeenCalledWith(
+        "service-worker-request-failed",
+        { messageType: "calendar.listEvents" },
+        failure,
+      );
+    } finally {
+      log.mockRestore();
+    }
+  });
+
   it("routes current Calendar reads", async () => {
     const { messageListener, operations } = installServiceWorker();
 

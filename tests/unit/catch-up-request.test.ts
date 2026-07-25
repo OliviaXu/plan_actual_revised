@@ -65,4 +65,23 @@ describe("createCatchUpRequestHandler", () => {
 
     expect(receivedDependencies).toBe(dependencies);
   });
+
+  it("lets unexpected runner failures reach the service-worker boundary", async () => {
+    const failure = new Error("Catch-up crashed.");
+    const runCatchUpRequest = createCatchUpRequestHandler(
+      {
+        listDayRecords: vi.fn(async () => ({ records: [], invalidKeys: [] })),
+        saveDayRecord: vi.fn(async () => undefined),
+        deleteDayRecord: vi.fn(async () => undefined),
+        listCalendarEvents: vi.fn(),
+        insertCalendarEvent: vi.fn(),
+        now: () => new Date(2026, 6, 15, 12),
+      },
+      vi.fn(async () => {
+        throw failure;
+      }),
+    );
+
+    await expect(runCatchUpRequest("2026-07-15")).rejects.toBe(failure);
+  });
 });

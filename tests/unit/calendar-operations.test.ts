@@ -314,6 +314,17 @@ describe("createCalendarOperations", () => {
     );
   });
 
+  it("clears a rejected current-day read without an orphaned rejection", async () => {
+    const failure = new Error("Calendar client crashed.");
+    const { operations } = installCalendarOperations({
+      listPrimaryCalendarEvents: vi.fn(async () => {
+        throw failure;
+      }),
+    });
+
+    await expect(operations.listCurrentDayEvents()).rejects.toBe(failure);
+  });
+
   it("does not call Calendar when no cached token is available", async () => {
     const { dependencies, operations } = installCalendarOperations({
       requestCachedToken: vi.fn(async () => ({

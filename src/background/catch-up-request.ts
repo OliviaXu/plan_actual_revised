@@ -27,26 +27,13 @@ export function createCatchUpRequestHandler(
             totalDurationMs: performance.now() - startedAt,
           });
           return { ok: true as const, value: summary };
-        })
-        .catch(() => {
-          console.info("calendar-catch-up", {
-            ok: false,
-            totalDurationMs: performance.now() - startedAt,
-          });
-          return {
-            ok: false as const,
-            error: {
-              code: "CATCH_UP_FAILED",
-              message: "Unable to catch up historical Actuals.",
-            },
-          };
         });
-      inFlightCatchUp = catchUp;
-      void catchUp.finally(() => {
-        if (inFlightCatchUp === catchUp) {
+      const trackedCatchUp = catchUp.finally(() => {
+        if (inFlightCatchUp === trackedCatchUp) {
           inFlightCatchUp = undefined;
         }
       });
+      inFlightCatchUp = trackedCatchUp;
     }
     return inFlightCatchUp;
   };

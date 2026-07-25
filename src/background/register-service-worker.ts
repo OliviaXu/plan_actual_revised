@@ -26,26 +26,79 @@ export default function registerServiceWorker(
   chrome.runtime.onMessage.addListener(
     (message: RuntimeMessage, _sender, sendResponse) => {
       if (message?.type === "auth.requestInteractiveToken") {
-        void operations.connectCalendar().then(sendResponse);
+        forwardRuntimeResponse(
+          message.type,
+          operations.connectCalendar,
+          sendResponse,
+        );
         return true;
       }
 
       if (message?.type === "calendar.listEvents") {
-        void operations.listCurrentCalendarEvents().then(sendResponse);
+        forwardRuntimeResponse(
+          message.type,
+          operations.listCurrentCalendarEvents,
+          sendResponse,
+        );
         return true;
       }
 
       if (message?.type === "calendar.insertEvent") {
-        void operations.insertCalendarEvent(message.event).then(sendResponse);
+        forwardRuntimeResponse(
+          message.type,
+          () => operations.insertCalendarEvent(message.event),
+          sendResponse,
+        );
         return true;
       }
 
       if (message?.type === "catchUp.run") {
-        void operations.runCatchUp(message.todayDate).then(sendResponse);
+        forwardRuntimeResponse(
+          message.type,
+          () => operations.runCatchUp(message.todayDate),
+          sendResponse,
+        );
         return true;
       }
 
       return false;
     },
   );
+}
+
+function forwardRuntimeResponse(
+  messageType: RuntimeMessage["type"],
+  operation: () => Promise<unknown>,
+  sendResponse: (response: unknown) => void,
+) {
+  let response: Promise<unknown>;
+  try {
+    response = operation();
+  } catch (error) {
+    sendInternalError(messageType, error, sendResponse);
+    return;
+  }
+
+  void response.then(sendResponse, (error) => {
+    sendInternalError(messageType, error, sendResponse);
+  });
+}
+
+function sendInternalError(
+  messageType: RuntimeMessage["type"],
+  error: unknown,
+  sendResponse: (response: unknown) => void,
+) {
+  console.error(
+    "service-worker-request-failed",
+    { messageType },
+    error,
+  );
+  sendResponse({
+    ok: false,
+    error: {
+      code: "INTERNAL_ERROR",
+      message: "An unexpected background error occurred.",
+    },
+  });
 }
