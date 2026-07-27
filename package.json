@@ -14,11 +14,13 @@
     "lint": "eslint .",
     "test": "vitest run",
     "test:e2e": "npm run build && playwright test",
-    "test:real:actual": "npm run build && playwright test --config=playwright.real.config.ts",
+    "test:real:actual": "npm run build && playwright test --config=playwright.real.config.ts tests/real/actual-calendar-smoke.spec.ts",
+    "test:real:slack": "npm run build && playwright test --config=playwright.real.config.ts tests/real/slack-audit-smoke.spec.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
     "@radix-ui/react-dialog": "^1.1.20",
+    "@radix-ui/react-popover": "^1.1.23",
     "lucide-react": "^1.24.0",
     "luxon": "^3.7.2",
     "react": "^19.2.7",

@@ -21,6 +21,7 @@ export function buildEditedActual(
     startMinutes: actual.startMinutes,
     durationMinutes: changes.durationMinutes,
     colorId: changes.colorId,
+    ...(actual.isSlack ? { isSlack: true } : {}),
     saveDisposition: "unsaved",
   };
 }

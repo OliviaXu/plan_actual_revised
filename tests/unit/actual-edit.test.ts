@@ -113,4 +113,28 @@ describe("buildEditedActual", () => {
     });
     expect(createId).toHaveBeenCalledOnce();
   });
+
+  it("preserves the Slack audit marker through edits and identity changes", () => {
+    const createId = vi.fn(() => "replacement-id");
+
+    expect(
+      buildEditedActual(
+        actualEvent({
+          isSlack: true,
+          saveDisposition: "calendarSaved",
+          calendarEventId: "calendar-event-id",
+        }),
+        titleEdit,
+        createId,
+      ),
+    ).toEqual({
+      id: "replacement-id",
+      summary: "Edited title",
+      startMinutes: 540,
+      durationMinutes: 30,
+      colorId: "8",
+      isSlack: true,
+      saveDisposition: "unsaved",
+    });
+  });
 });

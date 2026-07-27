@@ -527,6 +527,48 @@ describe("App Actual persistence", () => {
     });
   });
 
+  it("naturally layers a newly saved exact-time Actual above the older Actual", async () => {
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual: [{
+        id: "z-existing-actual",
+        summary: "Existing Actual",
+        startMinutes: 720,
+        durationMinutes: 30,
+        colorId: "8",
+      }],
+      updatedAt: "2026-07-15T18:00:00.000Z",
+    };
+    vi.stubGlobal("crypto", { randomUUID: () => "a-new-actual" });
+
+    render(<App now={now} />);
+    expect(await screen.findByText("Existing Actual")).toBeVisible();
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Actual" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save" }));
+
+    const newBlock = (await screen.findAllByTestId("actual-block")).find(
+      (block) => block.getAttribute("data-actual-id") === "a-new-actual",
+    );
+    expect(newBlock).toHaveAttribute("data-overlap-layer-index", "1");
+    expect(newBlock).toHaveStyle({ zIndex: "1" });
+  });
+
   it("shortens a new Actual to the time remaining before midnight", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
@@ -1119,6 +1161,184 @@ describe("App new Actual dialog", () => {
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: "calendar.deleteEvent" }),
     );
+  });
+});
+
+describe("App Slack audit", () => {
+  function connectCalendar() {
+    return mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+  }
+
+  it("uses compact accessible icon controls in the Actual header", async () => {
+    connectCalendar();
+
+    render(<App now={now} launchSlack={vi.fn()} />);
+
+    const addActual = await screen.findByRole("button", {
+      name: "Add Actual",
+    });
+    const logSlack = screen.getByRole("button", {
+      name: "Log Slack time",
+    });
+    expect(addActual).toHaveAttribute("aria-label", "Add Actual");
+    expect(logSlack).toHaveAttribute("aria-label", "Log Slack time");
+    expect(within(addActual).queryByText("Add Actual")).not.toBeInTheDocument();
+    expect(within(logSlack).queryByText("Slack")).not.toBeInTheDocument();
+    expect(within(logSlack).getByTestId("slack-mark-icon")).toBeVisible();
+    expect(logSlack).toHaveClass("text-muted-foreground");
+  });
+
+  it("disables Slack submission until a reason is entered", async () => {
+    connectCalendar();
+    const launchSlack = vi.fn();
+
+    render(<App now={now} launchSlack={launchSlack} />);
+    const logSlack = await screen.findByRole("button", {
+      name: "Log Slack time",
+    });
+    await waitFor(() => expect(logSlack).toBeEnabled());
+    fireEvent.click(logSlack);
+    const popover = await screen.findByRole("dialog", {
+      name: "Log Slack time",
+    });
+    const reason = within(popover).getByPlaceholderText(
+      "attention is devotion :)",
+    );
+    const submit = within(popover).getByRole("button", {
+      name: "Open Slack",
+    });
+
+    expect(submit).toBeDisabled();
+    expect(submit).toHaveClass("disabled:opacity-50");
+    fireEvent.change(reason, { target: { value: "   " } });
+    expect(submit).toBeDisabled();
+    fireEvent.change(reason, { target: { value: "Check release channel" } });
+    expect(submit).toBeEnabled();
+    expect(screen.queryByText("Reason is required.")).not.toBeInTheDocument();
+    expect(launchSlack).not.toHaveBeenCalled();
+    expect(chrome.storage.local.set).not.toHaveBeenCalled();
+    expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
+  });
+
+  it("logs a normal Slack-marked Actual and launches from the submit click", async () => {
+    const stored = connectCalendar();
+    const launchSlack = vi.fn();
+    vi.stubGlobal("crypto", { randomUUID: () => "slack-actual-id" });
+
+    render(<App now={now} launchSlack={launchSlack} />);
+    const logSlack = await screen.findByRole("button", {
+      name: "Log Slack time",
+    });
+    await waitFor(() => expect(logSlack).toBeEnabled());
+    fireEvent.click(logSlack);
+
+    const popover = await screen.findByRole("dialog", {
+      name: "Log Slack time",
+    });
+    expect(popover).toHaveClass("w-56", "p-3");
+    expect(within(popover).getByText("What are you up to?")).toBeVisible();
+    const reason = within(popover).getByPlaceholderText(
+      "attention is devotion :)",
+    );
+    expect(reason).toHaveFocus();
+    expect(reason).toHaveClass("border-b", "bg-transparent");
+    expect(reason).not.toHaveClass("rounded-sm");
+    expect(
+      within(popover).getByRole("button", { name: "Open Slack" }),
+    ).toHaveClass("h-8");
+    expect(
+      within(popover).getByRole("button", { name: "Open Slack" }),
+    ).not.toHaveClass("w-full");
+    fireEvent.change(reason, {
+      target: { value: "  Check release channel  " },
+    });
+    fireEvent.click(within(popover).getByRole("button", {
+      name: "Open Slack",
+    }));
+
+    expect(launchSlack).toHaveBeenCalledOnce();
+    expect(screen.queryByRole("dialog", {
+      name: "Log Slack time",
+    })).not.toBeInTheDocument();
+    const block = await screen.findByTestId("actual-block");
+    expect(block).toHaveTextContent("Check release channel");
+    expect(block).toHaveTextContent("15m");
+    expect(block).toHaveStyle({ zIndex: "0" });
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{
+        id: "slack-actual-id",
+        summary: "Check release channel",
+        startMinutes: 720,
+        durationMinutes: 15,
+        colorId: "1",
+        isSlack: true,
+        saveDisposition: "unsaved",
+      }],
+    });
+  });
+
+  it("keeps the Slack Actual and warns when launching throws", async () => {
+    const stored = connectCalendar();
+    const launchSlack = vi.fn(() => {
+      throw new Error("Protocol blocked");
+    });
+
+    render(<App now={now} launchSlack={launchSlack} />);
+    const logSlack = await screen.findByRole("button", {
+      name: "Log Slack time",
+    });
+    await waitFor(() => expect(logSlack).toBeEnabled());
+    fireEvent.click(logSlack);
+    fireEvent.change(screen.getByPlaceholderText("attention is devotion :)"), {
+      target: { value: "Incident response" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open Slack" }));
+
+    expect(await screen.findByRole("alert")).toHaveTextContent(
+      "Slack may not have opened. Your time was still logged.",
+    );
+    expect(screen.getByTestId("actual-block")).toHaveTextContent(
+      "Incident response",
+    );
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{ isSlack: true }],
+    });
+  });
+
+  it("bounds a late-night Slack Actual at midnight", async () => {
+    const stored = connectCalendar();
+
+    render(
+      <App
+        now={() => new Date("2026-07-15T23:58:00-07:00")}
+        launchSlack={vi.fn()}
+      />,
+    );
+    const logSlack = await screen.findByRole("button", {
+      name: "Log Slack time",
+    });
+    await waitFor(() => expect(logSlack).toBeEnabled());
+    fireEvent.click(logSlack);
+    fireEvent.change(screen.getByPlaceholderText("attention is devotion :)"), {
+      target: { value: "Late check" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open Slack" }));
+
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [{ startMinutes: 1435, durationMinutes: 5 }],
+    });
   });
 });
 

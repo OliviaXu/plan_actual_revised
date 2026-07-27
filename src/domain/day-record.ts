@@ -34,6 +34,7 @@ function isActualEvent(value: unknown): value is ActualEvent {
     Number.isInteger(value.durationMinutes) &&
     (value.durationMinutes as number) > 0 &&
     typeof value.colorId === "string" &&
+    (value.isSlack === undefined || value.isSlack === true) &&
     (value.saveDisposition === undefined ||
       value.saveDisposition === "unsaved" ||
       value.saveDisposition === "calendarSaved" ||

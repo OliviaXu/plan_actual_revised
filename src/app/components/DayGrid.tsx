@@ -1,3 +1,4 @@
+import { Plus } from "lucide-react";
 import { useEffect, useLayoutEffect, useRef, useState } from "react";
 import {
   calculateDayGridBlocks,
@@ -13,6 +14,7 @@ import {
   PlanGridBlock,
 } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
+import { SlackAuditPopover } from "./SlackAuditPopover";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const DAY_GRID_TEMPLATE_COLUMNS = `${DAY_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
@@ -31,6 +33,7 @@ type DayGridProps = {
   planEvents: PlanEvent[];
   now?: () => Date;
   onAddActual?: () => void;
+  onStartSlack?: (reason: string) => void;
   onEditActual?: (actualId: string) => void;
   onActualResizeEnd?: (actualId: string, durationMinutes: number) => void;
   status: DayGridStatus;
@@ -45,6 +48,7 @@ export function DayGrid({
   planEvents,
   now = readSystemTime,
   onAddActual,
+  onStartSlack,
   onEditActual,
   onActualResizeEnd,
   status,
@@ -140,14 +144,21 @@ export function DayGrid({
           <h2 className="px-4 py-2 text-sm font-semibold">Plan</h2>
           <div className="flex items-center justify-between border-l border-border px-4 py-2">
             <h2 className="text-sm font-semibold">Actual</h2>
-            <button
-              className="rounded-sm border border-border bg-white px-2 py-0.5 text-xs font-medium disabled:opacity-50"
-              disabled={!canAddActual}
-              onClick={onAddActual}
-              type="button"
-            >
-              Add Actual
-            </button>
+            <div className="flex items-center gap-1.5">
+              <button
+                aria-label="Add Actual"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-white text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
+                disabled={!canAddActual}
+                onClick={onAddActual}
+                type="button"
+              >
+                <Plus aria-hidden="true" className="h-4 w-4" />
+              </button>
+              <SlackAuditPopover
+                disabled={!canAddActual}
+                onSubmit={(reason) => onStartSlack?.(reason)}
+              />
+            </div>
           </div>
         </div>
         <div

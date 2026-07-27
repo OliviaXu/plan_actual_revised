@@ -152,4 +152,35 @@ describe("syncDayActualsToCalendar", () => {
     expect(listCalendarEvents).not.toHaveBeenCalled();
     expect(persistDayRecord).not.toHaveBeenCalled();
   });
+
+  it("uses the Slack prefix while keeping the standard Actual metadata", async () => {
+    const slackActual = {
+      ...actual("slack-audit", "Check release channel", 720),
+      isSlack: true as const,
+    };
+    const insertCalendarEvent = vi.fn().mockResolvedValue({
+      ok: true,
+      value: { eventId: "calendar-slack-audit" },
+    });
+
+    await syncDayActualsToCalendar({
+      record: dayRecord([slackActual]),
+      now,
+      listCalendarEvents: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { events: [] },
+      }),
+      insertCalendarEvent,
+      persistDayRecord: vi.fn(),
+    });
+
+    expect(insertCalendarEvent).toHaveBeenCalledWith(
+      expect.objectContaining({
+        summary: "[s] Check release channel",
+        extendedProperties: {
+          private: { planActualRevisedActual: "true" },
+        },
+      }),
+    );
+  });
 });

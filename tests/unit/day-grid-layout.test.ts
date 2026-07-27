@@ -227,6 +227,26 @@ describe("calculateDayGridBlocks", () => {
     ]);
   });
 
+  it("keeps insertion order for exact timing ties so newer Actuals layer above", () => {
+    const blocks = calculateDayGridBlocks(
+      [
+        actualEvent("z-older", 720, 30),
+        actualEvent("a-newer", 720, 30),
+      ],
+      7,
+      21,
+      defaultSettings,
+    );
+
+    expect(blocks.map(({ event, overlapLayerIndex }) => ({
+      id: event.id,
+      overlapLayerIndex,
+    }))).toEqual([
+      { id: "z-older", overlapLayerIndex: 0 },
+      { id: "a-newer", overlapLayerIndex: 1 },
+    ]);
+  });
+
   it("uses the same geometry for Plan and Actual events", () => {
     const planBlock = calculateDayGridBlocks(
       [planEvent("plan", 540, 60)],

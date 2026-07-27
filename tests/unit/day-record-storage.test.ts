@@ -63,9 +63,27 @@ describe("day record storage", () => {
     });
   });
 
+  it("round trips a Slack Actual in the existing record version", async () => {
+    const storage = mockStorage();
+    const slackRecord = {
+      ...record,
+      actual: [{ ...record.actual[0], isSlack: true as const }],
+    };
+
+    await saveDayRecord(slackRecord);
+
+    await expect(loadDayRecord(slackRecord.date)).resolves.toEqual(
+      slackRecord,
+    );
+    expect(storage.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": slackRecord,
+    });
+  });
+
   it.each([
     { ...record, schemaVersion: 2 },
     { ...record, actual: [{ ...record.actual[0], durationMinutes: 0 }] },
+    { ...record, actual: [{ ...record.actual[0], isSlack: false }] },
     { ...record, date: "July 15" },
   ])("rejects malformed or unsupported stored data without overwriting it", async (raw) => {
     const storage = mockStorage({ "dayRecord:2026-07-15": raw });

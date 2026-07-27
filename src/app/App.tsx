@@ -1,4 +1,4 @@
-import { CalendarDays } from "lucide-react";
+import { CalendarDays, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "./components/ui/button";
@@ -26,9 +26,18 @@ type ActualEditorState =
   | { mode: "edit"; targetId: string };
 
 const readSystemTime = () => new Date();
+const openSlackProtocol = () => {
+  window.open("slack://open", "_self");
+};
 const defaultActualDurationMinutes = 30;
 
-export function App({ now = readSystemTime }: { now?: () => Date }) {
+export function App({
+  now = readSystemTime,
+  launchSlack = openSlackProtocol,
+}: {
+  now?: () => Date;
+  launchSlack?: () => void;
+}) {
   const { calendarState, calendarDay, connectCalendar } =
     useCalendarPlan(now);
   const calendarConnected = calendarState.status === "connected";
@@ -42,6 +51,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
   const [calendarSaveSummary, setCalendarSaveSummary] = useState<string>();
+  const [slackLaunchWarning, setSlackLaunchWarning] = useState(false);
   const [catchUpFeedback, setCatchUpFeedback] = useState<{
     message: string;
     warning: boolean;
@@ -55,6 +65,10 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       : dayRecord?.actual.find(
           (actual) => actual.id === actualEditorState?.targetId,
         );
+  const canCreateActual =
+    calendarConnected &&
+    actualLoadStatus !== "loading" &&
+    !isSavingActualsToCalendar;
 
   useEffect(() => {
     if (!calendarConnected || actualLoadStatus !== "loaded") return;
@@ -88,42 +102,82 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
     };
   }, [actualLoadStatus, calendarConnected, calendarDay.date]);
 
+  function buildNewActual({
+    summary,
+    requestedDurationMinutes,
+    colorId,
+    isSlack,
+    createdAt,
+  }: {
+    summary: string;
+    requestedDurationMinutes: number;
+    colorId: string;
+    isSlack?: true;
+    createdAt: Date;
+  }): ActualEvent {
+    return {
+      id: crypto.randomUUID(),
+      summary,
+      ...getNewActualTiming(
+        createdAt,
+        calendarDay.timeZone,
+        requestedDurationMinutes,
+      ),
+      colorId,
+      ...(isSlack ? { isSlack: true } : {}),
+      saveDisposition: "unsaved",
+    };
+  }
+
+  function appendActual(actual: ActualEvent, updatedAt: Date) {
+    const updatedAtIso = updatedAt.toISOString();
+    const nextRecord: DayRecord = dayRecord
+      ? {
+          ...dayRecord,
+          actual: [...dayRecord.actual, actual],
+          updatedAt: updatedAtIso,
+        }
+      : {
+          schemaVersion: 1,
+          date: calendarDay.date,
+          timezone: calendarDay.timeZone,
+          actual: [actual],
+          updatedAt: updatedAtIso,
+        };
+
+    void persistDayRecord(nextRecord);
+  }
+
   function addActual() {
-    if (
-      !calendarConnected ||
-      actualLoadStatus === "loading" ||
-      isSavingActualsToCalendar
-    ) {
-      return;
-    }
+    if (!canCreateActual) return;
+
+    const newActual = buildNewActual({
+      summary: "Untitled",
+      requestedDurationMinutes: defaultActualDurationMinutes,
+      colorId: defaultSettings.defaultActualColorId,
+      createdAt: now(),
+    });
+    setActualEditorState({ mode: "create", proposedActual: newActual });
+  }
+
+  function startSlack(reason: string) {
+    if (!canCreateActual) return;
 
     const createdAt = now();
-    const minutes = getCalendarTime(
+    const newActual = buildNewActual({
+      summary: reason,
+      requestedDurationMinutes: defaultSettings.slackDefaultDurationMinutes,
+      colorId: defaultSettings.slackColorId,
+      isSlack: true,
       createdAt,
-      calendarDay.timeZone,
-    ).minutesSinceMidnight;
-    const startMinutes =
-      Math.floor(minutes / defaultSettings.snapMinutes) *
-      defaultSettings.snapMinutes;
-    const lastPossibleStartMinutes =
-      24 * 60 - defaultSettings.minimumBlockDurationMinutes;
-    const boundedStartMinutes = Math.min(
-      startMinutes,
-      lastPossibleStartMinutes,
-    );
-    const durationMinutes = Math.min(
-      defaultActualDurationMinutes,
-      24 * 60 - boundedStartMinutes,
-    );
-    const newActual = {
-      id: crypto.randomUUID(),
-      summary: "Untitled",
-      startMinutes: boundedStartMinutes,
-      durationMinutes,
-      colorId: defaultSettings.defaultActualColorId,
-      saveDisposition: "unsaved" as const,
-    };
-    setActualEditorState({ mode: "create", proposedActual: newActual });
+    });
+    appendActual(newActual, createdAt);
+    setSlackLaunchWarning(false);
+    try {
+      launchSlack();
+    } catch {
+      setSlackLaunchWarning(true);
+    }
   }
 
   function saveActualDraft(draft: ActualDraft) {
@@ -131,24 +185,9 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       setActualEditorState(undefined);
       return;
     }
-    const updatedAt = now().toISOString();
     if (actualEditorState.mode === "create") {
       const newActual = { ...actualEditorState.proposedActual, ...draft };
-      const nextRecord: DayRecord = dayRecord
-        ? {
-            ...dayRecord,
-            actual: [...dayRecord.actual, newActual],
-            updatedAt,
-          }
-        : {
-            schemaVersion: 1,
-            date: calendarDay.date,
-            timezone: calendarDay.timeZone,
-            actual: [newActual],
-            updatedAt,
-          };
-
-      void persistDayRecord(nextRecord);
+      appendActual(newActual, now());
       setActualEditorState(undefined);
       return;
     }
@@ -170,6 +209,7 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
       draft,
       () => crypto.randomUUID(),
     );
+    const updatedAt = now().toISOString();
     void persistDayRecord({
       ...dayRecord,
       actual: dayRecord.actual.map((actual) =>
@@ -329,14 +369,11 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
         <DayGrid
           actuals={dayRecord?.actual ?? []}
           actualMutationsDisabled={isSavingActualsToCalendar}
-          canAddActual={
-            calendarConnected &&
-            actualLoadStatus !== "loading" &&
-            !isSavingActualsToCalendar
-          }
+          canAddActual={canCreateActual}
           planEvents={planEvents}
           now={now}
           onAddActual={addActual}
+          onStartSlack={startSlack}
           onEditActual={(targetId) =>
             setActualEditorState({ mode: "edit", targetId })
           }
@@ -384,8 +421,51 @@ export function App({ now = readSystemTime }: { now?: () => Date }) {
           }
         />
       ) : null}
+      {slackLaunchWarning ? (
+        <div
+          className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-md border border-border bg-white px-4 py-3 text-sm shadow-soft"
+          role="alert"
+        >
+          <span>Slack may not have opened. Your time was still logged.</span>
+          <button
+            aria-label="Dismiss Slack warning"
+            className="-mr-1 rounded-sm p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+            onClick={() => setSlackLaunchWarning(false)}
+            type="button"
+          >
+            <X aria-hidden="true" className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
     </main>
   );
+}
+
+function getNewActualTiming(
+  createdAt: Date,
+  timeZone: string,
+  requestedDurationMinutes: number,
+) {
+  const minutes = getCalendarTime(
+    createdAt,
+    timeZone,
+  ).minutesSinceMidnight;
+  const startMinutes =
+    Math.floor(minutes / defaultSettings.snapMinutes) *
+    defaultSettings.snapMinutes;
+  const lastPossibleStartMinutes =
+    24 * 60 - defaultSettings.minimumBlockDurationMinutes;
+  const boundedStartMinutes = Math.min(
+    startMinutes,
+    lastPossibleStartMinutes,
+  );
+  return {
+    startMinutes: boundedStartMinutes,
+    durationMinutes: Math.min(
+      requestedDurationMinutes,
+      24 * 60 - boundedStartMinutes,
+    ),
+  };
 }
 
 function getCatchUpFeedback(

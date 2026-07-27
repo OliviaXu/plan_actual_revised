@@ -136,7 +136,6 @@ export function calculateDayGridBlocks<T extends DayEvent>(
   });
 
   return assignOverlapLayers(positionedBlocks, (block) => ({
-    id: block.event.id,
     start: block.clippedStartMinutes,
     end: block.clippedEndMinutes,
   }));
@@ -168,19 +167,20 @@ export function calculateDayGridNowIndicatorTopPx(
 
 function assignOverlapLayers<T>(
   blocks: T[],
-  getInterval: (block: T) => { id: string; start: number; end: number },
+  getInterval: (block: T) => { start: number; end: number },
 ): Array<T & OverlapPlacement> {
-  const sortedBlocks = [...blocks].sort(
-    (left, right) => {
-      const leftInterval = getInterval(left);
-      const rightInterval = getInterval(right);
+  const sortedBlocks = blocks
+    .map((block, inputIndex) => ({ block, inputIndex }))
+    .sort((left, right) => {
+      const leftInterval = getInterval(left.block);
+      const rightInterval = getInterval(right.block);
       return (
         leftInterval.start - rightInterval.start ||
         rightInterval.end - leftInterval.end ||
-        leftInterval.id.localeCompare(rightInterval.id)
+        left.inputIndex - right.inputIndex
       );
-    },
-  );
+    })
+    .map(({ block }) => block);
   let overlapGroupIndex = -1;
   let overlapGroupEnd = Number.NEGATIVE_INFINITY;
   let layerOccupiedUntil: number[] = [];

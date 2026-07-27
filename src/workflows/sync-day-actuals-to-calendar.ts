@@ -109,7 +109,9 @@ export async function syncDayActualsToCalendar({
         actual,
         date: record.date,
         timezone: record.timezone,
-        summaryPrefix: defaultSettings.actualEventPrefix,
+        summaryPrefix: actual.isSlack
+          ? defaultSettings.slackEventPrefix
+          : defaultSettings.actualEventPrefix,
         defaultColorId: defaultSettings.defaultActualColorId,
       };
       const insertResponse = await insertCalendarEvent(

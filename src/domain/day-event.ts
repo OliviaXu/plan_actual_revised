@@ -16,6 +16,7 @@ export type SaveError = {
 };
 
 export type ActualEvent = DayEvent & {
+  isSlack?: true;
   saveDisposition?: SaveDisposition;
   calendarEventId?: string;
   lastSaveAttemptAt?: string;
