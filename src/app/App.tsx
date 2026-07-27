@@ -366,22 +366,24 @@ export function App({
           </p>
         ) : null}
 
-        <DayGrid
-          actuals={dayRecord?.actual ?? []}
-          actualMutationsDisabled={isSavingActualsToCalendar}
-          canAddActual={canCreateActual}
-          planEvents={planEvents}
-          now={now}
-          onAddActual={addActual}
-          onStartSlack={startSlack}
-          onEditActual={(targetId) =>
-            setActualEditorState({ mode: "edit", targetId })
-          }
-          onActualResizeEnd={persistResizedActual}
-          status={calendarState.status === "disconnected" ? "error" : calendarState.status}
-          date={calendarDay.date}
-          timeZone={calendarDay.timeZone}
-        />
+        {calendarState.status !== "disconnected" ? (
+          <DayGrid
+            actuals={dayRecord?.actual ?? []}
+            actualMutationsDisabled={isSavingActualsToCalendar}
+            canAddActual={canCreateActual}
+            planEvents={planEvents}
+            now={now}
+            onAddActual={addActual}
+            onStartSlack={startSlack}
+            onEditActual={(targetId) =>
+              setActualEditorState({ mode: "edit", targetId })
+            }
+            onActualResizeEnd={persistResizedActual}
+            status={calendarState.status}
+            date={calendarDay.date}
+            timeZone={calendarDay.timeZone}
+          />
+        ) : null}
 
         {dayRecord?.actual.length ? (
           <footer className="flex items-center gap-4">

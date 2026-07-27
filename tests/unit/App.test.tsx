@@ -157,7 +157,9 @@ describe("App Plan loading", () => {
     expect(
       screen.getByRole("button", { name: "Connect Calendar" }),
     ).toBeVisible();
-    expect(screen.getByRole("region", { name: "Day grid" })).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Day grid" }),
+    ).not.toBeInTheDocument();
     expect(
       screen.queryByText(
         "Sign in to load today's events into this read-only column.",
@@ -756,7 +758,7 @@ describe("App Actual persistence", () => {
     expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
   });
 
-  it("keeps Actual creation disabled while Calendar is disconnected", async () => {
+  it("hides Actual creation while Calendar is disconnected", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return {
@@ -769,10 +771,13 @@ describe("App Actual persistence", () => {
 
     render(<App now={now} />);
 
+    await screen.findByRole("button", { name: "Connect Calendar" });
     expect(
-      await screen.findByRole("button", { name: "Add Actual" }),
-    ).toBeDisabled();
-    expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
+      screen.queryByRole("button", { name: "Add Actual" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByRole("heading", { name: "Actual" }),
+    ).not.toBeInTheDocument();
     expect(chrome.storage.local.get).not.toHaveBeenCalled();
   });
 });

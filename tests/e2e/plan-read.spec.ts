@@ -97,12 +97,12 @@ test("a disconnected user can connect and populate Plan", async () => {
     ).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Day grid" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: "Actual", exact: true }),
-    ).toBeVisible();
-    await expect(page.getByRole("button", { name: "Add Actual" })).toBeDisabled();
-    await expect(page.getByTestId("plan-unavailable")).toBeVisible();
+    ).toHaveCount(0);
+    await expect(page.getByRole("button", { name: "Add Actual" })).toHaveCount(0);
+    await expect(page.getByTestId("plan-unavailable")).toHaveCount(0);
     await expect(page.getByTestId("plan-empty")).toHaveCount(0);
     await expect(page.getByTestId("calendar-error")).toHaveCount(0);
     await page.getByRole("button", { name: "Connect Calendar" }).click();
