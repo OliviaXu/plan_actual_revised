@@ -4,10 +4,15 @@ import { useEffect, useState } from "react";
 import { Button } from "./components/ui/button";
 import { DayGrid } from "./components/DayGrid";
 import {
-  ActualEditDialog,
-  type ActualDraft,
-} from "./components/ActualEditDialog";
-import type { ActualEvent } from "../domain/day-event";
+  EditableEventDialog,
+  type EditableEventDraft,
+} from "./components/EditableEventDialog";
+import type {
+  ActualEvent,
+  EditableColumn,
+  EditableEvent,
+  RevisedEvent,
+} from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
 import { defaultSettings } from "../domain/settings";
 import { buildEditedActual } from "../domain/actual-edit";
@@ -21,9 +26,9 @@ import { getCalendarTime } from "../calendar/calendar-time";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
 
-type ActualEditorState =
-  | { mode: "create"; proposedActual: ActualEvent }
-  | { mode: "edit"; targetId: string };
+type EditableEventEditorState =
+  | { mode: "create"; column: "actual"; event: ActualEvent }
+  | { mode: "edit"; column: EditableColumn; event: EditableEvent };
 
 const readSystemTime = () => new Date();
 const openSlackProtocol = () => {
@@ -56,15 +61,10 @@ export function App({
     message: string;
     warning: boolean;
   }>();
-  const [actualEditorState, setActualEditorState] =
-    useState<ActualEditorState>();
+  const [editableEventEditorState, setEditableEventEditorState] =
+    useState<EditableEventEditorState>();
   const currentDate = now();
-  const actualEditTarget =
-    actualEditorState?.mode === "create"
-      ? actualEditorState.proposedActual
-      : dayRecord?.actual.find(
-          (actual) => actual.id === actualEditorState?.targetId,
-        );
+  const editableEventTarget = editableEventEditorState?.event;
   const canCreateActual =
     calendarConnected &&
     actualLoadStatus !== "loading" &&
@@ -142,6 +142,7 @@ export function App({
           date: calendarDay.date,
           timezone: calendarDay.timeZone,
           actual: [actual],
+          revised: [],
           updatedAt: updatedAtIso,
         };
 
@@ -157,7 +158,11 @@ export function App({
       colorId: defaultSettings.defaultActualColorId,
       createdAt: now(),
     });
-    setActualEditorState({ mode: "create", proposedActual: newActual });
+    setEditableEventEditorState({
+      mode: "create",
+      column: "actual",
+      event: newActual,
+    });
   }
 
   function startSlack(reason: string) {
@@ -180,87 +185,127 @@ export function App({
     }
   }
 
-  function saveActualDraft(draft: ActualDraft) {
-    if (!actualEditorState || !actualEditTarget) {
-      setActualEditorState(undefined);
+  function saveEditableEventDraft(draft: EditableEventDraft) {
+    if (!editableEventEditorState || !editableEventTarget) {
+      setEditableEventEditorState(undefined);
       return;
     }
-    if (actualEditorState.mode === "create") {
-      const newActual = { ...actualEditorState.proposedActual, ...draft };
+    if (editableEventEditorState.mode === "create") {
+      const newActual = {
+        ...editableEventEditorState.event,
+        ...draft,
+      };
       appendActual(newActual, now());
-      setActualEditorState(undefined);
+      setEditableEventEditorState(undefined);
       return;
     }
     if (!dayRecord) {
-      setActualEditorState(undefined);
+      setEditableEventEditorState(undefined);
       return;
     }
     if (
-      draft.summary === actualEditTarget.summary &&
-      draft.durationMinutes === actualEditTarget.durationMinutes &&
-      draft.colorId === actualEditTarget.colorId
+      draft.summary === editableEventTarget.summary &&
+      draft.durationMinutes === editableEventTarget.durationMinutes &&
+      draft.colorId === editableEventTarget.colorId
     ) {
-      setActualEditorState(undefined);
+      setEditableEventEditorState(undefined);
       return;
     }
 
-    const editedActual = buildEditedActual(
-      actualEditTarget,
-      draft,
-      () => crypto.randomUUID(),
-    );
-    const updatedAt = now().toISOString();
+    let editedDayRecord: DayRecord;
+    if (editableEventEditorState.column === "actual") {
+      const editedActual = buildEditedActual(
+        editableEventTarget as ActualEvent,
+        draft,
+        () => crypto.randomUUID(),
+      );
+      editedDayRecord = {
+        ...dayRecord,
+        actual: dayRecord.actual.map((actual) =>
+          actual.id === editableEventTarget.id ? editedActual : actual,
+        ),
+      };
+    } else {
+      const editedRevised: RevisedEvent = {
+        ...editableEventTarget,
+        ...draft,
+      };
+      editedDayRecord = {
+        ...dayRecord,
+        revised: dayRecord.revised.map((event) =>
+          event.id === editableEventTarget.id ? editedRevised : event,
+        ),
+      };
+    }
     void persistDayRecord({
-      ...dayRecord,
-      actual: dayRecord.actual.map((actual) =>
-        actual.id === actualEditTarget.id ? editedActual : actual,
-      ),
-      updatedAt,
+      ...editedDayRecord,
+      updatedAt: now().toISOString(),
     });
-    setActualEditorState(undefined);
+    setEditableEventEditorState(undefined);
   }
 
-  function deleteActualEditTarget() {
+  function deleteEditableEventTarget() {
     if (
-      actualEditorState?.mode !== "edit" ||
+      editableEventEditorState?.mode !== "edit" ||
       !dayRecord ||
-      !actualEditTarget
+      !editableEventTarget
     ) {
-      setActualEditorState(undefined);
+      setEditableEventEditorState(undefined);
       return;
     }
 
-    const updatedAt = now().toISOString();
+    const column = editableEventEditorState.column;
     void persistDayRecord({
       ...dayRecord,
-      actual: dayRecord.actual.filter(
-        (actual) => actual.id !== actualEditTarget.id,
+      [column]: dayRecord[column].filter(
+        (event) => event.id !== editableEventTarget.id,
       ),
-      updatedAt,
+      updatedAt: now().toISOString(),
     });
-    setActualEditorState(undefined);
+    setEditableEventEditorState(undefined);
   }
 
-  function persistResizedActual(actualId: string, durationMinutes: number) {
+  function persistResizedEditableEvent(
+    column: EditableColumn,
+    eventId: string,
+    durationMinutes: number,
+  ) {
     if (!dayRecord || isSavingActualsToCalendar) return;
 
-    const actual = dayRecord.actual.find((event) => event.id === actualId);
-    if (!actual || actual.durationMinutes === durationMinutes) return;
-
-    const resizedActual = buildEditedActual(
-      actual,
-      {
-        summary: actual.summary,
-        durationMinutes,
-        colorId: actual.colorId,
-      },
-      () => crypto.randomUUID(),
+    const event = dayRecord[column].find((candidate) =>
+      candidate.id === eventId
     );
+    if (!event || event.durationMinutes === durationMinutes) return;
+
+    let editedDayRecord: DayRecord;
+    if (column === "actual") {
+      const resizedActual = buildEditedActual(
+        event as ActualEvent,
+        {
+          summary: event.summary,
+          durationMinutes,
+          colorId: event.colorId,
+        },
+        () => crypto.randomUUID(),
+      );
+      editedDayRecord = {
+        ...dayRecord,
+        actual: dayRecord.actual.map((actual) =>
+          actual.id === eventId ? resizedActual : actual,
+        ),
+      };
+    } else {
+      editedDayRecord = {
+        ...dayRecord,
+        revised: dayRecord.revised.map((revised) =>
+          revised.id === eventId
+            ? { ...revised, durationMinutes }
+            : revised,
+        ),
+      };
+    }
     void persistDayRecord({
-      ...dayRecord,
-      actual: dayRecord.actual.map((event) =>
-        event.id === actualId ? resizedActual : event,
-      ),
+      ...editedDayRecord,
       updatedAt: now().toISOString(),
     });
   }
@@ -369,16 +414,21 @@ export function App({
         {calendarState.status !== "disconnected" ? (
           <DayGrid
             actuals={dayRecord?.actual ?? []}
-            actualMutationsDisabled={isSavingActualsToCalendar}
+            revised={dayRecord?.revised ?? []}
+            editableMutationsDisabled={isSavingActualsToCalendar}
             canAddActual={canCreateActual}
             planEvents={planEvents}
             now={now}
             onAddActual={addActual}
             onStartSlack={startSlack}
-            onEditActual={(targetId) =>
-              setActualEditorState({ mode: "edit", targetId })
+            onEditEditable={(column, event) =>
+              setEditableEventEditorState({
+                mode: "edit",
+                column,
+                event,
+              })
             }
-            onActualResizeEnd={persistResizedActual}
+            onEditableResizeEnd={persistResizedEditableEvent}
             status={calendarState.status}
             date={calendarDay.date}
             timeZone={calendarDay.timeZone}
@@ -407,20 +457,15 @@ export function App({
           </footer>
         ) : null}
       </section>
-      {actualEditTarget ? (
-        <ActualEditDialog
-          actual={actualEditTarget}
-          onDelete={
-            actualEditorState?.mode === "edit"
-              ? deleteActualEditTarget
-              : undefined
-          }
-          onDismiss={() => setActualEditorState(undefined)}
-          onSave={saveActualDraft}
+      {editableEventTarget && editableEventEditorState ? (
+        <EditableEventDialog
+          column={editableEventEditorState.column}
+          event={editableEventTarget}
+          mode={editableEventEditorState.mode}
+          onDelete={deleteEditableEventTarget}
+          onDismiss={() => setEditableEventEditorState(undefined)}
+          onSave={saveEditableEventDraft}
           paletteColorIds={defaultSettings.actualPaletteColorIds}
-          titleFocusMode={
-            actualEditorState?.mode === "create" ? "selectAll" : "caretEnd"
-          }
         />
       ) : null}
       {slackLaunchWarning ? (

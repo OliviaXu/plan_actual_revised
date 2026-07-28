@@ -8,6 +8,11 @@ export type DayEvent = {
 
 export type PlanEvent = DayEvent;
 
+export type EditableEvent = DayEvent & {
+  sourceCalendarEventId?: string;
+  isSlack?: true;
+};
+
 export type SaveDisposition = "unsaved" | "calendarSaved" | "planMatched";
 
 export type SaveError = {
@@ -15,10 +20,13 @@ export type SaveError = {
   message: string;
 };
 
-export type ActualEvent = DayEvent & {
-  isSlack?: true;
+export type ActualEvent = EditableEvent & {
   saveDisposition?: SaveDisposition;
   calendarEventId?: string;
   lastSaveAttemptAt?: string;
   lastSaveError?: SaveError;
 };
+
+export type RevisedEvent = EditableEvent;
+
+export type EditableColumn = "actual" | "revised";

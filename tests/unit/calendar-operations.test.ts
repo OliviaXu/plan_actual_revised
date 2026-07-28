@@ -110,6 +110,7 @@ describe("createCalendarOperations", () => {
       date: "2026-07-14",
       timezone: "America/Los_Angeles",
       actual: [],
+      revised: [],
       updatedAt: "2026-07-14T18:00:00.000Z",
     });
 

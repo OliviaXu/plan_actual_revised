@@ -24,17 +24,20 @@ const titleEdit = {
 describe("buildEditedActual", () => {
   it("preserves an ordinary unsaved Actual identity", () => {
     const createId = vi.fn(() => "replacement-id");
+    const edited = buildEditedActual(actualEvent(), titleEdit, createId);
 
-    expect(
-      buildEditedActual(actualEvent(), titleEdit, createId),
-    ).toEqual({
+    expect(edited).toEqual({
       id: "original-id",
       summary: "Edited title",
       startMinutes: 540,
       durationMinutes: 30,
       colorId: "8",
+      sourceCalendarEventId: undefined,
+      isSlack: undefined,
       saveDisposition: "unsaved",
     });
+    expect(Object.hasOwn(edited, "sourceCalendarEventId")).toBe(true);
+    expect(Object.hasOwn(edited, "isSlack")).toBe(true);
     expect(createId).not.toHaveBeenCalled();
   });
 
@@ -58,6 +61,8 @@ describe("buildEditedActual", () => {
       startMinutes: 540,
       durationMinutes: 30,
       colorId: "8",
+      sourceCalendarEventId: undefined,
+      isSlack: undefined,
       saveDisposition: "unsaved",
     });
     expect(createId).not.toHaveBeenCalled();
@@ -82,6 +87,8 @@ describe("buildEditedActual", () => {
       startMinutes: 540,
       durationMinutes: 30,
       colorId: "8",
+      sourceCalendarEventId: undefined,
+      isSlack: undefined,
       saveDisposition: "unsaved",
     });
     expect(createId).toHaveBeenCalledOnce();
@@ -109,18 +116,21 @@ describe("buildEditedActual", () => {
       startMinutes: 540,
       durationMinutes: 30,
       colorId: "8",
+      sourceCalendarEventId: undefined,
+      isSlack: undefined,
       saveDisposition: "unsaved",
     });
     expect(createId).toHaveBeenCalledOnce();
   });
 
-  it("preserves the Slack audit marker through edits and identity changes", () => {
+  it("preserves editable-event provenance through edits and identity changes", () => {
     const createId = vi.fn(() => "replacement-id");
 
     expect(
       buildEditedActual(
         actualEvent({
           isSlack: true,
+          sourceCalendarEventId: "plan-source",
           saveDisposition: "calendarSaved",
           calendarEventId: "calendar-event-id",
         }),
@@ -134,6 +144,7 @@ describe("buildEditedActual", () => {
       durationMinutes: 30,
       colorId: "8",
       isSlack: true,
+      sourceCalendarEventId: "plan-source",
       saveDisposition: "unsaved",
     });
   });

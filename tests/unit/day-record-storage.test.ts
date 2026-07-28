@@ -24,6 +24,7 @@ const record: DayRecord = {
       colorId: "8",
     },
   ],
+  revised: [],
   updatedAt: "2026-07-15T19:00:00.000Z",
 };
 
@@ -52,6 +53,47 @@ describe("day record storage", () => {
   it("returns null when the local date has no record", async () => {
     mockStorage();
     await expect(loadDayRecord("2026-07-15")).resolves.toBeNull();
+  });
+
+  it("normalizes a legacy version-one record to an empty Revised column", async () => {
+    const legacyRecord = {
+      schemaVersion: record.schemaVersion,
+      date: record.date,
+      timezone: record.timezone,
+      actual: record.actual,
+      updatedAt: record.updatedAt,
+    };
+    const storage = mockStorage({
+      [dayRecordStorageKey(record.date)]: legacyRecord,
+    });
+
+    await expect(loadDayRecord(record.date)).resolves.toEqual(record);
+    expect(storage.set).not.toHaveBeenCalled();
+  });
+
+  it("round trips a valid Revised block in the existing record version", async () => {
+    const storage = mockStorage();
+    const recordWithRevised = {
+      ...record,
+      revised: [{
+        id: "revised-1",
+        summary: "Revised",
+        startMinutes: 780,
+        durationMinutes: 45,
+        colorId: "6",
+        sourceCalendarEventId: "plan-1",
+        isSlack: true as const,
+      }],
+    };
+
+    await saveDayRecord(recordWithRevised);
+
+    await expect(loadDayRecord(record.date)).resolves.toEqual(
+      recordWithRevised,
+    );
+    expect(storage.set).toHaveBeenCalledWith({
+      "dayRecord:2026-07-15": recordWithRevised,
+    });
   });
 
   it("round trips a valid version-one record", async () => {
@@ -84,6 +126,10 @@ describe("day record storage", () => {
     { ...record, schemaVersion: 2 },
     { ...record, actual: [{ ...record.actual[0], durationMinutes: 0 }] },
     { ...record, actual: [{ ...record.actual[0], isSlack: false }] },
+    {
+      ...record,
+      revised: [{ ...record.actual[0], sourceCalendarEventId: 42 }],
+    },
     { ...record, date: "July 15" },
   ])("rejects malformed or unsupported stored data without overwriting it", async (raw) => {
     const storage = mockStorage({ "dayRecord:2026-07-15": raw });

@@ -274,6 +274,5 @@ The following remain outside Phase 5:
 
 - Revised-column behavior;
 - dragging Actual blocks;
-- overlap-priority persistence;
 - Calendar event update; and
 - Calendar event deletion.

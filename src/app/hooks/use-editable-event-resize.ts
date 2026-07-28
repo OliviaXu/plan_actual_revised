@@ -1,10 +1,10 @@
 import { useEffect, useRef, useState } from "react";
 
-import type { ActualEvent } from "../../domain/day-event";
+import type { EditableEvent } from "../../domain/day-event";
 import type { AppSettings } from "../../domain/settings";
 
-type ActualResizePreview = {
-  actualId: string;
+type EditableEventResizePreview = {
+  eventId: string;
   durationMinutes: number;
 };
 
@@ -13,19 +13,19 @@ type ResizeSettings = Pick<
   "minimumBlockDurationMinutes" | "pixelsPerMinute" | "snapMinutes"
 >;
 
-export function useActualResize({
-  actuals,
+export function useEditableEventResize({
+  events,
   disabled,
   onResizeEnd,
   settings,
 }: {
-  actuals: ActualEvent[];
+  events: EditableEvent[];
   disabled?: boolean;
-  onResizeEnd?: (actualId: string, durationMinutes: number) => void;
+  onResizeEnd?: (eventId: string, durationMinutes: number) => void;
   settings: ResizeSettings;
 }) {
-  const [preview, setPreview] = useState<ActualResizePreview>();
-  const previewRef = useRef<ActualResizePreview | undefined>(undefined);
+  const [preview, setPreview] = useState<EditableEventResizePreview>();
+  const previewRef = useRef<EditableEventResizePreview | undefined>(undefined);
   const removePointerListenersRef = useRef<(() => void) | undefined>(
     undefined,
   );
@@ -34,8 +34,8 @@ export function useActualResize({
     return () => removePointerListenersRef.current?.();
   }, []);
 
-  function startActualResize(
-    actual: ActualEvent,
+  function startResize(
+    event: EditableEvent,
     initialPointer: PointerEvent,
   ) {
     if (disabled) return;
@@ -47,21 +47,21 @@ export function useActualResize({
 
     stopListening();
     const initialPreview = {
-      actualId: actual.id,
-      durationMinutes: actual.durationMinutes,
+      eventId: event.id,
+      durationMinutes: event.durationMinutes,
     };
     previewRef.current = initialPreview;
     setPreview(initialPreview);
 
-    function updatePreview(event: PointerEvent) {
+    function updatePreview(pointer: PointerEvent) {
       const durationMinutes = calculateResizeDuration(
-        actual.durationMinutes,
-        event.clientY - initialPointer.clientY,
+        event.durationMinutes,
+        pointer.clientY - initialPointer.clientY,
         settings,
       );
       if (previewRef.current?.durationMinutes === durationMinutes) return;
 
-      const nextPreview = { actualId: actual.id, durationMinutes };
+      const nextPreview = { eventId: event.id, durationMinutes };
       previewRef.current = nextPreview;
       setPreview(nextPreview);
     }
@@ -77,9 +77,9 @@ export function useActualResize({
       clearResizeSession();
       if (
         finalPreview &&
-        finalPreview.durationMinutes !== actual.durationMinutes
+        finalPreview.durationMinutes !== event.durationMinutes
       ) {
-        onResizeEnd?.(actual.id, finalPreview.durationMinutes);
+        onResizeEnd?.(event.id, finalPreview.durationMinutes);
       }
     }
 
@@ -93,13 +93,13 @@ export function useActualResize({
     );
   }
 
-  const displayedActuals = actuals.map((actual) =>
-    actual.id === preview?.actualId
-      ? { ...actual, durationMinutes: preview.durationMinutes }
-      : actual,
+  const displayedEvents = events.map((event) =>
+    event.id === preview?.eventId
+      ? { ...event, durationMinutes: preview.durationMinutes }
+      : event,
   );
 
-  return { displayedActuals, startActualResize };
+  return { displayedEvents, startResize };
 }
 
 function calculateResizeDuration(

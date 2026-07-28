@@ -6,18 +6,25 @@ import {
   calculateDayGridRange,
 } from "./day-grid-layout";
 import { defaultSettings } from "../../domain/settings";
-import type { ActualEvent, PlanEvent } from "../../domain/day-event";
+import type {
+  ActualEvent,
+  EditableColumn,
+  EditableEvent,
+  PlanEvent,
+  RevisedEvent,
+} from "../../domain/day-event";
 import { getCalendarTime } from "../../calendar/calendar-time";
-import { useActualResize } from "../hooks/use-actual-resize";
+import { useEditableEventResize } from "../hooks/use-editable-event-resize";
 import {
-  ActualGridBlock,
+  EditableGridBlock,
   PlanGridBlock,
 } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { SlackAuditPopover } from "./SlackAuditPopover";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
-const DAY_GRID_TEMPLATE_COLUMNS = `${DAY_TIME_AXIS_WIDTH} minmax(0, 1fr) minmax(0, 1fr)`;
+const DAY_GRID_TEMPLATE_COLUMNS =
+  `${DAY_TIME_AXIS_WIDTH} repeat(3, minmax(0, 1fr))`;
 const readSystemTime = () => new Date();
 
 type DayGridStatus =
@@ -28,14 +35,19 @@ type DayGridStatus =
 
 type DayGridProps = {
   actuals?: ActualEvent[];
-  actualMutationsDisabled?: boolean;
+  revised?: RevisedEvent[];
+  editableMutationsDisabled?: boolean;
   canAddActual?: boolean;
   planEvents: PlanEvent[];
   now?: () => Date;
   onAddActual?: () => void;
   onStartSlack?: (reason: string) => void;
-  onEditActual?: (actualId: string) => void;
-  onActualResizeEnd?: (actualId: string, durationMinutes: number) => void;
+  onEditEditable?: (column: EditableColumn, event: EditableEvent) => void;
+  onEditableResizeEnd?: (
+    column: EditableColumn,
+    eventId: string,
+    durationMinutes: number,
+  ) => void;
   status: DayGridStatus;
   date: string;
   timeZone: string;
@@ -43,28 +55,44 @@ type DayGridProps = {
 
 export function DayGrid({
   actuals,
-  actualMutationsDisabled,
+  revised,
+  editableMutationsDisabled,
   canAddActual,
   planEvents,
   now = readSystemTime,
   onAddActual,
   onStartSlack,
-  onEditActual,
-  onActualResizeEnd,
+  onEditEditable,
+  onEditableResizeEnd,
   status,
   date,
   timeZone,
 }: DayGridProps) {
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
   const [frontActualId, setFrontActualId] = useState<string | null>(null);
+  const [frontRevisedId, setFrontRevisedId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(now);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
-  const { displayedActuals, startActualResize } = useActualResize({
-    actuals: actuals ?? [],
-    disabled: actualMutationsDisabled,
-    onResizeEnd: onActualResizeEnd,
+  const {
+    displayedEvents: displayedActuals,
+    startResize: startActualResize,
+  } = useEditableEventResize({
+    events: actuals ?? [],
+    disabled: editableMutationsDisabled,
+    onResizeEnd: (eventId, durationMinutes) =>
+      onEditableResizeEnd?.("actual", eventId, durationMinutes),
+    settings: defaultSettings,
+  });
+  const {
+    displayedEvents: displayedRevised,
+    startResize: startRevisedResize,
+  } = useEditableEventResize({
+    events: revised ?? [],
+    disabled: editableMutationsDisabled,
+    onResizeEnd: (eventId, durationMinutes) =>
+      onEditableResizeEnd?.("revised", eventId, durationMinutes),
     settings: defaultSettings,
   });
   const gridRange = calculateDayGridRange(
@@ -79,6 +107,12 @@ export function DayGrid({
   );
   const actualBlocks = calculateDayGridBlocks(
     displayedActuals,
+    gridRange.startHour,
+    gridRange.endHour,
+    defaultSettings,
+  );
+  const revisedBlocks = calculateDayGridBlocks(
+    displayedRevised,
     gridRange.startHour,
     gridRange.endHour,
     defaultSettings,
@@ -160,6 +194,9 @@ export function DayGrid({
               />
             </div>
           </div>
+          <h2 className="border-l border-border px-4 py-2 text-sm font-semibold">
+            Revised
+          </h2>
         </div>
         <div
           className="relative"
@@ -175,7 +212,12 @@ export function DayGrid({
               style={{
                 left: DAY_TIME_AXIS_WIDTH,
                 top: nowIndicatorTopPx,
-                zIndex: Math.max(planBlocks.length, actualBlocks.length) + 1,
+                zIndex:
+                  Math.max(
+                    planBlocks.length,
+                    actualBlocks.length,
+                    revisedBlocks.length,
+                  ) + 1,
               }}
             >
               <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-now" />
@@ -237,19 +279,43 @@ export function DayGrid({
               data-testid="actual-column"
             >
               {actualBlocks.map((block) => (
-                <ActualGridBlock
+                <EditableGridBlock
                   block={block}
+                  column="actual"
                   frontZIndex={actualBlocks.length}
                   isFront={frontActualId === block.event.id}
                   key={block.event.id}
-                  mutationsDisabled={actualMutationsDisabled}
+                  mutationsDisabled={editableMutationsDisabled}
                   onResizeStart={(actual, pointer) => {
                     setFrontActualId(actual.id);
                     startActualResize(actual, pointer);
                   }}
                   onSelect={() => {
                     setFrontActualId(block.event.id);
-                    onEditActual?.(block.event.id);
+                    onEditEditable?.("actual", block.event);
+                  }}
+                />
+              ))}
+            </div>
+            <div
+              className="relative overflow-hidden border-l border-border"
+              data-testid="revised-column"
+            >
+              {revisedBlocks.map((block) => (
+                <EditableGridBlock
+                  block={block}
+                  column="revised"
+                  frontZIndex={revisedBlocks.length}
+                  isFront={frontRevisedId === block.event.id}
+                  key={block.event.id}
+                  mutationsDisabled={editableMutationsDisabled}
+                  onResizeStart={(event, pointer) => {
+                    setFrontRevisedId(event.id);
+                    startRevisedResize(event, pointer);
+                  }}
+                  onSelect={() => {
+                    setFrontRevisedId(block.event.id);
+                    onEditEditable?.("revised", block.event);
                   }}
                 />
               ))}

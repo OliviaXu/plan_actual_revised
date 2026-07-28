@@ -28,6 +28,7 @@ function dayRecord(actuals: ActualEvent[]): DayRecord {
     date: "2026-07-15",
     timezone: "America/Los_Angeles",
     actual: actuals,
+    revised: [],
     updatedAt: "2026-07-15T18:00:00.000Z",
   };
 }

@@ -1,4 +1,7 @@
-import { isDayRecord, type DayRecord } from "../domain/day-record";
+import {
+  normalizeDayRecord,
+  type DayRecord,
+} from "../domain/day-record";
 
 export class DayRecordStorageError extends Error {
   constructor(
@@ -32,13 +35,14 @@ export async function loadDayRecord(date: string): Promise<DayRecord | null> {
 
   const value = stored[key];
   if (value === undefined) return null;
-  if (!isDayRecord(value) || value.date !== date) {
+  const record = normalizeDayRecord(value);
+  if (!record || record.date !== date) {
     throw new DayRecordStorageError(
       "DAY_RECORD_INVALID",
-      "Stored Actuals use an unsupported or invalid format.",
+      "Stored Actual/Revised blocks use an unsupported or invalid format.",
     );
   }
-  return value;
+  return record;
 }
 
 export async function saveDayRecord(record: DayRecord): Promise<void> {
@@ -72,11 +76,12 @@ export async function listDayRecords(): Promise<{
   const invalidKeys: string[] = [];
   for (const [key, value] of Object.entries(stored)) {
     if (!key.startsWith("dayRecord:")) continue;
-    if (!isDayRecord(value) || key !== dayRecordStorageKey(value.date)) {
+    const record = normalizeDayRecord(value);
+    if (!record || key !== dayRecordStorageKey(record.date)) {
       invalidKeys.push(key);
       continue;
     }
-    records.push(value);
+    records.push(record);
   }
   return { records, invalidKeys };
 }

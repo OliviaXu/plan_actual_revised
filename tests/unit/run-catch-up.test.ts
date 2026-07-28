@@ -37,6 +37,7 @@ function record(date: string, actuals: ActualEvent[]): DayRecord {
     date,
     timezone: "America/Los_Angeles",
     actual: actuals,
+    revised: [],
     updatedAt: `${date}T18:00:00.000Z`,
   };
 }

@@ -8,7 +8,11 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type { ActualEvent, PlanEvent } from "../../src/domain/day-event";
+import type {
+  ActualEvent,
+  PlanEvent,
+  RevisedEvent,
+} from "../../src/domain/day-event";
 import { DayGrid } from "../../src/app/components/DayGrid";
 
 const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
@@ -41,6 +45,20 @@ function actualEvent(
     durationMinutes,
     colorId: "8",
     saveDisposition: "unsaved",
+  };
+}
+
+function revisedEvent(
+  id: string,
+  startMinutes: number,
+  durationMinutes: number,
+): RevisedEvent {
+  return {
+    id,
+    summary: id,
+    startMinutes,
+    durationMinutes,
+    colorId: "6",
   };
 }
 
@@ -114,6 +132,49 @@ describe("DayGrid", () => {
         borderColor: "#61616180",
       });
     }
+  });
+
+  it("renders Revised as a fourth column with column-aware edit and resize interactions", () => {
+    const onEditEditable = vi.fn();
+    const onEditableResizeEnd = vi.fn();
+    render(
+      <DayGrid
+        actuals={[actualEvent("actual", 540, 30)]}
+        revised={[revisedEvent("revised", 600, 30)]}
+        onEditEditable={onEditEditable}
+        onEditableResizeEnd={onEditableResizeEnd}
+        planEvents={[]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Revised" })).toBeVisible();
+    expect(screen.getByTestId("revised-column")).toHaveClass(
+      "overflow-hidden",
+    );
+    expect(screen.getByTestId("revised-block")).toHaveTextContent("revised");
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit revised" }),
+    );
+    expect(onEditEditable).toHaveBeenCalledWith(
+      "revised",
+      revisedEvent("revised", 600, 30),
+    );
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Resize revised" }),
+      { clientY: 100, pointerId: 7 },
+    );
+    fireEvent.pointerMove(window, { clientY: 121, pointerId: 7 });
+    fireEvent.pointerUp(window, { clientY: 121, pointerId: 7 });
+
+    expect(onEditableResizeEnd).toHaveBeenCalledWith(
+      "revised",
+      "revised",
+      45,
+    );
   });
 
   it("hides the time range below 40px and shows it above 40px", () => {
@@ -303,13 +364,13 @@ describe("DayGrid", () => {
   });
 
   it("previews a snapped Actual resize and commits once on pointer release", () => {
-    const onEditActual = vi.fn();
-    const onActualResizeEnd = vi.fn();
+    const onEditEditable = vi.fn();
+    const onEditableResizeEnd = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("resized-actual", 540, 30)]}
-        onEditActual={onEditActual}
-        onActualResizeEnd={onActualResizeEnd}
+        onEditEditable={onEditEditable}
+        onEditableResizeEnd={onEditableResizeEnd}
         planEvents={[]}
         status="connected"
         {...calendarDay}
@@ -326,22 +387,26 @@ describe("DayGrid", () => {
     expect(preview).toHaveStyle({ height: "63px" });
     expect(within(preview).getByText("45m")).toBeVisible();
     expect(within(preview).getByText("9:00 AM – 9:45 AM")).toBeVisible();
-    expect(onActualResizeEnd).not.toHaveBeenCalled();
-    expect(onEditActual).not.toHaveBeenCalled();
+    expect(onEditableResizeEnd).not.toHaveBeenCalled();
+    expect(onEditEditable).not.toHaveBeenCalled();
 
     fireEvent.pointerUp(window, { clientY: 121, pointerId: 1 });
 
-    expect(onActualResizeEnd).toHaveBeenCalledOnce();
-    expect(onActualResizeEnd).toHaveBeenCalledWith("resized-actual", 45);
-    expect(onEditActual).not.toHaveBeenCalled();
+    expect(onEditableResizeEnd).toHaveBeenCalledOnce();
+    expect(onEditableResizeEnd).toHaveBeenCalledWith(
+      "actual",
+      "resized-actual",
+      45,
+    );
+    expect(onEditEditable).not.toHaveBeenCalled();
   });
 
   it("enforces the minimum resize duration and restores on cancellation", () => {
-    const onActualResizeEnd = vi.fn();
+    const onEditableResizeEnd = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("cancelled-actual", 540, 30)]}
-        onActualResizeEnd={onActualResizeEnd}
+        onEditableResizeEnd={onEditableResizeEnd}
         planEvents={[]}
         status="connected"
         {...calendarDay}
@@ -363,7 +428,7 @@ describe("DayGrid", () => {
     expect(screen.getByTestId("actual-block")).toHaveStyle({ height: "42px" });
     expect(within(screen.getByTestId("actual-block")).getByText("30m"))
       .toBeVisible();
-    expect(onActualResizeEnd).not.toHaveBeenCalled();
+    expect(onEditableResizeEnd).not.toHaveBeenCalled();
   });
 
   it("clips minimum-height Plan and Actual blocks at midnight", () => {

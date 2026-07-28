@@ -16,6 +16,7 @@ function dayRecord(date: string, actualCount = 1): DayRecord {
       colorId: "8",
       saveDisposition: "unsaved",
     })),
+    revised: [],
     updatedAt: `${date}T17:00:00.000Z`,
   };
 }

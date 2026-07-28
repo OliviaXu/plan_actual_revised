@@ -1,7 +1,8 @@
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import type {
-  ActualEvent,
   DayEvent,
+  EditableColumn,
+  EditableEvent,
   PlanEvent,
 } from "../../domain/day-event";
 import {
@@ -10,19 +11,21 @@ import {
   type DayGridBlock,
 } from "./day-grid-layout";
 
-export function ActualGridBlock({
+export function EditableGridBlock({
   block,
+  column,
   frontZIndex,
   isFront,
   mutationsDisabled,
   onResizeStart,
   onSelect,
 }: {
-  block: DayGridBlock<ActualEvent>;
+  block: DayGridBlock<EditableEvent>;
+  column: EditableColumn;
   frontZIndex: number;
   isFront: boolean;
   mutationsDisabled?: boolean;
-  onResizeStart: (actual: ActualEvent, pointer: PointerEvent) => void;
+  onResizeStart: (event: EditableEvent, pointer: PointerEvent) => void;
   onSelect: () => void;
 }) {
   const appearance = getDayGridBlockAppearance(
@@ -34,10 +37,11 @@ export function ActualGridBlock({
   return (
     <div
       className={appearance.className}
-      data-actual-id={block.event.id}
+      data-actual-id={column === "actual" ? block.event.id : undefined}
+      data-revised-id={column === "revised" ? block.event.id : undefined}
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
-      data-testid="actual-block"
+      data-testid={`${column}-block`}
       style={appearance.style}
     >
       <button
@@ -49,7 +53,7 @@ export function ActualGridBlock({
       >
         <DayGridBlockContent
           block={block}
-          timeRangeTestId="actual-event-time-range"
+          timeRangeTestId={`${column}-event-time-range`}
         />
       </button>
       <button

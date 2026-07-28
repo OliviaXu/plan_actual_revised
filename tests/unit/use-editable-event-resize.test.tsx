@@ -6,7 +6,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useActualResize } from "../../src/app/hooks/use-actual-resize";
+import { useEditableEventResize } from "../../src/app/hooks/use-editable-event-resize";
 import type { ActualEvent } from "../../src/domain/day-event";
 import { defaultSettings } from "../../src/domain/settings";
 
@@ -28,13 +28,13 @@ function pointerEvent(pointerId: number, clientY: number) {
   }) as PointerEvent;
 }
 
-describe("useActualResize", () => {
+describe("useEditableEventResize", () => {
   it("registers pointer listeners only for an active resize session", () => {
     const addEventListener = vi.spyOn(window, "addEventListener");
     const removeEventListener = vi.spyOn(window, "removeEventListener");
     const { result, unmount } = renderHook(() =>
-      useActualResize({
-        actuals: [actual],
+      useEditableEventResize({
+        events: [actual],
         settings: defaultSettings,
       }),
     );
@@ -46,7 +46,7 @@ describe("useActualResize", () => {
     ).toHaveLength(0);
 
     act(() => {
-      result.current.startActualResize(actual, pointerEvent(1, 100));
+      result.current.startResize(actual, pointerEvent(1, 100));
     });
 
     expect(
@@ -64,7 +64,7 @@ describe("useActualResize", () => {
     ).toHaveLength(3);
 
     act(() => {
-      result.current.startActualResize(actual, pointerEvent(2, 100));
+      result.current.startResize(actual, pointerEvent(2, 100));
     });
     unmount();
 
@@ -78,8 +78,8 @@ describe("useActualResize", () => {
   it("previews a snapped duration and commits it on pointer release", () => {
     const onResizeEnd = vi.fn();
     const { result } = renderHook(() =>
-      useActualResize({
-        actuals: [actual],
+      useEditableEventResize({
+        events: [actual],
         disabled: false,
         onResizeEnd,
         settings: defaultSettings,
@@ -87,16 +87,16 @@ describe("useActualResize", () => {
     );
 
     act(() => {
-      result.current.startActualResize(actual, pointerEvent(1, 100));
+      result.current.startResize(actual, pointerEvent(1, 100));
     });
     fireEvent.pointerMove(window, { pointerId: 1, clientY: 121 });
 
-    expect(result.current.displayedActuals[0].durationMinutes).toBe(45);
+    expect(result.current.displayedEvents[0].durationMinutes).toBe(45);
     expect(onResizeEnd).not.toHaveBeenCalled();
 
     fireEvent.pointerUp(window, { pointerId: 1, clientY: 121 });
 
-    expect(result.current.displayedActuals[0].durationMinutes).toBe(30);
+    expect(result.current.displayedEvents[0].durationMinutes).toBe(30);
     expect(onResizeEnd).toHaveBeenCalledOnce();
     expect(onResizeEnd).toHaveBeenCalledWith("actual-1", 45);
   });
@@ -105,8 +105,8 @@ describe("useActualResize", () => {
     const onResizeEnd = vi.fn();
     const { result, rerender } = renderHook(
       ({ disabled }) =>
-        useActualResize({
-          actuals: [actual],
+        useEditableEventResize({
+          events: [actual],
           disabled,
           onResizeEnd,
           settings: defaultSettings,
@@ -115,23 +115,23 @@ describe("useActualResize", () => {
     );
 
     act(() => {
-      result.current.startActualResize(actual, pointerEvent(2, 100));
+      result.current.startResize(actual, pointerEvent(2, 100));
     });
     fireEvent.pointerMove(window, { pointerId: 2, clientY: 30 });
-    expect(result.current.displayedActuals[0].durationMinutes).toBe(5);
+    expect(result.current.displayedEvents[0].durationMinutes).toBe(5);
 
     fireEvent.pointerCancel(window, { pointerId: 2 });
-    expect(result.current.displayedActuals[0].durationMinutes).toBe(30);
+    expect(result.current.displayedEvents[0].durationMinutes).toBe(30);
     expect(onResizeEnd).not.toHaveBeenCalled();
 
     rerender({ disabled: true });
     act(() => {
-      result.current.startActualResize(actual, pointerEvent(3, 100));
+      result.current.startResize(actual, pointerEvent(3, 100));
     });
     fireEvent.pointerMove(window, { pointerId: 3, clientY: 121 });
     fireEvent.pointerUp(window, { pointerId: 3, clientY: 121 });
 
-    expect(result.current.displayedActuals[0].durationMinutes).toBe(30);
+    expect(result.current.displayedEvents[0].durationMinutes).toBe(30);
     expect(onResizeEnd).not.toHaveBeenCalled();
   });
 });

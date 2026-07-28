@@ -1549,3 +1549,93 @@ describe("App Actual Calendar saving", () => {
     });
   });
 });
+
+describe("App Revised persistence", () => {
+  it("edits, resizes, and deletes Revised blocks without offering Calendar Save", async () => {
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual: [],
+      revised: [{
+        id: "revised-1",
+        summary: "Original Revised",
+        startMinutes: 720,
+        durationMinutes: 30,
+        colorId: "6",
+        sourceCalendarEventId: "plan-1",
+      }],
+      updatedAt: "2026-07-15T19:00:00.000Z",
+    };
+
+    render(<App now={now} />);
+
+    expect(await screen.findByText("Original Revised")).toBeVisible();
+    expect(
+      screen.queryByRole("button", { name: "Save Actual to calendar" }),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Original Revised" }),
+    );
+    const dialog = within(
+      await screen.findByRole("dialog", { name: "Edit Revised" }),
+    );
+    fireEvent.change(dialog.getByRole("textbox", { name: "Title" }), {
+      target: { value: "Edited Revised" },
+    });
+    fireEvent.click(dialog.getByRole("button", { name: "Save" }));
+
+    expect(await screen.findByText("Edited Revised")).toBeVisible();
+    expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+      actual: [],
+      revised: [{
+        id: "revised-1",
+        summary: "Edited Revised",
+        sourceCalendarEventId: "plan-1",
+      }],
+    });
+
+    fireEvent.pointerDown(
+      screen.getByRole("button", { name: "Resize Edited Revised" }),
+      { clientY: 100, pointerId: 8 },
+    );
+    fireEvent.pointerMove(window, { clientY: 121, pointerId: 8 });
+    fireEvent.pointerUp(window, { clientY: 121, pointerId: 8 });
+
+    await waitFor(() =>
+      expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+        revised: [{ durationMinutes: 45 }],
+      }),
+    );
+
+    fireEvent.click(
+      screen.getByRole("button", { name: "Edit Edited Revised" }),
+    );
+    fireEvent.click(
+      within(await screen.findByRole("dialog", { name: "Edit Revised" }))
+        .getByRole("button", { name: "Delete" }),
+    );
+
+    await waitFor(() =>
+      expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+        actual: [],
+        revised: [],
+      }),
+    );
+    expect(screen.queryByTestId("revised-block")).not.toBeInTheDocument();
+  });
+});

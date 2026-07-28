@@ -2,7 +2,7 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  ActualGridBlock,
+  EditableGridBlock,
   PlanGridBlock,
 } from "../../src/app/components/DayGridEventBlock";
 import { DayGridTimeAxis } from "../../src/app/components/DayGridTimeAxis";
@@ -63,8 +63,9 @@ describe("DayGrid event blocks", () => {
           isFront={false}
           onBringToFront={onBringToFront}
         />
-        <ActualGridBlock
+        <EditableGridBlock
           block={actual}
+          column="actual"
           frontZIndex={2}
           isFront
           onResizeStart={onResizeStart}

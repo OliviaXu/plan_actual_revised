@@ -171,15 +171,12 @@ Build:
 - Revised column rendering and persistence.
 - Drag Plan to Actual or Revised as copy.
 - Drag Actual/Revised between editable columns as move.
-- Drag Actual/Revised onto Plan as delete.
 - Snapped drop times based on settings defaults.
-- Cascade priority persistence for clicked/fronted blocks.
 
 Deterministic E2E tracer:
 
 - Drag a Plan event into Actual and Revised and verify copied summary, duration, color, source event ID, and snapped start time.
 - Move Actual to Revised and back.
-- Drag an editable block to Plan and verify deletion.
 - Reload and verify resulting Actual/Revised state persists.
 
 Real smoke:

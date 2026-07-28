@@ -1,7 +1,10 @@
 import { Check } from "lucide-react";
 import { useRef, useState, type FormEvent } from "react";
 
-import type { ActualEvent } from "../../domain/day-event";
+import type {
+  EditableColumn,
+  EditableEvent,
+} from "../../domain/day-event";
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import { Button } from "./ui/button";
 import {
@@ -11,31 +14,34 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
-export type ActualDraft = {
+export type EditableEventDraft = {
   summary: string;
   durationMinutes: number;
   colorId: string;
 };
 
-export function ActualEditDialog({
-  actual,
+export function EditableEventDialog({
+  column,
+  event,
+  mode,
   onDelete,
   onDismiss,
   onSave,
   paletteColorIds,
-  titleFocusMode,
 }: {
-  actual: ActualEvent;
-  onDelete?: () => void;
+  column: EditableColumn;
+  event: EditableEvent;
+  mode: "create" | "edit";
+  onDelete: () => void;
   onDismiss: () => void;
-  onSave: (draft: ActualDraft) => void;
+  onSave: (draft: EditableEventDraft) => void;
   paletteColorIds: string[];
-  titleFocusMode: "selectAll" | "caretEnd";
 }) {
   const titleInputRef = useRef<HTMLInputElement>(null);
-  const [title, setTitle] = useState(actual.summary);
-  const [duration, setDuration] = useState(String(actual.durationMinutes));
-  const [colorId, setColorId] = useState(actual.colorId);
+  const columnLabel = column === "actual" ? "Actual" : "Revised";
+  const [title, setTitle] = useState(event.summary);
+  const [duration, setDuration] = useState(String(event.durationMinutes));
+  const [colorId, setColorId] = useState(event.colorId);
   const [titleError, setTitleError] = useState<string>();
   const [durationError, setDurationError] = useState<string>();
 
@@ -64,12 +70,12 @@ export function ActualEditDialog({
       open
     >
       <DialogContent
-        aria-describedby="actual-dialog-description"
+        aria-describedby="editable-event-dialog-description"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           const titleInput = titleInputRef.current;
           titleInput?.focus();
-          if (titleFocusMode === "selectAll") {
+          if (mode === "create") {
             titleInput?.select();
           } else if (titleInput) {
             const titleEnd = titleInput.value.length;
@@ -78,12 +84,12 @@ export function ActualEditDialog({
         }}
         onBackdropClick={onDismiss}
       >
-        <DialogTitle className="sr-only">Edit Actual</DialogTitle>
+        <DialogTitle className="sr-only">Edit {columnLabel}</DialogTitle>
         <DialogDescription
           className="sr-only"
-          id="actual-dialog-description"
+          id="editable-event-dialog-description"
         >
-          Update this local Actual block.
+          Update this local {columnLabel} block.
         </DialogDescription>
 
         <form className="space-y-4" noValidate onSubmit={submitDraft}>
@@ -91,7 +97,7 @@ export function ActualEditDialog({
             aria-label="Title"
             aria-invalid={titleError ? true : undefined}
             className="-mx-2 block w-[calc(100%+1rem)] cursor-text border-b border-border bg-transparent px-2 py-1 text-xl font-semibold tracking-tight caret-primary outline-none selection:bg-primary/20 placeholder:text-muted-foreground focus:border-primary focus:ring-0"
-            id="actual-title"
+            id="editable-event-title"
             onChange={(event) => setTitle(event.target.value)}
             ref={titleInputRef}
             type="text"
@@ -105,14 +111,14 @@ export function ActualEditDialog({
             <div>
               <label
                 className="block text-sm font-medium"
-                htmlFor="actual-duration"
+                htmlFor="editable-event-duration"
               >
                 Minutes
                 <input
                   aria-label="Duration"
                   aria-invalid={durationError ? true : undefined}
                   className="mt-1 block h-9 w-16 rounded-md border border-border px-2 font-normal outline-none focus:ring-2 focus:ring-primary"
-                  id="actual-duration"
+                  id="editable-event-duration"
                   min={1}
                   onChange={(event) => setDuration(event.target.value)}
                   step={1}
@@ -163,10 +169,10 @@ export function ActualEditDialog({
 
           <div
             className={`flex items-center pt-1 ${
-              onDelete ? "justify-between" : "justify-end"
+              mode === "edit" ? "justify-between" : "justify-end"
             }`}
           >
-            {onDelete ? (
+            {mode === "edit" ? (
               <button
                 className="h-9 rounded-md px-2 text-sm font-medium text-destructive hover:bg-destructive/5"
                 onClick={onDelete}

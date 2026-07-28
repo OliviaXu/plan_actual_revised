@@ -165,7 +165,8 @@ It will verify that only eligible timed events render, colors and title fallback
 - Offset each layer 12px horizontally using a named layout constant.
 - Increase z-index with the layer index.
 - Bring a peeking event to the front when clicked.
-- Keep click-to-front priority transient; persistence belongs to Phase 4.
+- Keep click-to-front priority transient across later phases and reset it on
+  reload.
 - Treat events where one ends exactly as another begins as non-overlapping.
 
 ### Tracer

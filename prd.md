@@ -375,7 +375,7 @@ When events overlap, display them as cascaded cards:
 - Each later depth offsets 8px to the right.
 - Higher-depth blocks sit visually above lower-depth blocks.
 - Clicking a peeking block brings it to the front.
-- Cascade priority persists in the day record.
+- Click-to-front priority is transient and resets on reload.
 - Clicking Actual/Revised also opens the edit modal.
 
 Cascade affects display only. It does not alter the underlying time data.
@@ -421,11 +421,7 @@ The Plan block remains unchanged.
 
 Dragging Actual to Revised or Revised to Actual moves the block. The source column loses the block and the target column receives it at the dropped snapped time.
 
-### 10.3 Drag Actual/Revised to Plan
-
-Dragging an editable block onto the Plan column deletes it. During drag-over, Plan shows a red dashed outline and a `Drop to delete` indicator.
-
-### 10.4 Add Block
+### 10.3 Add Block
 
 The Actual header has a `+` button.
 
@@ -438,7 +434,7 @@ Clicking it:
 
 If the modal is dismissed, the block remains and can be edited or deleted later.
 
-### 10.5 Resize
+### 10.4 Resize
 
 Actual and Revised blocks have a bottom resize handle.
 

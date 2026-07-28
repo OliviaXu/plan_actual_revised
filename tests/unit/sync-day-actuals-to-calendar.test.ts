@@ -29,6 +29,7 @@ function dayRecord(actuals: ActualEvent[]): DayRecord {
     date: "2026-07-15",
     timezone: "America/Los_Angeles",
     actual: actuals,
+    revised: [],
     updatedAt: "2026-07-15T18:00:00.000Z",
   };
 }
@@ -94,6 +95,39 @@ describe("syncDayActualsToCalendar", () => {
       ["planMatched", "calendarSaved", "unsaved", "calendarSaved"],
       ["planMatched", "calendarSaved", "unsaved", "calendarSaved"],
     ]);
+  });
+
+  it("preserves Revised blocks in every Calendar disposition snapshot", async () => {
+    const record: DayRecord = {
+      ...dayRecord([actual("saved", "Calendar insert", 660)]),
+      revised: [{
+        id: "revised-1",
+        summary: "Revised plan",
+        startMinutes: 780,
+        durationMinutes: 30,
+        colorId: "6",
+        sourceCalendarEventId: "plan-1",
+      }],
+    };
+    const persistDayRecord = vi.fn();
+
+    await syncDayActualsToCalendar({
+      record,
+      now,
+      listCalendarEvents: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { events: [] },
+      }),
+      insertCalendarEvent: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { eventId: "calendar-saved" },
+      }),
+      persistDayRecord,
+    });
+
+    expect(persistDayRecord).toHaveBeenCalledWith(
+      expect.objectContaining({ revised: record.revised }),
+    );
   });
 
   it("persists a Plan lookup failure on every eligible block", async () => {

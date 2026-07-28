@@ -15,6 +15,7 @@ function dayRecord(updatedAt: string): DayRecord {
     date: calendarDay.date,
     timezone: calendarDay.timeZone,
     actual: [],
+    revised: [],
     updatedAt,
   };
 }
