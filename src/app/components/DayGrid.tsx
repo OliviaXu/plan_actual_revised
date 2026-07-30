@@ -1,5 +1,12 @@
 import { Plus } from "lucide-react";
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type DragEvent as ReactDragEvent,
+  type MouseEvent as ReactMouseEvent,
+} from "react";
 import {
   calculateDayGridBlocks,
   calculateDayGridNowIndicatorTopPx,
@@ -13,7 +20,10 @@ import type {
   PlanEvent,
   RevisedEvent,
 } from "../../domain/day-event";
-import { getCalendarTime } from "../../calendar/calendar-time";
+import {
+  formatMinuteOfDay,
+  getCalendarTime,
+} from "../../calendar/calendar-time";
 import { useEditableEventResize } from "../hooks/use-editable-event-resize";
 import {
   EditableGridBlock,
@@ -21,10 +31,17 @@ import {
 } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { SlackAuditPopover } from "./SlackAuditPopover";
+import {
+  calculateDroppedStartMinutes,
+  type DayGridDragSourceColumn,
+  type DayGridDropOperation,
+  type DayGridDropTargetColumn,
+} from "./day-grid-drag";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const DAY_GRID_TEMPLATE_COLUMNS =
   `${DAY_TIME_AXIS_WIDTH} repeat(3, minmax(0, 1fr))`;
+const DAY_GRID_DROP_TARGET_CLASS_NAME = "bg-accent/15";
 const readSystemTime = () => new Date();
 
 type DayGridStatus =
@@ -36,6 +53,7 @@ type DayGridStatus =
 type DayGridProps = {
   actuals?: ActualEvent[];
   revised?: RevisedEvent[];
+  dragDisabled?: boolean;
   editableMutationsDisabled?: boolean;
   canAddActual?: boolean;
   planEvents: PlanEvent[];
@@ -48,6 +66,7 @@ type DayGridProps = {
     eventId: string,
     durationMinutes: number,
   ) => void;
+  onDropEditable?: (operation: DayGridDropOperation) => void;
   status: DayGridStatus;
   date: string;
   timeZone: string;
@@ -56,6 +75,7 @@ type DayGridProps = {
 export function DayGrid({
   actuals,
   revised,
+  dragDisabled,
   editableMutationsDisabled,
   canAddActual,
   planEvents,
@@ -64,6 +84,7 @@ export function DayGrid({
   onStartSlack,
   onEditEditable,
   onEditableResizeEnd,
+  onDropEditable,
   status,
   date,
   timeZone,
@@ -71,10 +92,22 @@ export function DayGrid({
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
   const [frontActualId, setFrontActualId] = useState<string | null>(null);
   const [frontRevisedId, setFrontRevisedId] = useState<string | null>(null);
+  const [dragSession, setDragSession] = useState<{
+    sourceColumn: DayGridDragSourceColumn;
+    sourceEventId: string;
+    grabOffsetYPx: number;
+  }>();
+  const [dropPreview, setDropPreview] = useState<{
+    targetColumn: DayGridDropTargetColumn;
+    startMinutes: number;
+  }>();
   const [currentTime, setCurrentTime] = useState(now);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
+  const pendingGrabRef = useRef<
+    { sourceEventId: string; grabOffsetYPx: number } | undefined
+  >(undefined);
   const {
     displayedEvents: displayedActuals,
     startResize: startActualResize,
@@ -126,6 +159,8 @@ export function DayGrid({
     gridRange.endHour,
     defaultSettings.pixelsPerMinute,
   );
+  const gridStartMinutes = gridRange.startHour * 60;
+  const gridEndMinutes = gridRange.endHour * 60;
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setCurrentTime(now()), 60_000);
@@ -152,6 +187,117 @@ export function DayGrid({
     );
     didAutoScrollRef.current = true;
   }, [nowIndicatorTopPx, status]);
+
+  function clearDragState() {
+    pendingGrabRef.current = undefined;
+    setDragSession(undefined);
+    setDropPreview(undefined);
+  }
+
+  function captureGrabOffset(
+    event: ReactMouseEvent<HTMLButtonElement>,
+    sourceEventId: string,
+  ) {
+    const blockViewportTopPx =
+      event.currentTarget.getBoundingClientRect().top;
+    pendingGrabRef.current = {
+      sourceEventId,
+      grabOffsetYPx: event.clientY - blockViewportTopPx,
+    };
+  }
+
+  function startPlanDrag(
+    event: ReactDragEvent<HTMLButtonElement>,
+    sourceEventId: string,
+  ) {
+    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.setData("text/plain", sourceEventId);
+    const blockRect = event.currentTarget.getBoundingClientRect();
+    const recordedGrab = pendingGrabRef.current;
+    setDragSession({
+      sourceColumn: "plan",
+      sourceEventId,
+      grabOffsetYPx:
+        recordedGrab?.sourceEventId === sourceEventId
+          ? recordedGrab.grabOffsetYPx
+          : blockRect.height / 2,
+    });
+  }
+
+  function getDroppedStartMinutes(
+    event: ReactDragEvent<HTMLDivElement>,
+  ) {
+    if (!dragSession) return;
+
+    const columnViewportTopPx =
+      event.currentTarget.getBoundingClientRect().top;
+    return calculateDroppedStartMinutes({
+      pointerClientY: event.clientY,
+      columnViewportTopPx,
+      grabOffsetYPx: dragSession.grabOffsetYPx,
+      gridStartMinutes,
+      gridEndMinutes,
+      pixelsPerMinute: defaultSettings.pixelsPerMinute,
+      snapMinutes: defaultSettings.snapMinutes,
+    });
+  }
+
+  function previewEditableDrop(
+    event: ReactDragEvent<HTMLDivElement>,
+    targetColumn: DayGridDropTargetColumn,
+  ) {
+    if (
+      dragDisabled ||
+      !dragSession ||
+      dragSession.sourceColumn !== "plan"
+    ) {
+      return;
+    }
+
+    event.preventDefault();
+    event.dataTransfer.dropEffect = "copy";
+    const startMinutes = getDroppedStartMinutes(event);
+    if (startMinutes === undefined) return;
+    setDropPreview({ targetColumn, startMinutes });
+  }
+
+  function finishEditableDrop(
+    event: ReactDragEvent<HTMLDivElement>,
+    targetColumn: DayGridDropTargetColumn,
+  ) {
+    if (
+      dragDisabled ||
+      !dragSession ||
+      dragSession.sourceColumn !== "plan"
+    ) {
+      clearDragState();
+      return;
+    }
+
+    event.preventDefault();
+    const startMinutes = getDroppedStartMinutes(event);
+    if (startMinutes !== undefined) {
+      onDropEditable?.({
+        sourceColumn: dragSession.sourceColumn,
+        sourceEventId: dragSession.sourceEventId,
+        targetColumn,
+        startMinutes,
+      });
+    }
+    clearDragState();
+  }
+
+  function clearDropPreviewOnLeave(
+    event: ReactDragEvent<HTMLDivElement>,
+  ) {
+    if (
+      event.relatedTarget instanceof Node &&
+      event.currentTarget.contains(event.relatedTarget)
+    ) {
+      return;
+    }
+    setDropPreview(undefined);
+  }
 
   return (
     <section
@@ -207,7 +353,7 @@ export function DayGrid({
         >
           {nowIndicatorTopPx !== null ? (
             <div
-              className="pointer-events-none absolute right-0 border-t border-now"
+              className="pointer-events-none absolute right-0 flex items-start"
               data-testid="plan-now-indicator"
               style={{
                 left: DAY_TIME_AXIS_WIDTH,
@@ -221,7 +367,16 @@ export function DayGrid({
               }}
             >
               <span className="absolute -left-1 -top-1 h-2 w-2 rounded-full bg-now" />
-              <span className="absolute right-2 top-0 -translate-y-full bg-white px-1 text-xs font-medium text-now">
+              <span
+                aria-hidden="true"
+                className="min-w-0 flex-1 border-t border-now"
+                data-testid="now-time-trace"
+              />
+              <span
+                className={`mr-2 shrink-0 px-1 text-xs font-medium text-now ${
+                  nowIndicatorTopPx === 0 ? "" : "-translate-y-full"
+                }`}
+              >
                 {formatTime(currentTime, timeZone)}
               </span>
             </div>
@@ -267,17 +422,38 @@ export function DayGrid({
               {planBlocks.map((block) => (
                 <PlanGridBlock
                   block={block}
+                  dragDisabled={dragDisabled}
                   frontZIndex={planBlocks.length}
                   isFront={frontPlanId === block.event.id}
                   key={block.event.id}
                   onBringToFront={() => setFrontPlanId(block.event.id)}
+                  onDragEnd={clearDragState}
+                  onDragStart={(event) =>
+                    startPlanDrag(event, block.event.id)
+                  }
+                  onGrabOffsetCapture={(event) =>
+                    captureGrabOffset(event, block.event.id)
+                  }
                 />
               ))}
             </div>
             <div
-              className="relative overflow-hidden border-l border-border"
+              className={`relative overflow-hidden border-l border-border ${
+                dropPreview?.targetColumn === "actual"
+                  ? DAY_GRID_DROP_TARGET_CLASS_NAME
+                  : ""
+              }`}
               data-testid="actual-column"
+              onDragLeave={clearDropPreviewOnLeave}
+              onDragOver={(event) => previewEditableDrop(event, "actual")}
+              onDrop={(event) => finishEditableDrop(event, "actual")}
             >
+              {dropPreview?.targetColumn === "actual" ? (
+                <DropTimeIndicator
+                  gridStartMinutes={gridStartMinutes}
+                  startMinutes={dropPreview.startMinutes}
+                />
+              ) : null}
               {actualBlocks.map((block) => (
                 <EditableGridBlock
                   block={block}
@@ -298,9 +474,22 @@ export function DayGrid({
               ))}
             </div>
             <div
-              className="relative overflow-hidden border-l border-border"
+              className={`relative overflow-hidden border-l border-border ${
+                dropPreview?.targetColumn === "revised"
+                  ? DAY_GRID_DROP_TARGET_CLASS_NAME
+                  : ""
+              }`}
               data-testid="revised-column"
+              onDragLeave={clearDropPreviewOnLeave}
+              onDragOver={(event) => previewEditableDrop(event, "revised")}
+              onDrop={(event) => finishEditableDrop(event, "revised")}
             >
+              {dropPreview?.targetColumn === "revised" ? (
+                <DropTimeIndicator
+                  gridStartMinutes={gridStartMinutes}
+                  startMinutes={dropPreview.startMinutes}
+                />
+              ) : null}
               {revisedBlocks.map((block) => (
                 <EditableGridBlock
                   block={block}
@@ -327,10 +516,41 @@ export function DayGrid({
   );
 }
 
+function DropTimeIndicator({
+  gridStartMinutes,
+  startMinutes,
+}: {
+  gridStartMinutes: number;
+  startMinutes: number;
+}) {
+  return (
+    <div
+      className="pointer-events-none absolute inset-x-0 z-20 flex items-start"
+      data-testid="drop-time-indicator"
+      style={{
+        top:
+          (startMinutes - gridStartMinutes) *
+          defaultSettings.pixelsPerMinute,
+      }}
+    >
+      <span
+        className={`shrink-0 px-1 text-[10px] font-medium text-now/80 ${
+          startMinutes === gridStartMinutes ? "" : "-translate-y-full"
+        }`}
+      >
+        {formatMinuteOfDay(startMinutes)}
+      </span>
+      <span
+        aria-hidden="true"
+        className="min-w-0 flex-1 border-t border-now/40"
+        data-testid="drop-time-trace"
+      />
+    </div>
+  );
+}
+
 function formatTime(date: Date, timeZone: string) {
-  const { hour, minute } = getCalendarTime(date, timeZone);
-  const minutes = String(minute).padStart(2, "0");
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const clockHour = hour % 12 || 12;
-  return `${clockHour}:${minutes} ${suffix}`;
+  return formatMinuteOfDay(
+    getCalendarTime(date, timeZone).minutesSinceMidnight,
+  );
 }

@@ -67,6 +67,30 @@ function unexpectedMessage(message: RuntimeMessage): Promise<never> {
   );
 }
 
+function dragDataTransfer() {
+  return {
+    dropEffect: "none",
+    effectAllowed: "none",
+    getData: vi.fn(),
+    setData: vi.fn(),
+  } as unknown as DataTransfer;
+}
+
+function fireDragEvent(
+  target: Element,
+  type: "dragstart" | "dragover" | "drop",
+  clientY: number,
+  transfer: DataTransfer,
+) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientY,
+  });
+  Object.defineProperty(event, "dataTransfer", { value: transfer });
+  fireEvent(target, event);
+}
+
 afterEach(() => {
   cleanup();
   vi.unstubAllGlobals();
@@ -701,7 +725,7 @@ describe("App Actual persistence", () => {
     let finishWrite: (() => void) | undefined;
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -719,6 +743,10 @@ describe("App Actual persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByTestId("actual-block")).toBeVisible();
+    expect(screen.getByTestId("plan-event-design-review")).toHaveAttribute(
+      "draggable",
+      "true",
+    );
     const save = screen.getByRole("button", {
       name: "Save Actual to calendar",
     });
@@ -730,7 +758,7 @@ describe("App Actual persistence", () => {
   it("treats a rare storage read failure as an empty usable day", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       return unexpectedMessage(message);
     });
@@ -745,6 +773,10 @@ describe("App Actual persistence", () => {
     );
     const add = screen.getByRole("button", { name: "Add Actual" });
     expect(add).toBeEnabled();
+    expect(screen.getByTestId("plan-event-design-review")).toHaveAttribute(
+      "draggable",
+      "true",
+    );
     fireEvent.click(add);
 
     expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
@@ -1394,14 +1426,17 @@ describe("App Actual Calendar saving", () => {
     const resize = await screen.findByRole("button", {
       name: "Resize Design review",
     });
+    const planBlock = screen.getByTestId("plan-event-design-review");
     await waitFor(() => expect(add).toBeEnabled());
     expect(resize).toBeEnabled();
+    expect(planBlock).toHaveAttribute("draggable", "true");
     fireEvent.click(
       screen.getByRole("button", { name: "Save Actual to calendar" }),
     );
 
     expect(add).toBeDisabled();
     expect(resize).toBeDisabled();
+    expect(planBlock).toHaveAttribute("draggable", "false");
     finishCalendarRefresh?.({
       ok: true,
       value: {
@@ -1416,6 +1451,7 @@ describe("App Actual Calendar saving", () => {
     );
     await waitFor(() => expect(add).toBeEnabled());
     expect(resize).toBeEnabled();
+    expect(planBlock).toHaveAttribute("draggable", "true");
   });
 
   it("permanently classifies an exact Plan match without inserting", async () => {
@@ -1637,5 +1673,182 @@ describe("App Revised persistence", () => {
       }),
     );
     expect(screen.queryByTestId("revised-block")).not.toBeInTheDocument();
+  });
+});
+
+describe("App Plan copy dragging", () => {
+  it("disables Plan dragging until the canonical storage read settles", async () => {
+    let finishRead: ((value: Record<string, unknown>) => void) | undefined;
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [timedEvent],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.mocked(chrome.storage.local.get).mockImplementationOnce(
+      () =>
+        new Promise((resolve) => {
+          finishRead = resolve;
+        }),
+    );
+
+    render(<App now={now} />);
+    const planBlock = await screen.findByTestId(
+      "plan-event-design-review",
+    );
+    expect(planBlock).toHaveAttribute("draggable", "false");
+
+    finishRead?.({});
+    await waitFor(() =>
+      expect(planBlock).toHaveAttribute("draggable", "true")
+    );
+  });
+
+  it("copies Plan into Actual and Revised with distinct identities and provenance", async () => {
+    const stored = mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [timedEvent],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    const ids = ["actual-copy", "revised-copy"];
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn(() => ids.shift() ?? "unexpected-id"),
+    });
+
+    render(<App now={now} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    const planBlock = screen.getByTestId("plan-event-design-review");
+    vi.spyOn(planBlock, "getBoundingClientRect").mockReturnValue({
+      top: 168,
+      bottom: 252,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 84,
+      x: 0,
+      y: 168,
+      toJSON: () => undefined,
+    });
+
+    for (const [targetTestId, clientY] of [
+      ["actual-column", 399],
+      ["revised-column", 483],
+    ] as const) {
+      const target = screen.getByTestId(targetTestId);
+      vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+        top: 0,
+        bottom: 1_176,
+        left: 200,
+        right: 400,
+        width: 200,
+        height: 1_176,
+        x: 200,
+        y: 0,
+        toJSON: () => undefined,
+      });
+      const transfer = dragDataTransfer();
+      fireDragEvent(planBlock, "dragstart", 210, transfer);
+      fireDragEvent(target, "dragover", clientY, transfer);
+      fireDragEvent(target, "drop", clientY, transfer);
+    }
+
+    await waitFor(() =>
+      expect(stored["dayRecord:2026-07-15"]).toEqual({
+        schemaVersion: 1,
+        date: "2026-07-15",
+        timezone: "America/Los_Angeles",
+        actual: [{
+          id: "actual-copy",
+          summary: "Design review",
+          startMinutes: 675,
+          durationMinutes: 60,
+          colorId: "9",
+          sourceCalendarEventId: "design-review",
+          saveDisposition: "unsaved",
+        }],
+        revised: [{
+          id: "revised-copy",
+          summary: "Design review",
+          startMinutes: 735,
+          durationMinutes: 60,
+          colorId: "9",
+          sourceCalendarEventId: "design-review",
+        }],
+        updatedAt: "2026-07-15T19:00:00.000Z",
+      }),
+    );
+  });
+
+  it("keeps a failed Plan copy visible and surfaces the storage warning", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [timedEvent],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+    vi.mocked(chrome.storage.local.set).mockRejectedValueOnce(
+      new Error("quota exceeded"),
+    );
+
+    render(<App now={now} />);
+    const add = await screen.findByRole("button", { name: "Add Actual" });
+    await waitFor(() => expect(add).toBeEnabled());
+    const planBlock = screen.getByTestId("plan-event-design-review");
+    vi.spyOn(planBlock, "getBoundingClientRect").mockReturnValue({
+      top: 168,
+      bottom: 252,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 84,
+      x: 0,
+      y: 168,
+      toJSON: () => undefined,
+    });
+    const actualColumn = screen.getByTestId("actual-column");
+    vi.spyOn(actualColumn, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 1_176,
+      left: 200,
+      right: 400,
+      width: 200,
+      height: 1_176,
+      x: 200,
+      y: 0,
+      toJSON: () => undefined,
+    });
+    const transfer = dragDataTransfer();
+
+    fireDragEvent(planBlock, "dragstart", 210, transfer);
+    fireDragEvent(actualColumn, "drop", 399, transfer);
+
+    expect(await screen.findByTestId("actual-block")).toHaveTextContent(
+      "Design review",
+    );
+    expect(await screen.findByTestId("actual-storage-error"))
+      .toHaveTextContent("Unable to save local changes.");
   });
 });

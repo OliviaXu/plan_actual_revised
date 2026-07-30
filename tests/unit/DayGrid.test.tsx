@@ -62,6 +62,30 @@ function revisedEvent(
   };
 }
 
+function dataTransfer() {
+  return {
+    dropEffect: "none",
+    effectAllowed: "none",
+    getData: vi.fn(),
+    setData: vi.fn(),
+  } as unknown as DataTransfer;
+}
+
+function fireDragEvent(
+  target: Element,
+  type: "dragstart" | "dragover" | "drop",
+  clientY: number,
+  transfer: DataTransfer,
+) {
+  const event = new MouseEvent(type, {
+    bubbles: true,
+    cancelable: true,
+    clientY,
+  });
+  Object.defineProperty(event, "dataTransfer", { value: transfer });
+  fireEvent(target, event);
+}
+
 afterEach(() => {
   cleanup();
   vi.useRealTimers();
@@ -174,6 +198,173 @@ describe("DayGrid", () => {
       "revised",
       "revised",
       45,
+    );
+  });
+
+  it("previews and emits a snapped Plan copy over valid editable targets", () => {
+    const onDropEditable = vi.fn();
+    render(
+      <DayGrid
+        onDropEditable={onDropEditable}
+        planEvents={[planEvent("plan-copy", 540, 60)]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    const planBlock = screen.getByTestId("plan-event-plan-copy");
+    vi.spyOn(planBlock, "getBoundingClientRect").mockReturnValue({
+      top: 168,
+      bottom: 252,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 84,
+      x: 0,
+      y: 168,
+      toJSON: () => undefined,
+    });
+    const actualColumn = screen.getByTestId("actual-column");
+    vi.spyOn(actualColumn, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 1_176,
+      left: 200,
+      right: 400,
+      width: 200,
+      height: 1_176,
+      x: 200,
+      y: 0,
+      toJSON: () => undefined,
+    });
+    const transfer = dataTransfer();
+
+    fireDragEvent(planBlock, "dragstart", 210, transfer);
+    fireDragEvent(actualColumn, "dragover", 399, transfer);
+
+    expect(actualColumn).toHaveClass("bg-accent/15");
+    const dropTimeIndicator = screen.getByTestId("drop-time-indicator");
+    expect(dropTimeIndicator).toHaveStyle({
+      top: "357px",
+    });
+    expect(dropTimeIndicator).toHaveTextContent(
+      "11:15 AM",
+    );
+    const timeLabel = screen.getByText("11:15 AM");
+    const timeTrace = screen.getByTestId("drop-time-trace");
+    expect(timeLabel).not.toHaveClass("bg-white/90");
+    expect(timeLabel).toHaveClass("text-now/80");
+    expect(timeTrace).toHaveClass("border-now/40");
+    expect(timeLabel.nextElementSibling).toBe(timeTrace);
+
+    fireDragEvent(actualColumn, "drop", 399, transfer);
+
+    expect(onDropEditable).toHaveBeenCalledWith({
+      sourceColumn: "plan",
+      sourceEventId: "plan-copy",
+      targetColumn: "actual",
+      startMinutes: 675,
+    });
+    expect(screen.queryByTestId("drop-time-indicator"))
+      .not.toBeInTheDocument();
+    expect(actualColumn).not.toHaveClass("bg-accent/15");
+  });
+
+  it("disables every Plan drag source and drop target while dragging is disabled", () => {
+    const onDropEditable = vi.fn();
+    render(
+      <DayGrid
+        dragDisabled
+        onDropEditable={onDropEditable}
+        planEvents={[planEvent("disabled-plan", 540, 60)]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    const planBlock = screen.getByTestId("plan-event-disabled-plan");
+    expect(planBlock).toHaveAttribute("draggable", "false");
+    fireEvent.dragStart(planBlock, {
+      clientY: 210,
+      dataTransfer: dataTransfer(),
+    });
+    fireEvent.dragOver(screen.getByTestId("revised-column"), {
+      clientY: 399,
+      dataTransfer: dataTransfer(),
+    });
+
+    expect(screen.queryByTestId("drop-time-indicator"))
+      .not.toBeInTheDocument();
+    expect(onDropEditable).not.toHaveBeenCalled();
+  });
+
+  it("clears a valid drop preview when a drag leaves or is canceled", () => {
+    render(
+      <DayGrid
+        planEvents={[planEvent("cancel-plan", 540, 60)]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+    const planBlock = screen.getByTestId("plan-event-cancel-plan");
+    const actualColumn = screen.getByTestId("actual-column");
+    const transfer = dataTransfer();
+
+    fireDragEvent(planBlock, "dragstart", 210, transfer);
+    fireDragEvent(actualColumn, "dragover", 399, transfer);
+    expect(screen.getByTestId("drop-time-indicator")).toBeInTheDocument();
+
+    fireEvent.dragLeave(actualColumn);
+    expect(screen.queryByTestId("drop-time-indicator"))
+      .not.toBeInTheDocument();
+
+    fireDragEvent(actualColumn, "dragover", 399, transfer);
+    fireEvent.dragEnd(planBlock, { dataTransfer: transfer });
+    expect(screen.queryByTestId("drop-time-indicator"))
+      .not.toBeInTheDocument();
+  });
+
+  it("places the first-slot time label below its unclipped grid edge", () => {
+    render(
+      <DayGrid
+        planEvents={[planEvent("grid-start-plan", 540, 60)]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+    const planBlock = screen.getByTestId("plan-event-grid-start-plan");
+    vi.spyOn(planBlock, "getBoundingClientRect").mockReturnValue({
+      top: 168,
+      bottom: 252,
+      left: 0,
+      right: 200,
+      width: 200,
+      height: 84,
+      x: 0,
+      y: 168,
+      toJSON: () => undefined,
+    });
+    const actualColumn = screen.getByTestId("actual-column");
+    vi.spyOn(actualColumn, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 1_176,
+      left: 200,
+      right: 400,
+      width: 200,
+      height: 1_176,
+      x: 200,
+      y: 0,
+      toJSON: () => undefined,
+    });
+    const transfer = dataTransfer();
+
+    fireDragEvent(planBlock, "dragstart", 210, transfer);
+    fireDragEvent(actualColumn, "dragover", 42, transfer);
+
+    expect(screen.getByTestId("drop-time-indicator")).toHaveStyle({
+      top: "0px",
+    });
+    expect(screen.getByText("7:00 AM")).not.toHaveClass(
+      "-translate-y-full",
     );
   });
 
@@ -471,13 +662,33 @@ describe("DayGrid", () => {
     const indicator = screen.getByTestId("plan-now-indicator");
     expect(indicator.parentElement).toBe(screen.getByTestId("day-grid-body"));
     expect(indicator).toHaveStyle({ top: "467.6px" });
-    expect(within(indicator).getByText("12:34 PM")).toBeVisible();
+    const timeLabel = within(indicator).getByText("12:34 PM");
+    const timeTrace = within(indicator).getByTestId("now-time-trace");
+    expect(timeLabel).toBeVisible();
+    expect(timeLabel).not.toHaveClass("bg-white");
+    expect(timeTrace).toHaveClass("border-now");
+    expect(timeTrace.nextElementSibling).toBe(timeLabel);
 
     currentTime = new Date(2026, 6, 15, 12, 35);
     act(() => vi.advanceTimersByTime(60_000));
 
     expect(indicator).toHaveStyle({ top: "469px" });
     expect(within(indicator).getByText("12:35 PM")).toBeVisible();
+  });
+
+  it("keeps the Now label inside the first visible grid slot", () => {
+    render(
+      <DayGrid
+        planEvents={[]}
+        now={() => new Date(2026, 6, 15, 7)}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+
+    expect(screen.getByText("7:00 AM")).not.toHaveClass(
+      "-translate-y-full",
+    );
   });
 
   it("auto-scrolls once after connected content renders", () => {

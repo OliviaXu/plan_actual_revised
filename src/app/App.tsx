@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 
 import { Button } from "./components/ui/button";
 import { DayGrid } from "./components/DayGrid";
+import type { DayGridDropOperation } from "./components/day-grid-drag";
 import {
   EditableEventDialog,
   type EditableEventDraft,
@@ -14,6 +15,11 @@ import type {
   RevisedEvent,
 } from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
+import {
+  appendEditableEvent,
+  type EditableEventAddition,
+} from "../domain/day-record-edit";
+import { buildPlanCopy } from "../domain/editable-event-drag";
 import { defaultSettings } from "../domain/settings";
 import { buildEditedActual } from "../domain/actual-edit";
 import {
@@ -69,6 +75,12 @@ export function App({
     calendarConnected &&
     actualLoadStatus !== "loading" &&
     !isSavingActualsToCalendar;
+  const planEvents =
+    calendarState.status === "connected" ? calendarState.planEvents : [];
+  const dragDisabled =
+    !calendarConnected ||
+    actualLoadStatus === "loading" ||
+    isSavingActualsToCalendar;
 
   useEffect(() => {
     if (!calendarConnected || actualLoadStatus !== "loaded") return;
@@ -129,24 +141,15 @@ export function App({
     };
   }
 
-  function appendActual(actual: ActualEvent, updatedAt: Date) {
-    const updatedAtIso = updatedAt.toISOString();
-    const nextRecord: DayRecord = dayRecord
-      ? {
-          ...dayRecord,
-          actual: [...dayRecord.actual, actual],
-          updatedAt: updatedAtIso,
-        }
-      : {
-          schemaVersion: 1,
-          date: calendarDay.date,
-          timezone: calendarDay.timeZone,
-          actual: [actual],
-          revised: [],
-          updatedAt: updatedAtIso,
-        };
-
-    void persistDayRecord(nextRecord);
+  function persistAddedEditableEvent(addition: EditableEventAddition) {
+    void persistDayRecord(
+      appendEditableEvent({
+        record: dayRecord,
+        day: calendarDay,
+        addition,
+        updatedAt: now().toISOString(),
+      }),
+    );
   }
 
   function addActual() {
@@ -176,7 +179,7 @@ export function App({
       isSlack: true,
       createdAt,
     });
-    appendActual(newActual, createdAt);
+    persistAddedEditableEvent({ column: "actual", event: newActual });
     setSlackLaunchWarning(false);
     try {
       launchSlack();
@@ -195,7 +198,7 @@ export function App({
         ...editableEventEditorState.event,
         ...draft,
       };
-      appendActual(newActual, now());
+      persistAddedEditableEvent({ column: "actual", event: newActual });
       setEditableEventEditorState(undefined);
       return;
     }
@@ -310,6 +313,29 @@ export function App({
     });
   }
 
+  function copyPlanToEditableColumn(operation: DayGridDropOperation) {
+    if (dragDisabled || operation.sourceColumn !== "plan") return;
+
+    const planEvent = planEvents.find(
+      (event) => event.id === operation.sourceEventId,
+    );
+    if (!planEvent) return;
+
+    const copiedEvent = buildPlanCopy(
+      planEvent,
+      operation.startMinutes,
+      crypto.randomUUID(),
+    );
+    const addition: EditableEventAddition =
+      operation.targetColumn === "actual"
+        ? {
+            column: "actual",
+            event: { ...copiedEvent, saveDisposition: "unsaved" },
+          }
+        : { column: "revised", event: copiedEvent };
+    persistAddedEditableEvent(addition);
+  }
+
   async function handleSaveActualsToCalendar() {
     if (!dayRecord || isSavingActualsToCalendar) return;
 
@@ -329,8 +355,6 @@ export function App({
     }
   }
 
-  const planEvents =
-    calendarState.status === "connected" ? calendarState.planEvents : [];
   const errorMessage =
     calendarState.status === "error"
       ? calendarState.message
@@ -415,6 +439,7 @@ export function App({
           <DayGrid
             actuals={dayRecord?.actual ?? []}
             revised={dayRecord?.revised ?? []}
+            dragDisabled={dragDisabled}
             editableMutationsDisabled={isSavingActualsToCalendar}
             canAddActual={canCreateActual}
             planEvents={planEvents}
@@ -429,6 +454,7 @@ export function App({
               })
             }
             onEditableResizeEnd={persistResizedEditableEvent}
+            onDropEditable={copyPlanToEditableColumn}
             status={calendarState.status}
             date={calendarDay.date}
             timeZone={calendarDay.timeZone}

@@ -1,4 +1,9 @@
+import { formatMinuteOfDay } from "../../calendar/calendar-time";
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
+import type {
+  DragEvent as ReactDragEvent,
+  MouseEvent as ReactMouseEvent,
+} from "react";
 import type {
   DayEvent,
   EditableColumn,
@@ -79,14 +84,24 @@ export function EditableGridBlock({
 
 export function PlanGridBlock({
   block,
+  dragDisabled,
   frontZIndex,
   isFront,
   onBringToFront,
+  onDragEnd,
+  onDragStart,
+  onGrabOffsetCapture,
 }: {
   block: DayGridBlock<PlanEvent>;
+  dragDisabled?: boolean;
   frontZIndex: number;
   isFront: boolean;
   onBringToFront: () => void;
+  onDragEnd?: (event: ReactDragEvent<HTMLButtonElement>) => void;
+  onDragStart?: (event: ReactDragEvent<HTMLButtonElement>) => void;
+  onGrabOffsetCapture?: (
+    event: ReactMouseEvent<HTMLButtonElement>,
+  ) => void;
 }) {
   const appearance = getDayGridBlockAppearance(
     block,
@@ -101,7 +116,11 @@ export function PlanGridBlock({
       data-overlap-group-index={block.overlapGroupIndex}
       data-overlap-layer-index={block.overlapLayerIndex}
       data-testid={`plan-event-${block.event.id}`}
+      draggable={!dragDisabled}
       onClick={onBringToFront}
+      onDragEnd={dragDisabled ? undefined : onDragEnd}
+      onDragStart={dragDisabled ? undefined : onDragStart}
+      onMouseDown={dragDisabled ? undefined : onGrabOffsetCapture}
       style={appearance.style}
       type="button"
     >
@@ -173,14 +192,6 @@ function getDayGridBlockAppearance(
         : {}),
     },
   };
-}
-
-function formatMinuteOfDay(minutesSinceMidnight: number) {
-  const hour = Math.floor(minutesSinceMidnight / 60) % 24;
-  const minute = minutesSinceMidnight % 60;
-  const suffix = hour >= 12 ? "PM" : "AM";
-  const clockHour = hour % 12 || 12;
-  return `${clockHour}:${String(minute).padStart(2, "0")} ${suffix}`;
 }
 
 function formatDuration(durationMinutes: number) {
