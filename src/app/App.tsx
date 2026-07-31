@@ -17,6 +17,7 @@ import type {
 import type { DayRecord } from "../domain/day-record";
 import {
   appendEditableEvent,
+  moveEditableEvent,
   type EditableEventAddition,
 } from "../domain/day-record-edit";
 import { buildPlanCopy } from "../domain/editable-event-drag";
@@ -313,27 +314,44 @@ export function App({
     });
   }
 
-  function copyPlanToEditableColumn(operation: DayGridDropOperation) {
-    if (dragDisabled || operation.sourceColumn !== "plan") return;
+  function persistEditableDrop(operation: DayGridDropOperation) {
+    if (dragDisabled) return;
 
-    const planEvent = planEvents.find(
-      (event) => event.id === operation.sourceEventId,
-    );
-    if (!planEvent) return;
+    if (operation.sourceColumn === "plan") {
+      const planEvent = planEvents.find(
+        (event) => event.id === operation.sourceEventId,
+      );
+      if (!planEvent) return;
 
-    const copiedEvent = buildPlanCopy(
-      planEvent,
-      operation.startMinutes,
-      crypto.randomUUID(),
-    );
-    const addition: EditableEventAddition =
-      operation.targetColumn === "actual"
-        ? {
-            column: "actual",
-            event: { ...copiedEvent, saveDisposition: "unsaved" },
-          }
-        : { column: "revised", event: copiedEvent };
-    persistAddedEditableEvent(addition);
+      const copiedEvent = buildPlanCopy(
+        planEvent,
+        operation.startMinutes,
+        crypto.randomUUID(),
+      );
+      const addition: EditableEventAddition =
+        operation.targetColumn === "actual"
+          ? {
+              column: "actual",
+              event: { ...copiedEvent, saveDisposition: "unsaved" },
+            }
+          : { column: "revised", event: copiedEvent };
+      persistAddedEditableEvent(addition);
+      return;
+    }
+
+    if (!dayRecord) return;
+    const movedRecord = moveEditableEvent({
+      record: dayRecord,
+      sourceColumn: operation.sourceColumn,
+      sourceEventId: operation.sourceEventId,
+      targetColumn: operation.targetColumn,
+      startMinutes: operation.startMinutes,
+      updatedAt: now().toISOString(),
+      createId: () => crypto.randomUUID(),
+    });
+    if (movedRecord) {
+      void persistDayRecord(movedRecord);
+    }
   }
 
   async function handleSaveActualsToCalendar() {
@@ -454,7 +472,7 @@ export function App({
               })
             }
             onEditableResizeEnd={persistResizedEditableEvent}
-            onDropEditable={copyPlanToEditableColumn}
+            onDropEditable={persistEditableDrop}
             status={calendarState.status}
             date={calendarDay.date}
             timeZone={calendarDay.timeZone}

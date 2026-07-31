@@ -421,6 +421,8 @@ The Plan block remains unchanged.
 
 Dragging Actual to Revised or Revised to Actual moves the block. The source column loses the block and the target column receives it at the dropped snapped time.
 
+Dragging an Actual or Revised block within its current column updates its snapped start time. Dropping it at the same snapped start time is a no-op.
+
 ### 10.3 Add Block
 
 The Actual header has a `+` button.

@@ -73,7 +73,7 @@ function dataTransfer() {
 
 function fireDragEvent(
   target: Element,
-  type: "dragstart" | "dragover" | "drop",
+  type: "dragstart" | "dragover" | "drop" | "dragend",
   clientY: number,
   transfer: DataTransfer,
 ) {
@@ -273,6 +273,7 @@ describe("DayGrid", () => {
     const onDropEditable = vi.fn();
     render(
       <DayGrid
+        actuals={[actualEvent("disabled-actual", 600, 30)]}
         dragDisabled
         onDropEditable={onDropEditable}
         planEvents={[planEvent("disabled-plan", 540, 60)]}
@@ -282,7 +283,14 @@ describe("DayGrid", () => {
     );
 
     const planBlock = screen.getByTestId("plan-event-disabled-plan");
+    const actualBlockButton = screen.getByRole("button", {
+      name: "Edit disabled-actual",
+    });
     expect(planBlock).toHaveAttribute("draggable", "false");
+    expect(actualBlockButton).toHaveAttribute("draggable", "false");
+    expect(screen.getByRole("button", {
+      name: "Resize disabled-actual",
+    })).toHaveProperty("draggable", false);
     fireEvent.dragStart(planBlock, {
       clientY: 210,
       dataTransfer: dataTransfer(),
@@ -295,6 +303,120 @@ describe("DayGrid", () => {
     expect(screen.queryByTestId("drop-time-indicator"))
       .not.toBeInTheDocument();
     expect(onDropEditable).not.toHaveBeenCalled();
+  });
+
+  it("moves an editable block across columns and suppresses its drag click", () => {
+    const onDropEditable = vi.fn();
+    const onEditEditable = vi.fn();
+    render(
+      <DayGrid
+        actuals={[actualEvent("actual-source", 600, 30)]}
+        onDropEditable={onDropEditable}
+        onEditEditable={onEditEditable}
+        planEvents={[]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+    const source = screen.getByRole("button", {
+      name: "Edit actual-source",
+    });
+    vi.spyOn(source, "getBoundingClientRect").mockReturnValue({
+      top: 252,
+      bottom: 294,
+      left: 200,
+      right: 400,
+      width: 200,
+      height: 42,
+      x: 200,
+      y: 252,
+      toJSON: () => undefined,
+    });
+    const target = screen.getByTestId("revised-column");
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 1_176,
+      left: 400,
+      right: 600,
+      width: 200,
+      height: 1_176,
+      x: 400,
+      y: 0,
+      toJSON: () => undefined,
+    });
+    const transfer = dataTransfer();
+
+    fireEvent.mouseDown(source, { clientY: 273 });
+    fireDragEvent(source, "dragstart", 273, transfer);
+    expect(transfer.effectAllowed).toBe("move");
+    expect(screen.getByTestId("actual-block")).toHaveStyle({ zIndex: "0" });
+    fireDragEvent(target, "dragover", 441, transfer);
+    expect(transfer.dropEffect).toBe("move");
+    expect(screen.getByTestId("drop-time-indicator")).toHaveStyle({
+      top: "420px",
+    });
+    fireDragEvent(target, "drop", 441, transfer);
+    fireDragEvent(source, "dragend", 441, transfer);
+    fireEvent.click(source);
+
+    expect(onDropEditable).toHaveBeenCalledWith({
+      sourceColumn: "actual",
+      sourceEventId: "actual-source",
+      targetColumn: "revised",
+      startMinutes: 720,
+    });
+    expect(onEditEditable).not.toHaveBeenCalled();
+  });
+
+  it("emits same-column editable drops as reposition operations", () => {
+    const onDropEditable = vi.fn();
+    render(
+      <DayGrid
+        revised={[revisedEvent("revised-source", 600, 30)]}
+        onDropEditable={onDropEditable}
+        planEvents={[]}
+        status="connected"
+        {...calendarDay}
+      />,
+    );
+    const source = screen.getByRole("button", {
+      name: "Edit revised-source",
+    });
+    vi.spyOn(source, "getBoundingClientRect").mockReturnValue({
+      top: 252,
+      bottom: 294,
+      left: 400,
+      right: 600,
+      width: 200,
+      height: 42,
+      x: 400,
+      y: 252,
+      toJSON: () => undefined,
+    });
+    const target = screen.getByTestId("revised-column");
+    vi.spyOn(target, "getBoundingClientRect").mockReturnValue({
+      top: 0,
+      bottom: 1_176,
+      left: 400,
+      right: 600,
+      width: 200,
+      height: 1_176,
+      x: 400,
+      y: 0,
+      toJSON: () => undefined,
+    });
+    const transfer = dataTransfer();
+
+    fireEvent.mouseDown(source, { clientY: 273 });
+    fireDragEvent(source, "dragstart", 273, transfer);
+    fireDragEvent(target, "drop", 357, transfer);
+
+    expect(onDropEditable).toHaveBeenCalledWith({
+      sourceColumn: "revised",
+      sourceEventId: "revised-source",
+      targetColumn: "revised",
+      startMinutes: 660,
+    });
   });
 
   it("clears a valid drop preview when a drag leaves or is canceled", () => {

@@ -106,7 +106,11 @@ export function DayGrid({
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
   const pendingGrabRef = useRef<
-    { sourceEventId: string; grabOffsetYPx: number } | undefined
+    {
+      sourceColumn: DayGridDragSourceColumn;
+      sourceEventId: string;
+      grabOffsetYPx: number;
+    } | undefined
   >(undefined);
   const {
     displayedEvents: displayedActuals,
@@ -196,29 +200,34 @@ export function DayGrid({
 
   function captureGrabOffset(
     event: ReactMouseEvent<HTMLButtonElement>,
+    sourceColumn: DayGridDragSourceColumn,
     sourceEventId: string,
   ) {
     const blockViewportTopPx =
       event.currentTarget.getBoundingClientRect().top;
     pendingGrabRef.current = {
+      sourceColumn,
       sourceEventId,
       grabOffsetYPx: event.clientY - blockViewportTopPx,
     };
   }
 
-  function startPlanDrag(
+  function startDrag(
     event: ReactDragEvent<HTMLButtonElement>,
+    sourceColumn: DayGridDragSourceColumn,
     sourceEventId: string,
   ) {
-    event.dataTransfer.effectAllowed = "copy";
+    event.dataTransfer.effectAllowed =
+      sourceColumn === "plan" ? "copy" : "move";
     event.dataTransfer.setData("text/plain", sourceEventId);
     const blockRect = event.currentTarget.getBoundingClientRect();
     const recordedGrab = pendingGrabRef.current;
     setDragSession({
-      sourceColumn: "plan",
+      sourceColumn,
       sourceEventId,
       grabOffsetYPx:
-        recordedGrab?.sourceEventId === sourceEventId
+        recordedGrab?.sourceColumn === sourceColumn &&
+        recordedGrab.sourceEventId === sourceEventId
           ? recordedGrab.grabOffsetYPx
           : blockRect.height / 2,
     });
@@ -226,15 +235,14 @@ export function DayGrid({
 
   function getDroppedStartMinutes(
     event: ReactDragEvent<HTMLDivElement>,
+    grabOffsetYPx: number,
   ) {
-    if (!dragSession) return;
-
     const columnViewportTopPx =
       event.currentTarget.getBoundingClientRect().top;
     return calculateDroppedStartMinutes({
       pointerClientY: event.clientY,
       columnViewportTopPx,
-      grabOffsetYPx: dragSession.grabOffsetYPx,
+      grabOffsetYPx,
       gridStartMinutes,
       gridEndMinutes,
       pixelsPerMinute: defaultSettings.pixelsPerMinute,
@@ -248,16 +256,18 @@ export function DayGrid({
   ) {
     if (
       dragDisabled ||
-      !dragSession ||
-      dragSession.sourceColumn !== "plan"
+      !dragSession
     ) {
       return;
     }
 
     event.preventDefault();
-    event.dataTransfer.dropEffect = "copy";
-    const startMinutes = getDroppedStartMinutes(event);
-    if (startMinutes === undefined) return;
+    event.dataTransfer.dropEffect =
+      dragSession.sourceColumn === "plan" ? "copy" : "move";
+    const startMinutes = getDroppedStartMinutes(
+      event,
+      dragSession.grabOffsetYPx,
+    );
     setDropPreview({ targetColumn, startMinutes });
   }
 
@@ -267,23 +277,23 @@ export function DayGrid({
   ) {
     if (
       dragDisabled ||
-      !dragSession ||
-      dragSession.sourceColumn !== "plan"
+      !dragSession
     ) {
       clearDragState();
       return;
     }
 
     event.preventDefault();
-    const startMinutes = getDroppedStartMinutes(event);
-    if (startMinutes !== undefined) {
-      onDropEditable?.({
-        sourceColumn: dragSession.sourceColumn,
-        sourceEventId: dragSession.sourceEventId,
-        targetColumn,
-        startMinutes,
-      });
-    }
+    const startMinutes = getDroppedStartMinutes(
+      event,
+      dragSession.grabOffsetYPx,
+    );
+    onDropEditable?.({
+      sourceColumn: dragSession.sourceColumn,
+      sourceEventId: dragSession.sourceEventId,
+      targetColumn,
+      startMinutes,
+    });
     clearDragState();
   }
 
@@ -429,10 +439,10 @@ export function DayGrid({
                   onBringToFront={() => setFrontPlanId(block.event.id)}
                   onDragEnd={clearDragState}
                   onDragStart={(event) =>
-                    startPlanDrag(event, block.event.id)
+                    startDrag(event, "plan", block.event.id)
                   }
                   onGrabOffsetCapture={(event) =>
-                    captureGrabOffset(event, block.event.id)
+                    captureGrabOffset(event, "plan", block.event.id)
                   }
                 />
               ))}
@@ -458,10 +468,18 @@ export function DayGrid({
                 <EditableGridBlock
                   block={block}
                   column="actual"
+                  dragDisabled={dragDisabled}
                   frontZIndex={actualBlocks.length}
                   isFront={frontActualId === block.event.id}
                   key={block.event.id}
                   mutationsDisabled={editableMutationsDisabled}
+                  onDragEnd={clearDragState}
+                  onDragStart={(event) =>
+                    startDrag(event, "actual", block.event.id)
+                  }
+                  onGrabOffsetCapture={(event) =>
+                    captureGrabOffset(event, "actual", block.event.id)
+                  }
                   onResizeStart={(actual, pointer) => {
                     setFrontActualId(actual.id);
                     startActualResize(actual, pointer);
@@ -494,10 +512,18 @@ export function DayGrid({
                 <EditableGridBlock
                   block={block}
                   column="revised"
+                  dragDisabled={dragDisabled}
                   frontZIndex={revisedBlocks.length}
                   isFront={frontRevisedId === block.event.id}
                   key={block.event.id}
                   mutationsDisabled={editableMutationsDisabled}
+                  onDragEnd={clearDragState}
+                  onDragStart={(event) =>
+                    startDrag(event, "revised", block.event.id)
+                  }
+                  onGrabOffsetCapture={(event) =>
+                    captureGrabOffset(event, "revised", block.event.id)
+                  }
                   onResizeStart={(event, pointer) => {
                     setFrontRevisedId(event.id);
                     startRevisedResize(event, pointer);

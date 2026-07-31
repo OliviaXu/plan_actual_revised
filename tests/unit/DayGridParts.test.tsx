@@ -34,6 +34,69 @@ describe("DayGridTimeAxis", () => {
 });
 
 describe("DayGrid event blocks", () => {
+  it("uses draggable to disable dragging without removing drag handlers", () => {
+    const plan = dayGridBlock<PlanEvent>({
+      id: "plan",
+      summary: "Plan event",
+      colorId: "8",
+      startMinutes: 540,
+      durationMinutes: 60,
+    });
+    const actual = dayGridBlock<ActualEvent>({
+      id: "actual",
+      summary: "Actual event",
+      colorId: "8",
+      startMinutes: 540,
+      durationMinutes: 60,
+      saveDisposition: "unsaved",
+    });
+    const onPlanDragStart = vi.fn();
+    const onActualDragStart = vi.fn();
+    const onGrabOffsetCapture = vi.fn();
+
+    render(
+      <>
+        <PlanGridBlock
+          block={plan}
+          dragDisabled
+          frontZIndex={2}
+          isFront={false}
+          onBringToFront={vi.fn()}
+          onDragStart={onPlanDragStart}
+          onGrabOffsetCapture={onGrabOffsetCapture}
+        />
+        <EditableGridBlock
+          block={actual}
+          column="actual"
+          dragDisabled
+          frontZIndex={2}
+          isFront
+          onDragStart={onActualDragStart}
+          onGrabOffsetCapture={onGrabOffsetCapture}
+          onResizeStart={vi.fn()}
+          onSelect={vi.fn()}
+        />
+      </>,
+    );
+
+    const planButton = screen.getByTestId("plan-event-plan");
+    const actualButton = screen.getByRole("button", {
+      name: "Edit Actual event",
+    });
+
+    expect(planButton).toHaveAttribute("draggable", "false");
+    expect(actualButton).toHaveAttribute("draggable", "false");
+
+    fireEvent.dragStart(planButton);
+    fireEvent.dragStart(actualButton);
+    fireEvent.mouseDown(planButton);
+    fireEvent.mouseDown(actualButton);
+
+    expect(onPlanDragStart).toHaveBeenCalledOnce();
+    expect(onActualDragStart).toHaveBeenCalledOnce();
+    expect(onGrabOffsetCapture).not.toHaveBeenCalled();
+  });
+
   it("keeps Plan and Actual interactions distinct while sharing event content", () => {
     const plan = dayGridBlock<PlanEvent>({
       id: "plan",

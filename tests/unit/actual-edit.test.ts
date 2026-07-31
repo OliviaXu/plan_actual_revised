@@ -1,6 +1,10 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { buildEditedActual } from "../../src/domain/actual-edit";
+import {
+  actualChangeNeedsFreshId,
+  buildEditedActual,
+  buildMovedActual,
+} from "../../src/domain/actual-edit";
 import type { ActualEvent } from "../../src/domain/day-event";
 
 function actualEvent(overrides: Partial<ActualEvent> = {}): ActualEvent {
@@ -145,6 +149,73 @@ describe("buildEditedActual", () => {
       colorId: "8",
       isSlack: true,
       sourceCalendarEventId: "plan-source",
+      saveDisposition: "unsaved",
+    });
+  });
+});
+
+describe("actualChangeNeedsFreshId", () => {
+  it("requires a fresh identity for Calendar-saved and ambiguously attempted Actuals", () => {
+    expect(actualChangeNeedsFreshId(actualEvent())).toBe(false);
+    expect(
+      actualChangeNeedsFreshId(actualEvent({
+        saveDisposition: "planMatched",
+        lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
+      })),
+    ).toBe(false);
+    expect(
+      actualChangeNeedsFreshId(actualEvent({
+        saveDisposition: "calendarSaved",
+      })),
+    ).toBe(true);
+    expect(
+      actualChangeNeedsFreshId(actualEvent({
+        lastSaveAttemptAt: "2026-07-15T19:00:00.000Z",
+      })),
+    ).toBe(true);
+  });
+});
+
+describe("buildMovedActual", () => {
+  it("changes only the start time and save state when identity remains safe", () => {
+    const createId = vi.fn(() => "replacement-id");
+
+    expect(
+      buildMovedActual(actualEvent({
+        sourceCalendarEventId: "plan-source",
+        isSlack: true,
+      }), 600, createId),
+    ).toEqual({
+      id: "original-id",
+      summary: "Original title",
+      startMinutes: 600,
+      durationMinutes: 30,
+      colorId: "8",
+      sourceCalendarEventId: "plan-source",
+      isSlack: true,
+      saveDisposition: "unsaved",
+    });
+    expect(createId).not.toHaveBeenCalled();
+  });
+
+  it("uses a fresh identity when moving a Calendar-saved Actual", () => {
+    expect(
+      buildMovedActual(
+        actualEvent({
+          saveDisposition: "calendarSaved",
+          calendarEventId: "calendar-event-id",
+        }),
+        600,
+        () => "replacement-id",
+      ),
+    ).toEqual({
+      id: "replacement-id",
+      summary: "Original title",
+      startMinutes: 600,
+      durationMinutes: 30,
+      colorId: "8",
+      sourceCalendarEventId: undefined,
+      isSlack: undefined,
       saveDisposition: "unsaved",
     });
   });

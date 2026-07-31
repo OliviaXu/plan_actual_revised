@@ -1852,3 +1852,172 @@ describe("App Plan copy dragging", () => {
       .toHaveTextContent("Unable to save local changes.");
   });
 });
+
+describe("App editable dragging", () => {
+  function seedEditableRecord(
+    stored: Record<string, unknown>,
+    actual: ActualEvent[],
+  ) {
+    stored["dayRecord:2026-07-15"] = {
+      schemaVersion: 1,
+      date: "2026-07-15",
+      timezone: "America/Los_Angeles",
+      actual,
+      revised: [],
+      updatedAt: "2026-07-15T18:00:00.000Z",
+    };
+  }
+
+  function connectWithTimedPlan() {
+    return mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: true,
+          value: {
+            events: [timedEvent],
+            date: "2026-07-15",
+            timeZone: "America/Los_Angeles",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+  }
+
+  function mockDragRect(
+    element: Element,
+    top: number,
+    left: number,
+    width = 200,
+    height = 42,
+  ) {
+    vi.spyOn(element, "getBoundingClientRect").mockReturnValue({
+      top,
+      bottom: top + height,
+      left,
+      right: left + width,
+      width,
+      height,
+      x: left,
+      y: top,
+      toJSON: () => undefined,
+    });
+  }
+
+  it("moves an untouched Actual to Revised and back without changing its ID", async () => {
+    const stored = connectWithTimedPlan();
+    seedEditableRecord(stored, [{
+      id: "movable-actual",
+      summary: "Movable",
+      startMinutes: 600,
+      durationMinutes: 30,
+      colorId: "8",
+      sourceCalendarEventId: "plan-source",
+      isSlack: true,
+      saveDisposition: "unsaved",
+    }]);
+
+    render(<App now={now} />);
+    const actualSource = await screen.findByRole("button", {
+      name: "Edit Movable",
+    });
+    mockDragRect(actualSource, 252, 200);
+    const revisedTarget = screen.getByTestId("revised-column");
+    mockDragRect(revisedTarget, 0, 400, 200, 1_176);
+    let transfer = dragDataTransfer();
+
+    fireEvent.mouseDown(actualSource, { clientY: 273 });
+    fireDragEvent(actualSource, "dragstart", 273, transfer);
+    fireDragEvent(revisedTarget, "drop", 441, transfer);
+
+    await waitFor(() =>
+      expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+        actual: [],
+        revised: [{
+          id: "movable-actual",
+          startMinutes: 720,
+          sourceCalendarEventId: "plan-source",
+          isSlack: true,
+        }],
+      }),
+    );
+
+    const revisedSource = await screen.findByRole("button", {
+      name: "Edit Movable",
+    });
+    mockDragRect(revisedSource, 420, 400);
+    const actualTarget = screen.getByTestId("actual-column");
+    mockDragRect(actualTarget, 0, 200, 200, 1_176);
+    transfer = dragDataTransfer();
+    fireEvent.mouseDown(revisedSource, { clientY: 441 });
+    fireDragEvent(revisedSource, "dragstart", 441, transfer);
+    fireDragEvent(actualTarget, "drop", 462, transfer);
+
+    await waitFor(() =>
+      expect(stored["dayRecord:2026-07-15"]).toEqual({
+        schemaVersion: 1,
+        date: "2026-07-15",
+        timezone: "America/Los_Angeles",
+        actual: [{
+          id: "movable-actual",
+          summary: "Movable",
+          startMinutes: 735,
+          durationMinutes: 30,
+          colorId: "8",
+          sourceCalendarEventId: "plan-source",
+          isSlack: true,
+          saveDisposition: "unsaved",
+        }],
+        revised: [],
+        updatedAt: "2026-07-15T19:00:00.000Z",
+      }),
+    );
+  });
+
+  it("repositions a Calendar-saved Actual under a fresh unsaved ID", async () => {
+    const stored = connectWithTimedPlan();
+    seedEditableRecord(stored, [{
+      id: "saved-actual",
+      summary: "Saved Actual",
+      startMinutes: 600,
+      durationMinutes: 30,
+      colorId: "8",
+      saveDisposition: "calendarSaved",
+      calendarEventId: "calendar-event",
+      lastSaveAttemptAt: "2026-07-15T18:30:00.000Z",
+    }]);
+    vi.stubGlobal("crypto", {
+      randomUUID: vi.fn(() => "fresh-actual"),
+    });
+
+    render(<App now={now} />);
+    const source = await screen.findByRole("button", {
+      name: "Edit Saved Actual",
+    });
+    mockDragRect(source, 252, 200);
+    const target = screen.getByTestId("actual-column");
+    mockDragRect(target, 0, 200, 200, 1_176);
+    const transfer = dragDataTransfer();
+
+    fireEvent.mouseDown(source, { clientY: 273 });
+    fireDragEvent(source, "dragstart", 273, transfer);
+    fireDragEvent(target, "drop", 357, transfer);
+
+    await waitFor(() =>
+      expect(stored["dayRecord:2026-07-15"]).toMatchObject({
+        actual: [{
+          id: "fresh-actual",
+          summary: "Saved Actual",
+          startMinutes: 660,
+          saveDisposition: "unsaved",
+        }],
+        revised: [],
+      }),
+    );
+    const savedRecord = stored["dayRecord:2026-07-15"] as {
+      actual: ActualEvent[];
+    };
+    expect(savedRecord.actual[0]).not.toHaveProperty("calendarEventId");
+    expect(savedRecord.actual[0]).not.toHaveProperty("lastSaveAttemptAt");
+  });
+});

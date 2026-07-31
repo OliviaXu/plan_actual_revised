@@ -3,7 +3,7 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
-test("Plan copies into Actual and Revised survive reload", async () => {
+test("Plan copies and editable moves survive reload", async () => {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "revised-drag-extension-"),
   );
@@ -120,6 +120,113 @@ registerServiceWorker(createServiceWorkerOperations({
     await expect(page.getByTestId("revised-block")).toContainText(
       "Design review",
     );
+
+    await page.getByTestId("plan-scroll-viewport").evaluate((element) => {
+      element.scrollTop = 300;
+    });
+    const actualCopy = page.locator(
+      `[data-actual-id="${copyIds[0]}"]`,
+    ).getByRole("button", { name: "Edit Design review" });
+    await actualCopy.dragTo(page.getByTestId("revised-column"), {
+      sourcePosition: { x: 20, y: 42 },
+      targetPosition: { x: 80, y: 567 },
+    });
+
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const stored = await chrome.storage.local.get(
+            "dayRecord:2026-07-15",
+          );
+          return stored["dayRecord:2026-07-15"];
+        }),
+      )
+      .toMatchObject({
+        actual: [],
+        revised: [
+          {
+            id: copyIds[1],
+            startMinutes: 735,
+          },
+          {
+            id: copyIds[0],
+            startMinutes: 795,
+          },
+        ],
+      });
+
+    const movedRevised = page.locator(
+      `[data-revised-id="${copyIds[0]}"]`,
+    ).getByRole("button", { name: "Edit Design review" });
+    await movedRevised.dragTo(page.getByTestId("actual-column"), {
+      sourcePosition: { x: 20, y: 42 },
+      targetPosition: { x: 80, y: 609 },
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const stored = await chrome.storage.local.get(
+            "dayRecord:2026-07-15",
+          );
+          return stored["dayRecord:2026-07-15"];
+        }),
+      )
+      .toMatchObject({
+        actual: [{
+          id: copyIds[0],
+          startMinutes: 825,
+          saveDisposition: "unsaved",
+        }],
+        revised: [{
+          id: copyIds[1],
+          startMinutes: 735,
+        }],
+      });
+
+    const returnedActual = page.locator(
+      `[data-actual-id="${copyIds[0]}"]`,
+    ).getByRole("button", { name: "Edit Design review" });
+    await returnedActual.dragTo(page.getByTestId("actual-column"), {
+      sourcePosition: { x: 20, y: 42 },
+      targetPosition: { x: 80, y: 651 },
+    });
+    await expect
+      .poll(() =>
+        page.evaluate(async () => {
+          const stored = await chrome.storage.local.get(
+            "dayRecord:2026-07-15",
+          );
+          return stored["dayRecord:2026-07-15"];
+        }),
+      )
+      .toMatchObject({
+        schemaVersion: 1,
+        actual: [{
+          id: copyIds[0],
+          summary: "Design review",
+          startMinutes: 855,
+          durationMinutes: 60,
+          colorId: "9",
+          sourceCalendarEventId: "design-review",
+          saveDisposition: "unsaved",
+        }],
+        revised: [{
+          id: copyIds[1],
+          summary: "Design review",
+          startMinutes: 735,
+          durationMinutes: 60,
+          colorId: "9",
+          sourceCalendarEventId: "design-review",
+        }],
+      });
+
+    await page.reload();
+    await expect(page.locator(
+      `[data-actual-id="${copyIds[0]}"]`,
+    )).toContainText("2:15 PM");
+    await expect(page.locator(
+      `[data-revised-id="${copyIds[1]}"]`,
+    )).toContainText("12:15 PM");
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });
