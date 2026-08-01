@@ -1,4 +1,5 @@
 import {
+  act,
   cleanup,
   fireEvent,
   render,
@@ -93,14 +94,18 @@ function fireDragEvent(
 
 afterEach(() => {
   cleanup();
+  vi.useRealTimers();
   vi.unstubAllGlobals();
 });
 
 describe("App Plan loading", () => {
-  it("silently loads today's Calendar events through cached auth", async () => {
-    mockRuntime(async (message) => {
+  it("shows a flat, accessible check-in before cached auth resolves", async () => {
+    let finishCalendarLoad: ((value: unknown) => void) | undefined;
+    mockRuntime((message) => {
       if (message.type === "calendar.listEvents") {
-        return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
+        return new Promise((resolve) => {
+          finishCalendarLoad = resolve;
+        });
       }
 
       return unexpectedMessage(message);
@@ -108,12 +113,82 @@ describe("App Plan loading", () => {
 
     render(<App now={now} />);
 
-    expect(screen.getByText("Loading today's plan")).toBeVisible();
-    expect(await screen.findByText("Design review")).toBeVisible();
-    expect(screen.queryByTestId("calendar-status")).not.toBeInTheDocument();
+    const checkIn = screen.getByTestId("calendar-check-in");
+    const greeting = within(checkIn).getByText("Let’s shape today.");
+    const explanation = within(checkIn).getByText(
+      "Checking in with your calendar…",
+    );
+    const wave = within(checkIn).getByText("👋");
+    expect(greeting).toHaveClass("text-base", "font-medium");
+    expect(greeting).not.toHaveClass("text-lg", "font-semibold");
+    expect(explanation).toHaveClass("text-sm", "text-muted-foreground");
+    expect(greeting.parentElement).toContainElement(explanation);
+    expect(wave.nextElementSibling).toBe(greeting.parentElement);
+    expect(checkIn).toHaveAttribute("role", "status");
+    expect(wave).toHaveAttribute("aria-hidden", "true");
+    expect(checkIn).not.toHaveClass(
+      "border",
+      "bg-white",
+      "shadow-soft",
+    );
+    expect(
+      screen.queryByRole("region", { name: "Day grid" }),
+    ).not.toBeInTheDocument();
     expect(chrome.runtime.sendMessage).toHaveBeenCalledWith({
       type: "calendar.listEvents",
     });
+
+    finishCalendarLoad?.({
+      ok: true,
+      value: {
+        events: [timedEvent],
+        date: "2026-07-15",
+        timeZone: "America/Los_Angeles",
+      },
+    });
+    expect(await screen.findByText("Design review")).toBeVisible();
+  });
+
+  it("keeps the outgoing check-in inaccessible during the crossfade", async () => {
+    vi.useFakeTimers();
+    let finishCalendarLoad: ((value: unknown) => void) | undefined;
+    mockRuntime((message) => {
+      if (message.type === "calendar.listEvents") {
+        return new Promise((resolve) => {
+          finishCalendarLoad = resolve;
+        });
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+    expect(screen.getByTestId("calendar-check-in")).toBeVisible();
+
+    await act(async () => {
+      finishCalendarLoad?.({
+        ok: false,
+        error: {
+          code: "AUTH_NOT_CONNECTED",
+          message: "Connect Calendar before requesting events.",
+        },
+      });
+    });
+
+    expect(
+      screen.getByText("Connect Google Calendar to show today's plan"),
+    ).toBeVisible();
+    const outgoing = screen.getByTestId("calendar-surface-outgoing");
+    expect(outgoing).toHaveAttribute("aria-hidden", "true");
+    expect(outgoing).toHaveAttribute("inert");
+    expect(within(outgoing).getByTestId("calendar-check-in")).toBeVisible();
+
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(240);
+    });
+
+    expect(
+      screen.queryByTestId("calendar-surface-outgoing"),
+    ).not.toBeInTheDocument();
   });
 
   it("loads only once while the mounted page remains open", async () => {
@@ -224,6 +299,38 @@ describe("App Plan loading", () => {
     expect(listAttempts).toBe(2);
   });
 
+  it("shows the check-in instead of the grid while connecting", async () => {
+    let finishAuthentication: ((value: unknown) => void) | undefined;
+    mockRuntime((message) => {
+      if (message.type === "calendar.listEvents") {
+        return Promise.resolve({
+          ok: false,
+          error: {
+            code: "AUTH_NOT_CONNECTED",
+            message: "Connect Calendar before requesting events.",
+          },
+        });
+      }
+      if (message.type === "auth.requestInteractiveToken") {
+        return new Promise((resolve) => {
+          finishAuthentication = resolve;
+        });
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+    await screen.findByRole("button", { name: "Connect Calendar" });
+
+    fireEvent.click(screen.getByRole("button", { name: "Connect Calendar" }));
+
+    expect(screen.getByTestId("calendar-check-in")).toBeVisible();
+    expect(
+      screen.queryByRole("region", { name: "Day grid" }),
+    ).not.toBeInTheDocument();
+    expect(finishAuthentication).toBeTypeOf("function");
+  });
+
   it("keeps interactive auth errors recoverable and retries Plan loading", async () => {
     let authAttempts = 0;
     let listAttempts = 0;
@@ -290,7 +397,7 @@ describe("App Plan loading", () => {
     );
   });
 
-  it("keeps the Plan surface usable when Calendar fails", async () => {
+  it("shows a flat compact error without the Day grid", async () => {
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return {
@@ -302,16 +409,75 @@ describe("App Plan loading", () => {
       return unexpectedMessage(message);
     });
 
-    render(<App now={now} />);
+    const reloadPage = vi.fn();
+    render(<App now={now} reloadPage={reloadPage} />);
 
     expect(await screen.findByTestId("calendar-error")).toHaveTextContent(
       "Calendar failed.",
     );
-    expect(screen.getByRole("heading", { name: "Plan" })).toBeVisible();
-    expect(screen.getByTestId("plan-unavailable")).toHaveTextContent(
-      "Unable to load today's plan",
+    expect(
+      screen.getByRole("heading", { name: "Unable to load today's plan" }),
+    ).toHaveClass("text-base", "font-medium");
+    expect(
+      screen.getByRole("heading", { name: "Unable to load today's plan" }),
+    ).not.toHaveClass("text-destructive", "text-lg", "font-semibold");
+    expect(screen.getByTestId("calendar-error-icon")).toHaveClass(
+      "text-destructive",
     );
-    expect(screen.queryByTestId("plan-empty")).not.toBeInTheDocument();
+    const errorDetail = screen.getByTestId("calendar-error");
+    expect(errorDetail).toHaveClass("text-sm", "text-muted-foreground");
+    expect(errorDetail).not.toHaveClass(
+      "border",
+      "bg-white",
+      "shadow-soft",
+    );
+    expect(
+      screen.queryByRole("region", { name: "Day grid" }),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("plan-unavailable"),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByTestId("plan-empty"),
+    ).not.toBeInTheDocument();
+
+    fireEvent.click(screen.getByRole("button", { name: "Refresh page" }));
+
+    expect(reloadPage).toHaveBeenCalledOnce();
+  });
+
+  it("renders the disconnected prompt without card styling", async () => {
+    mockRuntime(async (message) => {
+      if (message.type === "calendar.listEvents") {
+        return {
+          ok: false,
+          error: {
+            code: "AUTH_NOT_CONNECTED",
+            message: "Connect Calendar before requesting events.",
+          },
+        };
+      }
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+
+    const connection = await screen.findByRole("region", {
+      name: "Calendar connection",
+    });
+    expect(connection).not.toHaveClass(
+      "border",
+      "bg-white",
+      "shadow-soft",
+    );
+    const instruction = within(connection).getByText(
+      "Connect Google Calendar to show today's plan",
+    );
+    expect(instruction).toHaveClass("text-sm", "text-muted-foreground");
+    expect(instruction).not.toHaveClass("font-semibold");
+    expect(
+      within(connection).getByRole("button", { name: "Connect Calendar" }),
+    ).toHaveClass("mt-3");
   });
 });
 
@@ -465,16 +631,20 @@ describe("App Actual persistence", () => {
 
     render(<App now={now} />);
 
-    const add = await screen.findByRole("button", { name: "Add Actual" });
-    expect(add).toBeDisabled();
+    expect(
+      screen.queryByRole("button", { name: "Add Actual" }),
+    ).not.toBeInTheDocument();
     expect(chrome.storage.local.get).not.toHaveBeenCalled();
 
-    resolveCalendar?.({
-      ok: true,
-      value: { events: [], date: "2026-07-15", timeZone: "Asia/Tokyo" },
+    await act(async () => {
+      resolveCalendar?.({
+        ok: true,
+        value: { events: [], date: "2026-07-15", timeZone: "Asia/Tokyo" },
+      });
     });
 
     await screen.findByTestId("plan-empty");
+    const add = screen.getByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
     expect(chrome.storage.local.get).toHaveBeenCalledWith(
       "dayRecord:2026-07-15",

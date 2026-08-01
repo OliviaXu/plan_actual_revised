@@ -44,12 +44,6 @@ const DAY_GRID_TEMPLATE_COLUMNS =
 const DAY_GRID_DROP_TARGET_CLASS_NAME = "bg-accent/15";
 const readSystemTime = () => new Date();
 
-type DayGridStatus =
-  | "loading"
-  | "connecting"
-  | "connected"
-  | "error";
-
 type DayGridProps = {
   actuals?: ActualEvent[];
   revised?: RevisedEvent[];
@@ -67,7 +61,6 @@ type DayGridProps = {
     durationMinutes: number,
   ) => void;
   onDropEditable?: (operation: DayGridDropOperation) => void;
-  status: DayGridStatus;
   date: string;
   timeZone: string;
 };
@@ -85,7 +78,6 @@ export function DayGrid({
   onEditEditable,
   onEditableResizeEnd,
   onDropEditable,
-  status,
   date,
   timeZone,
 }: DayGridProps) {
@@ -175,7 +167,6 @@ export function DayGrid({
     const viewport = scrollViewportRef.current;
     const header = gridHeaderRef.current;
     if (
-      status !== "connected" ||
       didAutoScrollRef.current ||
       nowIndicatorTopPx === null ||
       viewport === null ||
@@ -190,7 +181,7 @@ export function DayGrid({
       header.offsetHeight + nowIndicatorTopPx - viewport.clientHeight * 0.3,
     );
     didAutoScrollRef.current = true;
-  }, [nowIndicatorTopPx, status]);
+  }, [nowIndicatorTopPx]);
 
   function clearDragState() {
     pendingGrabRef.current = undefined;
@@ -403,25 +394,7 @@ export function DayGrid({
               className="relative overflow-hidden"
               data-testid="plan-column"
             >
-              {status === "loading" ? (
-                <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
-                  Loading today&apos;s plan
-                </p>
-              ) : null}
-              {status === "connecting" ? (
-                <p className="absolute inset-x-4 top-6 text-sm text-muted-foreground">
-                  Connecting Google Calendar
-                </p>
-              ) : null}
-              {status === "error" ? (
-                <p
-                  className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
-                  data-testid="plan-unavailable"
-                >
-                  Unable to load today&apos;s plan
-                </p>
-              ) : null}
-              {status === "connected" && planBlocks.length === 0 ? (
+              {planBlocks.length === 0 ? (
                 <p
                   className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
                   data-testid="plan-empty"

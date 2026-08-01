@@ -1,7 +1,8 @@
-import { CalendarDays, X } from "lucide-react";
+import { CalendarDays, CircleAlert, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
 import { Button } from "./components/ui/button";
+import { CalendarSurfaceTransition } from "./components/CalendarSurfaceTransition";
 import { DayGrid } from "./components/DayGrid";
 import type { DayGridDropOperation } from "./components/day-grid-drag";
 import {
@@ -41,14 +42,17 @@ const readSystemTime = () => new Date();
 const openSlackProtocol = () => {
   window.open("slack://open", "_self");
 };
+const reloadAppPage = () => window.location.reload();
 const defaultActualDurationMinutes = 30;
 
 export function App({
   now = readSystemTime,
   launchSlack = openSlackProtocol,
+  reloadPage = reloadAppPage,
 }: {
   now?: () => Date;
   launchSlack?: () => void;
+  reloadPage?: () => void;
 }) {
   const { calendarState, calendarDay, connectCalendar } =
     useCalendarPlan(now);
@@ -82,6 +86,12 @@ export function App({
     !calendarConnected ||
     actualLoadStatus === "loading" ||
     isSavingActualsToCalendar;
+  const isCalendarCheckingIn =
+    calendarState.status === "loading" ||
+    calendarState.status === "connecting";
+  const calendarSurfaceKey = isCalendarCheckingIn
+    ? "check-in"
+    : calendarState.status;
 
   useEffect(() => {
     if (!calendarConnected || actualLoadStatus !== "loaded") return;
@@ -373,12 +383,6 @@ export function App({
     }
   }
 
-  const errorMessage =
-    calendarState.status === "error"
-      ? calendarState.message
-      : calendarState.status === "disconnected"
-        ? calendarState.errorMessage
-        : undefined;
   return (
     <main className="min-h-screen bg-background text-foreground">
       <section className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
@@ -403,33 +407,6 @@ export function App({
           </div>
         </header>
 
-        {errorMessage ? (
-          <p
-            className="rounded-md border border-destructive bg-white px-4 py-3 text-sm font-medium text-destructive"
-            data-testid="calendar-error"
-          >
-            {errorMessage}
-          </p>
-        ) : null}
-
-        {calendarState.status === "disconnected" ? (
-          <section
-            className="max-w-md rounded-md border border-border bg-white p-5 shadow-soft"
-            aria-label="Calendar connection"
-          >
-            <p className="font-semibold">
-              Connect Google Calendar to show today&apos;s plan
-            </p>
-            <Button
-              className="mt-4"
-              type="button"
-              onClick={() => void connectCalendar()}
-            >
-              Connect Calendar
-            </Button>
-          </section>
-        ) : null}
-
         {actualStorageError ? (
           <p
             className="rounded-md border border-destructive bg-white px-4 py-3 text-sm font-medium text-destructive"
@@ -453,31 +430,102 @@ export function App({
           </p>
         ) : null}
 
-        {calendarState.status !== "disconnected" ? (
-          <DayGrid
-            actuals={dayRecord?.actual ?? []}
-            revised={dayRecord?.revised ?? []}
-            dragDisabled={dragDisabled}
-            editableMutationsDisabled={isSavingActualsToCalendar}
-            canAddActual={canCreateActual}
-            planEvents={planEvents}
-            now={now}
-            onAddActual={addActual}
-            onStartSlack={startSlack}
-            onEditEditable={(column, event) =>
-              setEditableEventEditorState({
-                mode: "edit",
-                column,
-                event,
-              })
-            }
-            onEditableResizeEnd={persistResizedEditableEvent}
-            onDropEditable={persistEditableDrop}
-            status={calendarState.status}
-            date={calendarDay.date}
-            timeZone={calendarDay.timeZone}
-          />
-        ) : null}
+        <CalendarSurfaceTransition surfaceKey={calendarSurfaceKey}>
+          {isCalendarCheckingIn ? (
+            <section
+              aria-live="polite"
+              className="grid w-fit grid-cols-[auto_1fr] items-start gap-x-2 py-1"
+              data-testid="calendar-check-in"
+              role="status"
+            >
+              <span aria-hidden="true" className="text-base leading-6">
+                👋
+              </span>
+              <div className="min-w-0">
+                <p className="calendar-check-in-greeting relative w-fit text-base font-medium leading-6">
+                  Let’s shape today.
+                </p>
+                <p className="mt-0.5 text-sm text-muted-foreground">
+                  Checking in with your calendar…
+                </p>
+              </div>
+            </section>
+          ) : calendarState.status === "disconnected" ? (
+            <section className="py-1" aria-label="Calendar connection">
+              {calendarState.errorMessage ? (
+                <p
+                  className="mb-3 text-sm font-medium text-destructive"
+                  data-testid="calendar-error"
+                  role="alert"
+                >
+                  {calendarState.errorMessage}
+                </p>
+              ) : null}
+              <p className="text-sm text-muted-foreground">
+                Connect Google Calendar to show today&apos;s plan
+              </p>
+              <Button
+                className="mt-3"
+                type="button"
+                onClick={() => void connectCalendar()}
+              >
+                Connect Calendar
+              </Button>
+            </section>
+          ) : calendarState.status === "error" ? (
+            <section
+              className="grid w-fit grid-cols-[auto_1fr] items-start gap-x-2 py-1"
+              role="alert"
+            >
+              <CircleAlert
+                aria-hidden="true"
+                className="mt-1 h-4 w-4 text-destructive"
+                data-testid="calendar-error-icon"
+              />
+              <div className="min-w-0">
+                <h2 className="text-base font-medium leading-6">
+                  Unable to load today&apos;s plan
+                </h2>
+                <p
+                  className="mt-0.5 text-sm text-muted-foreground"
+                  data-testid="calendar-error"
+                >
+                  {calendarState.message}
+                </p>
+                <Button
+                  className="mt-3"
+                  onClick={reloadPage}
+                  type="button"
+                >
+                  Refresh page
+                </Button>
+              </div>
+            </section>
+          ) : (
+            <DayGrid
+              actuals={dayRecord?.actual ?? []}
+              revised={dayRecord?.revised ?? []}
+              dragDisabled={dragDisabled}
+              editableMutationsDisabled={isSavingActualsToCalendar}
+              canAddActual={canCreateActual}
+              planEvents={calendarState.planEvents}
+              now={now}
+              onAddActual={addActual}
+              onStartSlack={startSlack}
+              onEditEditable={(column, event) =>
+                setEditableEventEditorState({
+                  mode: "edit",
+                  column,
+                  event,
+                })
+              }
+              onEditableResizeEnd={persistResizedEditableEvent}
+              onDropEditable={persistEditableDrop}
+              date={calendarDay.date}
+              timeZone={calendarDay.timeZone}
+            />
+          )}
+        </CalendarSurfaceTransition>
 
         {dayRecord?.actual.length ? (
           <footer className="flex items-center gap-4">

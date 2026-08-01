@@ -4,7 +4,13 @@ import os from "node:os";
 import path from "node:path";
 
 async function createSeededExtension(
-  scenario: "authRetry" | "cached" | "disconnected" | "empty" | "error",
+  scenario:
+    | "authRetry"
+    | "cached"
+    | "disconnected"
+    | "empty"
+    | "error"
+    | "slowDisconnected",
 ) {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "plan-read-extension-"),
@@ -16,14 +22,17 @@ async function createSeededExtension(
 import registerServiceWorker from "./register-service-worker.js";
 import { createServiceWorkerOperations } from "./compose-service-worker.js";
 
-let connected = ${scenario === "disconnected" || scenario === "authRetry" ? "false" : "true"};
+let connected = ${scenario === "disconnected" || scenario === "slowDisconnected" || scenario === "authRetry" ? "false" : "true"};
 let authAttempts = 0;
 
 registerServiceWorker(createServiceWorkerOperations({
   openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
-  requestCachedToken: async () => connected
-    ? { ok: true, value: "test-token" }
-    : { ok: false, error: { code: "AUTH_TOKEN_UNAVAILABLE", message: "No cached token." } },
+  requestCachedToken: async () => {
+    ${scenario === "slowDisconnected" ? "await new Promise((resolve) => setTimeout(resolve, 700));" : ""}
+    return connected
+      ? { ok: true, value: "test-token" }
+      : { ok: false, error: { code: "AUTH_TOKEN_UNAVAILABLE", message: "No cached token." } };
+  },
   requestInteractiveToken: async () => {
     authAttempts += 1;
     if (${scenario === "authRetry" ? "true" : "false"} && authAttempts === 1) {
@@ -57,7 +66,10 @@ registerServiceWorker(createServiceWorkerOperations({
   return extensionPath;
 }
 
-async function openExtension(extensionPath: string) {
+async function openExtension(
+  extensionPath: string,
+  options: { reducedMotion?: "reduce" } = {},
+) {
   const context = await chromium.launchPersistentContext("", {
     headless: false,
     args: [
@@ -69,6 +81,9 @@ async function openExtension(extensionPath: string) {
     context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
   const extensionId = serviceWorker.url().split("/")[2];
   const page = await context.newPage();
+  if (options.reducedMotion) {
+    await page.emulateMedia({ reducedMotion: options.reducedMotion });
+  }
   await page.clock.setFixedTime(new Date("2026-07-15T12:00:00-07:00"));
   await page.goto(`chrome-extension://${extensionId}/index.html`);
   return { context, page };
@@ -114,6 +129,64 @@ test("a disconnected user can connect and populate Plan", async () => {
   }
 });
 
+test("a slow cached-auth check crossfades into the flat Connect prompt", async () => {
+  const extensionPath = await createSeededExtension("slowDisconnected");
+  const { context, page } = await openExtension(extensionPath);
+
+  try {
+    await expect(page.getByTestId("calendar-check-in")).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Day grid" }),
+    ).toHaveCount(0);
+
+    const connection = page.getByRole("region", {
+      name: "Calendar connection",
+    });
+    await expect(connection).toBeVisible();
+    await expect(connection).not.toHaveClass(/border|bg-white|shadow-soft/);
+    await expect(page.getByTestId("calendar-surface-outgoing")).toHaveCount(0);
+  } finally {
+    await context.close();
+    await fs.rm(extensionPath, { recursive: true, force: true });
+  }
+});
+
+test("reduced motion hides the outgoing check-in immediately", async () => {
+  const extensionPath = await createSeededExtension("slowDisconnected");
+  const { context, page } = await openExtension(extensionPath, {
+    reducedMotion: "reduce",
+  });
+
+  try {
+    await expect(page.getByTestId("calendar-check-in")).toBeVisible();
+    const outgoingDisplay = page.evaluate(() =>
+      new Promise<string>((resolve) => {
+        const observer = new MutationObserver(() => {
+          const outgoing = document.querySelector(
+            '[data-testid="calendar-surface-outgoing"]',
+          );
+          if (!outgoing) return;
+          observer.disconnect();
+          resolve(getComputedStyle(outgoing).display);
+        });
+        observer.observe(document.body, { childList: true, subtree: true });
+        window.setTimeout(() => {
+          observer.disconnect();
+          resolve("not observed");
+        }, 2_000);
+      }),
+    );
+
+    await expect(
+      page.getByRole("region", { name: "Calendar connection" }),
+    ).toBeVisible();
+    expect(await outgoingDisplay).toBe("none");
+  } finally {
+    await context.close();
+    await fs.rm(extensionPath, { recursive: true, force: true });
+  }
+});
+
 test("failed interactive auth remains recoverable", async () => {
   const extensionPath = await createSeededExtension("authRetry");
   const { context, page } = await openExtension(extensionPath);
@@ -149,7 +222,7 @@ test("an empty Calendar response renders the permanent Plan empty state", async 
   }
 });
 
-test("a Calendar failure remains visible beside the Plan surface", async () => {
+test("a Calendar failure replaces the Plan surface with a flat error", async () => {
   const extensionPath = await createSeededExtension("error");
   const { context, page } = await openExtension(extensionPath);
 
@@ -159,7 +232,16 @@ test("a Calendar failure remains visible beside the Plan surface", async () => {
     );
     await expect(
       page.getByRole("heading", { name: "Plan", exact: true }),
+    ).toHaveCount(0);
+    await expect(
+      page.getByRole("heading", { name: "Unable to load today's plan" }),
     ).toBeVisible();
+    await expect(
+      page.getByRole("button", { name: "Refresh page" }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Day grid" }),
+    ).toHaveCount(0);
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });

@@ -93,7 +93,7 @@ afterEach(() => {
 
 describe("DayGrid", () => {
   it("renders the complete default hour axis without full-width grid lines", () => {
-    render(<DayGrid planEvents={[]} status="connected" {...calendarDay} />);
+    render(<DayGrid planEvents={[]} {...calendarDay} />);
 
     expect(screen.queryByTestId("plan-hour-line")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("plan-hour-tick")).toHaveLength(15);
@@ -116,7 +116,6 @@ describe("DayGrid", () => {
         planEvents={[
           planEvent("Design review", 540, 60),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -140,7 +139,6 @@ describe("DayGrid", () => {
             colorId: "8",
           }),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -168,7 +166,6 @@ describe("DayGrid", () => {
         onEditEditable={onEditEditable}
         onEditableResizeEnd={onEditableResizeEnd}
         planEvents={[]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -207,7 +204,6 @@ describe("DayGrid", () => {
       <DayGrid
         onDropEditable={onDropEditable}
         planEvents={[planEvent("plan-copy", 540, 60)]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -277,7 +273,6 @@ describe("DayGrid", () => {
         dragDisabled
         onDropEditable={onDropEditable}
         planEvents={[planEvent("disabled-plan", 540, 60)]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -314,7 +309,6 @@ describe("DayGrid", () => {
         onDropEditable={onDropEditable}
         onEditEditable={onEditEditable}
         planEvents={[]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -375,7 +369,6 @@ describe("DayGrid", () => {
         revised={[revisedEvent("revised-source", 600, 30)]}
         onDropEditable={onDropEditable}
         planEvents={[]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -423,7 +416,6 @@ describe("DayGrid", () => {
     render(
       <DayGrid
         planEvents={[planEvent("cancel-plan", 540, 60)]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -449,7 +441,6 @@ describe("DayGrid", () => {
     render(
       <DayGrid
         planEvents={[planEvent("grid-start-plan", 540, 60)]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -497,7 +488,6 @@ describe("DayGrid", () => {
           planEvent("Below threshold", 540, 20),
           planEvent("Above threshold", 600, 30),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -520,7 +510,6 @@ describe("DayGrid", () => {
         planEvents={[
           planEvent("Final five minutes", 1_255, 5),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -545,7 +534,6 @@ describe("DayGrid", () => {
             colorId: "",
           }),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -576,7 +564,6 @@ describe("DayGrid", () => {
           planEvent("base", 540, 120),
           planEvent("nested", 570, 60),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -621,7 +608,6 @@ describe("DayGrid", () => {
           actualEvent("nested-actual", 570, 60),
         ]}
         planEvents={[]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -685,7 +671,6 @@ describe("DayGrid", () => {
         onEditEditable={onEditEditable}
         onEditableResizeEnd={onEditableResizeEnd}
         planEvents={[]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -721,7 +706,6 @@ describe("DayGrid", () => {
         actuals={[actualEvent("cancelled-actual", 540, 30)]}
         onEditableResizeEnd={onEditableResizeEnd}
         planEvents={[]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -751,7 +735,6 @@ describe("DayGrid", () => {
         planEvents={[
           planEvent("midnight-plan", 1_435, 5),
         ]}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -776,7 +759,6 @@ describe("DayGrid", () => {
       <DayGrid
         planEvents={[]}
         now={() => currentTime}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -803,7 +785,6 @@ describe("DayGrid", () => {
       <DayGrid
         planEvents={[]}
         now={() => new Date(2026, 6, 15, 7)}
-        status="connected"
         {...calendarDay}
       />,
     );
@@ -815,17 +796,21 @@ describe("DayGrid", () => {
 
   it("auto-scrolls once after connected content renders", () => {
     const now = () => new Date(2026, 6, 15, 12);
+    const clientHeight = vi.spyOn(
+      HTMLElement.prototype,
+      "clientHeight",
+      "get",
+    ).mockReturnValue(500);
+    const offsetHeight = vi.spyOn(
+      HTMLElement.prototype,
+      "offsetHeight",
+      "get",
+    ).mockReturnValue(35);
+
     const { rerender } = render(
-      <DayGrid planEvents={[]} now={now} status="loading" {...calendarDay} />,
+      <DayGrid planEvents={[]} now={now} {...calendarDay} />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
-    const header = screen.getByTestId("day-grid-header");
-    Object.defineProperty(viewport, "clientHeight", { value: 500 });
-    Object.defineProperty(header, "offsetHeight", { value: 35 });
-
-    rerender(
-      <DayGrid planEvents={[]} now={now} status="connected" {...calendarDay} />,
-    );
     expect(viewport.scrollTop).toBe(305);
 
     viewport.scrollTop = 700;
@@ -835,10 +820,12 @@ describe("DayGrid", () => {
           planEvent("Later event", 840, 60),
         ]}
         now={now}
-        status="connected"
         {...calendarDay}
       />,
     );
     expect(viewport.scrollTop).toBe(700);
+
+    clientHeight.mockRestore();
+    offsetHeight.mockRestore();
   });
 });

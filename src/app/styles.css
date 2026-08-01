@@ -46,3 +46,76 @@
       "Segoe UI", sans-serif;
   }
 }
+
+@keyframes calendar-check-in-breathe {
+  0%,
+  100% {
+    opacity: 0.35;
+    transform: scale(0.94);
+  }
+
+  50% {
+    opacity: 0.65;
+    transform: scale(1.04);
+  }
+}
+
+@keyframes calendar-surface-enter {
+  from {
+    opacity: 0;
+  }
+
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes calendar-surface-exit {
+  from {
+    opacity: 1;
+  }
+
+  to {
+    opacity: 0;
+  }
+}
+
+.calendar-check-in-greeting {
+  isolation: isolate;
+}
+
+.calendar-check-in-greeting::before {
+  position: absolute;
+  z-index: -1;
+  inset: -0.6rem -1rem;
+  border-radius: 9999px;
+  background: radial-gradient(
+    ellipse,
+    hsl(var(--accent) / 60%) 0%,
+    hsl(var(--accent) / 0%) 72%
+  );
+  content: "";
+  filter: blur(8px);
+  pointer-events: none;
+  animation: calendar-check-in-breathe 2.4s ease-in-out infinite;
+}
+
+.calendar-surface-enter {
+  animation: calendar-surface-enter 240ms ease-in-out both;
+}
+
+.calendar-surface-exit {
+  animation: calendar-surface-exit 240ms ease-in-out both;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .calendar-check-in-greeting::before,
+  .calendar-surface-enter,
+  .calendar-surface-exit {
+    animation: none;
+  }
+
+  .calendar-surface-exit {
+    display: none;
+  }
+}
