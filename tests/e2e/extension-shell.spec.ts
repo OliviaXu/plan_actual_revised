@@ -3,9 +3,11 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { getExtensionLaunchOptions } from "./extension-launch-options";
+
 async function openExtension(extensionPath: string) {
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    ...getExtensionLaunchOptions(),
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,

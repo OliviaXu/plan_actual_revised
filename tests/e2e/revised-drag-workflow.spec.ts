@@ -1,7 +1,47 @@
-import { expect, chromium, test } from "@playwright/test";
+import {
+  expect,
+  chromium,
+  test,
+  type Locator,
+  type Page,
+} from "@playwright/test";
 import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
+
+import { getExtensionLaunchOptions } from "./extension-launch-options";
+
+async function dragWithMouse({
+  page,
+  source,
+  target,
+  sourcePosition,
+  targetPosition,
+}: {
+  page: Page;
+  source: Locator;
+  target: Locator;
+  sourcePosition: { x: number; y: number };
+  targetPosition: { x: number; y: number };
+}) {
+  const sourceBox = await source.boundingBox();
+  const targetBox = await target.boundingBox();
+  if (!sourceBox || !targetBox) {
+    throw new Error("Drag source and target must both be visible");
+  }
+
+  await page.mouse.move(
+    sourceBox.x + sourcePosition.x,
+    sourceBox.y + sourcePosition.y,
+  );
+  await page.mouse.down();
+  await page.mouse.move(
+    targetBox.x + targetPosition.x,
+    targetBox.y + targetPosition.y,
+    { steps: 10 },
+  );
+  await page.mouse.up();
+}
 
 test("Plan copies and editable moves survive reload", async () => {
   const extensionPath = await fs.mkdtemp(
@@ -37,7 +77,7 @@ registerServiceWorker(createServiceWorkerOperations({
 `,
   );
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    ...getExtensionLaunchOptions(),
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,
@@ -59,14 +99,20 @@ registerServiceWorker(createServiceWorkerOperations({
       element.scrollTop = 200;
     });
 
-    await plan.dragTo(page.getByTestId("actual-column"), {
+    await dragWithMouse({
+      page,
+      source: plan,
+      target: page.getByTestId("actual-column"),
       sourcePosition: { x: 20, y: 42 },
       targetPosition: { x: 80, y: 399 },
     });
     await expect(page.getByTestId("actual-block")).toContainText(
       "Design review",
     );
-    await plan.dragTo(page.getByTestId("revised-column"), {
+    await dragWithMouse({
+      page,
+      source: plan,
+      target: page.getByTestId("revised-column"),
       sourcePosition: { x: 20, y: 42 },
       targetPosition: { x: 80, y: 483 },
     });
@@ -127,7 +173,10 @@ registerServiceWorker(createServiceWorkerOperations({
     const actualCopy = page.locator(
       `[data-actual-id="${copyIds[0]}"]`,
     ).getByRole("button", { name: "Edit Design review" });
-    await actualCopy.dragTo(page.getByTestId("revised-column"), {
+    await dragWithMouse({
+      page,
+      source: actualCopy,
+      target: page.getByTestId("revised-column"),
       sourcePosition: { x: 20, y: 42 },
       targetPosition: { x: 80, y: 567 },
     });
@@ -158,7 +207,10 @@ registerServiceWorker(createServiceWorkerOperations({
     const movedRevised = page.locator(
       `[data-revised-id="${copyIds[0]}"]`,
     ).getByRole("button", { name: "Edit Design review" });
-    await movedRevised.dragTo(page.getByTestId("actual-column"), {
+    await dragWithMouse({
+      page,
+      source: movedRevised,
+      target: page.getByTestId("actual-column"),
       sourcePosition: { x: 20, y: 42 },
       targetPosition: { x: 80, y: 609 },
     });
@@ -186,7 +238,10 @@ registerServiceWorker(createServiceWorkerOperations({
     const returnedActual = page.locator(
       `[data-actual-id="${copyIds[0]}"]`,
     ).getByRole("button", { name: "Edit Design review" });
-    await returnedActual.dragTo(page.getByTestId("actual-column"), {
+    await dragWithMouse({
+      page,
+      source: returnedActual,
+      target: page.getByTestId("actual-column"),
       sourcePosition: { x: 20, y: 42 },
       targetPosition: { x: 80, y: 651 },
     });

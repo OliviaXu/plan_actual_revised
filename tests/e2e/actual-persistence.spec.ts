@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { getExtensionLaunchOptions } from "./extension-launch-options";
+
 test("Actual creation, editing, resizing, and deletion survive reloads", async () => {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "actual-persistence-extension-"),
@@ -26,7 +28,7 @@ registerServiceWorker(createServiceWorkerOperations({
 `,
   );
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    ...getExtensionLaunchOptions(),
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,

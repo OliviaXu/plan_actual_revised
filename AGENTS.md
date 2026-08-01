@@ -3,6 +3,7 @@
 ## Local Test Environment Notes
 
 - Always run `npm run test:e2e` with sandbox escalation in this repo because Chromium's Crashpad cannot access its macOS settings inside the filesystem sandbox. Do not attempt a sandboxed run first.
+- Keep deterministic E2E and review recordings headless. Use `npm run test:e2e:headed` only when the user explicitly requests live browser observation or an interactive debugging flow.
 
 ## Runtime Boundary Validation
 

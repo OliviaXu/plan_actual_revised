@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { getExtensionLaunchOptions } from "./extension-launch-options";
+
 async function createExtension() {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "slack-audit-extension-"),
@@ -37,7 +39,7 @@ async function openExtension(
   launchBehavior: "capture" | "throw",
 ) {
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    ...getExtensionLaunchOptions(),
     args: [
       `--disable-extensions-except=${extensionPath}`,
       `--load-extension=${extensionPath}`,

@@ -3,6 +3,8 @@ import fs from "node:fs/promises";
 import os from "node:os";
 import path from "node:path";
 
+import { getExtensionLaunchOptions } from "./extension-launch-options";
+
 async function createConnectedExtension() {
   const extensionPath = await fs.mkdtemp(
     path.join(os.tmpdir(), "plan-current-time-extension-"),
@@ -28,7 +30,7 @@ registerServiceWorker(createServiceWorkerOperations({
 test("tracks current time without taking over the sticky viewport", async () => {
   const extensionPath = await createConnectedExtension();
   const context = await chromium.launchPersistentContext("", {
-    headless: false,
+    ...getExtensionLaunchOptions(),
     viewport: { width: 900, height: 600 },
     args: [
       `--disable-extensions-except=${extensionPath}`,
