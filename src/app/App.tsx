@@ -33,6 +33,10 @@ import { useDayRecord } from "./hooks/use-day-record";
 import { getCalendarTime } from "../calendar/calendar-time";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
+import {
+  useDayGridLayoutMode,
+  type AppSurface,
+} from "./side-panel-layout";
 
 type EditableEventEditorState =
   | { mode: "create"; column: "actual"; event: ActualEvent }
@@ -49,11 +53,15 @@ export function App({
   now = readSystemTime,
   launchSlack = openSlackProtocol,
   reloadPage = reloadAppPage,
+  surface = "standalone",
 }: {
   now?: () => Date;
   launchSlack?: () => void;
   reloadPage?: () => void;
+  surface?: AppSurface;
 }) {
+  const sidePanel = surface === "side-panel";
+  const dayGridLayoutMode = useDayGridLayoutMode(surface);
   const { calendarState, calendarDay, connectCalendar } =
     useCalendarPlan(now);
   const calendarConnected = calendarState.status === "connected";
@@ -384,8 +392,14 @@ export function App({
   }
 
   return (
-    <main className="min-h-screen bg-background text-foreground">
-      <section className="mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8">
+    <main
+      className="min-h-screen bg-background text-foreground"
+      data-app-surface={surface}
+    >
+      <section className={sidePanel
+        ? "flex w-full flex-col gap-3 px-2 py-3"
+        : "mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8"}
+      >
         <header className="flex items-center border-b border-border pb-5">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-accent-foreground shadow-soft">
@@ -400,7 +414,10 @@ export function App({
                   day: "numeric",
                 })}
               </p>
-              <h1 className="text-2xl font-semibold tracking-normal">
+              <h1 className={sidePanel
+                ? "text-lg font-semibold tracking-normal"
+                : "text-2xl font-semibold tracking-normal"}
+              >
                 Plan / Actual / Revised
               </h1>
             </div>
@@ -508,6 +525,7 @@ export function App({
               dragDisabled={dragDisabled}
               editableMutationsDisabled={isSavingActualsToCalendar}
               canAddActual={canCreateActual}
+              layoutMode={dayGridLayoutMode}
               planEvents={calendarState.planEvents}
               now={now}
               onAddActual={addActual}

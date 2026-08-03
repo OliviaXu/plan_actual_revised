@@ -4,6 +4,7 @@
   "name": "Plan / Actual / Revised",
   "description": "A personal plan, actual, and revised day planner.",
   "version": "0.1.0",
+  "minimum_chrome_version": "116",
   "action": {
     "default_title": "Plan / Actual / Revised"
   },
@@ -11,7 +12,7 @@
     "service_worker": "background/service-worker.js",
     "type": "module"
   },
-  "permissions": ["identity", "storage"],
+  "permissions": ["identity", "storage", "sidePanel", "tabs"],
   "host_permissions": ["https://www.googleapis.com/*"],
   "oauth2": {
     "client_id": "589036082654-p8qrov7unuladm4ud0ufh3hkgajr6a43.apps.googleusercontent.com",

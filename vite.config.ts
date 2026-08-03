@@ -10,6 +10,7 @@ export default defineConfig({
       preserveEntrySignatures: "strict",
       input: {
         index: path.resolve(__dirname, "index.html"),
+        "side-panel": path.resolve(__dirname, "side-panel.html"),
         "background/service-worker": path.resolve(
           __dirname,
           "src/background/service-worker.ts",

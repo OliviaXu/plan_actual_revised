@@ -80,6 +80,22 @@
   }
 }
 
+@keyframes day-grid-column-enter {
+  from {
+    opacity: 0;
+    transform: translateX(0.5rem);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}
+
+.day-grid-column-enter {
+  animation: day-grid-column-enter 180ms ease-out both;
+}
+
 .calendar-check-in-greeting {
   isolation: isolate;
 }
@@ -117,5 +133,9 @@
 
   .calendar-surface-exit {
     display: none;
+  }
+
+  .day-grid-column-enter {
+    animation: none;
   }
 }

@@ -9,14 +9,30 @@ type MessageListener = (
 ) => boolean;
 
 function installServiceWorker(overrides: Record<string, unknown> = {}) {
-  let actionListener: (() => void) | undefined;
+  let actionListener: ((tab: { id?: number; url?: string }) => void) | undefined;
+  let tabUpdatedListener:
+    | ((tabId: number, changeInfo: unknown, tab: { url?: string }) => void)
+    | undefined;
   let messageListener: MessageListener | undefined;
 
   vi.stubGlobal("chrome", {
     action: {
       onClicked: {
-        addListener: (listener: () => void) => {
+        addListener: (listener: (tab: { id?: number; url?: string }) => void) => {
           actionListener = listener;
+        },
+      },
+    },
+    tabs: {
+      onUpdated: {
+        addListener: (
+          listener: (
+            tabId: number,
+            changeInfo: unknown,
+            tab: { url?: string },
+          ) => void,
+        ) => {
+          tabUpdatedListener = listener;
         },
       },
     },
@@ -31,6 +47,8 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
 
   const operations = {
     openAppPage: vi.fn(async () => undefined),
+    openCalendarSidePanel: vi.fn(async () => undefined),
+    disableSidePanel: vi.fn(async () => undefined),
     connectCalendar: vi.fn(async () => ({
       ok: true as const,
       value: { status: "connected" as const },
@@ -56,11 +74,11 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
 
   registerServiceWorker(operations);
 
-  if (!actionListener || !messageListener) {
+  if (!actionListener || !messageListener || !tabUpdatedListener) {
     throw new Error("Service-worker listeners were not installed.");
   }
 
-  return { actionListener, messageListener, operations };
+  return { actionListener, messageListener, operations, tabUpdatedListener };
 }
 
 async function sendMessage(
@@ -78,12 +96,49 @@ async function sendMessage(
 }
 
 describe("registerServiceWorker", () => {
-  it("opens the app from the extension action", () => {
+  it("opens a refreshed side panel from the action on Google Calendar", () => {
     const { actionListener, operations } = installServiceWorker();
 
-    actionListener();
+    actionListener({ id: 17, url: "https://calendar.google.com/calendar/u/0/r" });
 
+    expect(operations.openCalendarSidePanel).toHaveBeenCalledWith(17);
+    expect(operations.openAppPage).not.toHaveBeenCalled();
+  });
+
+  it.each([
+    [{ id: 4, url: "https://example.com" }, 4],
+    [{ id: 5, url: "chrome://extensions" }, 5],
+    [{}, undefined],
+  ])("opens the standalone app outside Google Calendar", (tab, tabId) => {
+    const { actionListener, operations } = installServiceWorker();
+
+    actionListener(tab);
+
+    if (tabId === undefined) {
+      expect(operations.disableSidePanel).not.toHaveBeenCalled();
+    } else {
+      expect(operations.disableSidePanel).toHaveBeenCalledWith(tabId);
+    }
     expect(operations.openAppPage).toHaveBeenCalledOnce();
+    expect(operations.openCalendarSidePanel).not.toHaveBeenCalled();
+  });
+
+  it("disables a Calendar tab's side panel after navigation elsewhere", () => {
+    const { operations, tabUpdatedListener } = installServiceWorker();
+
+    tabUpdatedListener(17, {}, { url: "https://mail.google.com/mail/u/0" });
+
+    expect(operations.disableSidePanel).toHaveBeenCalledWith(17);
+  });
+
+  it("does not disable the panel during Google Calendar updates", () => {
+    const { operations, tabUpdatedListener } = installServiceWorker();
+
+    tabUpdatedListener(17, {}, {
+      url: "https://calendar.google.com/calendar/u/0/r/week",
+    });
+
+    expect(operations.disableSidePanel).not.toHaveBeenCalled();
   });
 
   it("routes interactive authentication and forwards its response", async () => {

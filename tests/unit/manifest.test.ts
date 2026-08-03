@@ -4,6 +4,20 @@ import path from "node:path";
 import { describe, expect, it } from "vitest";
 
 describe("extension manifest", () => {
+  it("declares the Google Calendar side-panel capabilities", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.resolve("public/manifest.json"), "utf8"),
+    ) as {
+      minimum_chrome_version?: unknown;
+      permissions?: unknown;
+    };
+
+    expect(manifest.minimum_chrome_version).toBe("116");
+    expect(manifest.permissions).toEqual(
+      expect.arrayContaining(["sidePanel", "tabs"]),
+    );
+  });
+
   it("includes a stable public key for a consistent unpacked extension ID", async () => {
     const manifest = JSON.parse(
       await readFile(path.resolve("public/manifest.json"), "utf8"),

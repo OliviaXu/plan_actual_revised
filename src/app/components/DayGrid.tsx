@@ -37,10 +37,10 @@ import {
   type DayGridDropOperation,
   type DayGridDropTargetColumn,
 } from "./day-grid-drag";
+import type { DayGridLayoutMode } from "../side-panel-layout";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
-const DAY_GRID_TEMPLATE_COLUMNS =
-  `${DAY_TIME_AXIS_WIDTH} repeat(3, minmax(0, 1fr))`;
+const REVEAL_RAIL_WIDTH = "23px";
 const DAY_GRID_DROP_TARGET_CLASS_NAME = "bg-accent/15";
 const readSystemTime = () => new Date();
 
@@ -50,6 +50,7 @@ type DayGridProps = {
   dragDisabled?: boolean;
   editableMutationsDisabled?: boolean;
   canAddActual?: boolean;
+  layoutMode?: DayGridLayoutMode;
   planEvents: PlanEvent[];
   now?: () => Date;
   onAddActual?: () => void;
@@ -71,6 +72,7 @@ export function DayGrid({
   dragDisabled,
   editableMutationsDisabled,
   canAddActual,
+  layoutMode = "full",
   planEvents,
   now = readSystemTime,
   onAddActual,
@@ -157,6 +159,14 @@ export function DayGrid({
   );
   const gridStartMinutes = gridRange.startHour * 60;
   const gridEndMinutes = gridRange.endHour * 60;
+  const showPlan = layoutMode === "full";
+  const showRevised = layoutMode !== "actual";
+  const revealColumn = layoutMode === "actual"
+    ? "revised"
+    : layoutMode === "actual-revised"
+      ? "plan"
+      : undefined;
+  const gridTemplateColumns = getDayGridTemplateColumns(layoutMode);
 
   useEffect(() => {
     const intervalId = window.setInterval(() => setCurrentTime(now()), 60_000);
@@ -314,7 +324,7 @@ export function DayGrid({
           className="sticky top-0 z-20 grid border-b border-border bg-muted"
           data-testid="day-grid-header"
           ref={gridHeaderRef}
-          style={{ gridTemplateColumns: DAY_GRID_TEMPLATE_COLUMNS }}
+          style={{ gridTemplateColumns }}
         >
           <div
             className="border-r border-border px-3 py-2 text-xs font-medium uppercase text-muted-foreground"
@@ -322,7 +332,14 @@ export function DayGrid({
           >
             Time
           </div>
-          <h2 className="px-4 py-2 text-sm font-semibold">Plan</h2>
+          {showPlan ? (
+            <h2 className="day-grid-column-enter px-4 py-2 text-sm font-semibold">
+              Plan
+            </h2>
+          ) : null}
+          {revealColumn === "plan" ? (
+            <RevealRailHeader column="plan" />
+          ) : null}
           <div className="flex items-center justify-between border-l border-border px-4 py-2">
             <h2 className="text-sm font-semibold">Actual</h2>
             <div className="flex items-center gap-1.5">
@@ -341,9 +358,14 @@ export function DayGrid({
               />
             </div>
           </div>
-          <h2 className="border-l border-border px-4 py-2 text-sm font-semibold">
-            Revised
-          </h2>
+          {showRevised ? (
+            <h2 className="day-grid-column-enter border-l border-border px-4 py-2 text-sm font-semibold">
+              Revised
+            </h2>
+          ) : null}
+          {revealColumn === "revised" ? (
+            <RevealRailHeader column="revised" />
+          ) : null}
         </div>
         <div
           className="relative"
@@ -384,44 +406,49 @@ export function DayGrid({
           ) : null}
           <div
             className="grid h-full"
-            style={{ gridTemplateColumns: DAY_GRID_TEMPLATE_COLUMNS }}
+            style={{ gridTemplateColumns }}
           >
             <DayGridTimeAxis
               hourHeightPx={hourHeightPx}
               range={gridRange}
             />
+            {showPlan ? (
+              <div
+                className="day-grid-column-enter relative overflow-hidden"
+                data-testid="plan-column"
+              >
+                {planBlocks.length === 0 ? (
+                  <p
+                    className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
+                    data-testid="plan-empty"
+                  >
+                    No timed events today
+                  </p>
+                ) : null}
+                {planBlocks.map((block) => (
+                  <PlanGridBlock
+                    block={block}
+                    dragDisabled={dragDisabled}
+                    frontZIndex={planBlocks.length}
+                    isFront={frontPlanId === block.event.id}
+                    key={block.event.id}
+                    onBringToFront={() => setFrontPlanId(block.event.id)}
+                    onDragEnd={clearDragState}
+                    onDragStart={(event) =>
+                      startDrag(event, "plan", block.event.id)
+                    }
+                    onGrabOffsetCapture={(event) =>
+                      captureGrabOffset(event, "plan", block.event.id)
+                    }
+                  />
+                ))}
+              </div>
+            ) : null}
+            {revealColumn === "plan" ? (
+              <RevealRailBody column="plan" hourHeightPx={hourHeightPx} />
+            ) : null}
             <div
-              className="relative overflow-hidden"
-              data-testid="plan-column"
-            >
-              {planBlocks.length === 0 ? (
-                <p
-                  className="absolute inset-x-4 top-6 text-sm text-muted-foreground"
-                  data-testid="plan-empty"
-                >
-                  No timed events today
-                </p>
-              ) : null}
-              {planBlocks.map((block) => (
-                <PlanGridBlock
-                  block={block}
-                  dragDisabled={dragDisabled}
-                  frontZIndex={planBlocks.length}
-                  isFront={frontPlanId === block.event.id}
-                  key={block.event.id}
-                  onBringToFront={() => setFrontPlanId(block.event.id)}
-                  onDragEnd={clearDragState}
-                  onDragStart={(event) =>
-                    startDrag(event, "plan", block.event.id)
-                  }
-                  onGrabOffsetCapture={(event) =>
-                    captureGrabOffset(event, "plan", block.event.id)
-                  }
-                />
-              ))}
-            </div>
-            <div
-              className={`relative overflow-hidden border-l border-border ${
+              className={`day-grid-column-enter relative overflow-hidden border-l border-border ${
                 dropPreview?.targetColumn === "actual"
                   ? DAY_GRID_DROP_TARGET_CLASS_NAME
                   : ""
@@ -464,7 +491,11 @@ export function DayGrid({
                 />
               ))}
             </div>
-            <div
+            {revealColumn === "revised" ? (
+              <RevealRailBody column="revised" hourHeightPx={hourHeightPx} />
+            ) : null}
+            {showRevised ? (
+              <div
               className={`relative overflow-hidden border-l border-border ${
                 dropPreview?.targetColumn === "revised"
                   ? DAY_GRID_DROP_TARGET_CLASS_NAME
@@ -507,11 +538,66 @@ export function DayGrid({
                   }}
                 />
               ))}
-            </div>
+              </div>
+            ) : null}
           </div>
         </div>
       </div>
     </section>
+  );
+}
+
+function getDayGridTemplateColumns(layoutMode: DayGridLayoutMode) {
+  if (layoutMode === "actual") {
+    return `${DAY_TIME_AXIS_WIDTH} minmax(0, 1fr) ${REVEAL_RAIL_WIDTH}`;
+  }
+  if (layoutMode === "actual-revised") {
+    return `${DAY_TIME_AXIS_WIDTH} ${REVEAL_RAIL_WIDTH} repeat(2, minmax(0, 1fr))`;
+  }
+  return `${DAY_TIME_AXIS_WIDTH} repeat(3, minmax(0, 1fr))`;
+}
+
+function RevealRailHeader({ column }: { column: "plan" | "revised" }) {
+  const label = column === "plan" ? "P" : "R";
+  return (
+    <div
+      aria-hidden="true"
+      className="flex items-center justify-center border-l border-border bg-accent/45 py-2 text-xs font-medium"
+      data-testid={`${column}-reveal-header`}
+    >
+      {label}
+    </div>
+  );
+}
+
+function RevealRailBody({
+  column,
+  hourHeightPx,
+}: {
+  column: "plan" | "revised";
+  hourHeightPx: number;
+}) {
+  const columnLabel = column === "plan" ? "Plan" : "Revised";
+  return (
+    <div
+      aria-label={`Widen the side panel to show ${columnLabel}`}
+      className="relative flex cursor-help justify-center overflow-visible border-l border-border text-muted-foreground"
+      data-testid={`${column}-reveal-rail`}
+      style={{
+        backgroundImage:
+          "linear-gradient(to bottom, transparent calc(100% - 1px), hsl(var(--border)) calc(100% - 1px))",
+        backgroundSize: `100% ${hourHeightPx}px`,
+      }}
+      title={`Drag the side panel wider to show ${columnLabel}`}
+    >
+      <span
+        aria-hidden="true"
+        className="sticky top-1/2 h-fit -translate-y-1/2 [writing-mode:vertical-rl]"
+        data-testid={`${column}-reveal-grip`}
+      >
+        •••
+      </span>
+    </div>
   );
 }
 

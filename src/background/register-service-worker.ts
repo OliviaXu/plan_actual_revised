@@ -6,6 +6,8 @@ import type { CalendarResult } from "./calendar-operations";
 
 type ServiceWorkerOperations = {
   openAppPage: () => Promise<unknown>;
+  openCalendarSidePanel: (tabId: number) => Promise<unknown>;
+  disableSidePanel: (tabId: number) => Promise<unknown>;
   connectCalendar: () => Promise<Result<{ status: "connected" }>>;
   listCurrentCalendarEvents: () => Promise<CalendarResult>;
   insertCalendarEvent: (
@@ -19,8 +21,22 @@ type ServiceWorkerOperations = {
 export default function registerServiceWorker(
   operations: ServiceWorkerOperations,
 ) {
-  chrome.action.onClicked.addListener(() => {
+  chrome.action.onClicked.addListener((tab) => {
+    if (tab.id !== undefined && isGoogleCalendarUrl(tab.url)) {
+      void operations.openCalendarSidePanel?.(tab.id);
+      return;
+    }
+
+    if (tab.id !== undefined) {
+      void operations.disableSidePanel?.(tab.id);
+    }
     void operations.openAppPage();
+  });
+
+  chrome.tabs.onUpdated.addListener((tabId, _changeInfo, tab) => {
+    if (tab.url && !isGoogleCalendarUrl(tab.url)) {
+      void operations.disableSidePanel?.(tabId);
+    }
   });
 
   chrome.runtime.onMessage.addListener(
@@ -64,6 +80,15 @@ export default function registerServiceWorker(
       return false;
     },
   );
+}
+
+export function isGoogleCalendarUrl(url?: string) {
+  if (!url) return false;
+  try {
+    return new URL(url).origin === "https://calendar.google.com";
+  } catch {
+    return false;
+  }
 }
 
 function forwardRuntimeResponse(

@@ -92,6 +92,102 @@ afterEach(() => {
 });
 
 describe("DayGrid", () => {
+  it("shows only Actual with a non-interactive Revised reveal rail", () => {
+    render(
+      <DayGrid
+        actuals={[actualEvent("actual", 540, 30)]}
+        layoutMode="actual"
+        planEvents={[planEvent("plan", 480, 30)]}
+        revised={[revisedEvent("revised", 600, 30)]}
+        {...calendarDay}
+      />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
+    expect(screen.queryByRole("heading", { name: "Plan" })).not.toBeInTheDocument();
+    expect(screen.queryByRole("heading", { name: "Revised" })).not.toBeInTheDocument();
+    expect(screen.queryByTestId("plan-column")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("revised-column")).not.toBeInTheDocument();
+    expect(screen.getByTestId("revised-reveal-header")).toHaveTextContent("R");
+    expect(screen.getByTestId("revised-reveal-rail")).toHaveAttribute(
+      "title",
+      "Drag the side panel wider to show Revised",
+    );
+    expect(screen.getByTestId("revised-reveal-rail")).not.toHaveAttribute(
+      "role",
+      "button",
+    );
+    expect(screen.getByTestId("revised-reveal-grip")).toHaveClass(
+      "sticky",
+      "top-1/2",
+    );
+    expect(screen.getByRole("button", { name: "Add Actual" })).toBeVisible();
+    expect(screen.getByRole("button", { name: "Log Slack time" })).toBeVisible();
+  });
+
+  it("shows Actual and Revised with the Plan reveal rail on the left", () => {
+    render(
+      <DayGrid
+        actuals={[actualEvent("actual", 540, 30)]}
+        layoutMode="actual-revised"
+        planEvents={[planEvent("plan", 480, 30)]}
+        revised={[revisedEvent("revised", 600, 30)]}
+        {...calendarDay}
+      />,
+    );
+
+    expect(screen.queryByRole("heading", { name: "Plan" })).not.toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Revised" })).toBeVisible();
+    expect(screen.getByTestId("plan-reveal-header")).toHaveTextContent("P");
+    expect(screen.getByTestId("plan-reveal-rail")).toHaveAttribute(
+      "title",
+      "Drag the side panel wider to show Plan",
+    );
+    expect(screen.getByTestId("plan-reveal-rail").compareDocumentPosition(
+      screen.getByTestId("actual-column"),
+    ) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it("shows all columns without a reveal rail in full mode", () => {
+    render(
+      <DayGrid layoutMode="full" planEvents={[]} {...calendarDay} />,
+    );
+
+    expect(screen.getByRole("heading", { name: "Plan" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Actual" })).toBeVisible();
+    expect(screen.getByRole("heading", { name: "Revised" })).toBeVisible();
+    expect(screen.queryByTestId("plan-reveal-rail")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("revised-reveal-rail")).not.toBeInTheDocument();
+  });
+
+  it("preserves the shared timeline and scroll position when columns appear", () => {
+    const { rerender } = render(
+      <DayGrid
+        layoutMode="actual"
+        planEvents={[planEvent("late-plan", 1200, 60)]}
+        {...calendarDay}
+      />,
+    );
+    const viewport = screen.getByTestId("plan-scroll-viewport");
+    const actualColumn = screen.getByTestId("actual-column");
+    viewport.scrollTop = 320;
+    const bodyHeight = screen.getByTestId("day-grid-body").style.height;
+
+    rerender(
+      <DayGrid
+        layoutMode="actual-revised"
+        planEvents={[planEvent("late-plan", 1200, 60)]}
+        {...calendarDay}
+      />,
+    );
+
+    expect(screen.getByTestId("plan-scroll-viewport")).toBe(viewport);
+    expect(screen.getByTestId("actual-column")).toBe(actualColumn);
+    expect(viewport.scrollTop).toBe(320);
+    expect(screen.getByTestId("day-grid-body").style.height).toBe(bodyHeight);
+  });
+
   it("renders the complete default hour axis without full-width grid lines", () => {
     render(<DayGrid planEvents={[]} {...calendarDay} />);
 
