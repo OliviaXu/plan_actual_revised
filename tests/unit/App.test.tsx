@@ -96,6 +96,7 @@ afterEach(() => {
   cleanup();
   vi.useRealTimers();
   vi.unstubAllGlobals();
+  vi.restoreAllMocks();
 });
 
 describe("App Plan loading", () => {
@@ -525,6 +526,7 @@ describe("App catch-up", () => {
   });
 
   it("does not run catch-up when the canonical local read fails", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return {
@@ -543,11 +545,15 @@ describe("App catch-up", () => {
     );
 
     render(<App now={now} />);
-    await screen.findByTestId("actual-storage-error");
+    await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+      "day-record-load-failed",
+      expect.objectContaining({ date: "2026-07-15" }),
+    ));
 
     expect(chrome.runtime.sendMessage).not.toHaveBeenCalledWith(
       expect.objectContaining({ type: "catchUp.run" }),
     );
+    expect(screen.queryByTestId("catch-up-toast")).not.toBeInTheDocument();
   });
 
   it("keeps Actual interactive while catch-up runs and shows its result", async () => {
@@ -575,7 +581,7 @@ describe("App catch-up", () => {
 
     const add = await screen.findByRole("button", { name: "Add Actual" });
     await waitFor(() => expect(add).toBeEnabled());
-    expect(screen.queryByTestId("catch-up-summary")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("catch-up-toast")).not.toBeInTheDocument();
 
     finishCatchUp?.({
       ok: true,
@@ -586,10 +592,13 @@ describe("App catch-up", () => {
       },
     });
 
-    expect(await screen.findByTestId("catch-up-summary")).toHaveTextContent(
-      "Catch-up: saved 2 Actuals to Calendar; 1 Actual couldn't be saved and will be retried next time.",
+    expect(await screen.findByTestId("catch-up-toast")).toHaveTextContent(
+      "Catch-up: saved 2 Actuals to Calendar; 1 Actual couldn’t be saved.",
     );
-    expect(screen.getByTestId("catch-up-summary")).toHaveRole("alert");
+    expect(screen.getByTestId("catch-up-toast")).toHaveRole("alert");
+    expect(
+      screen.queryByRole("button", { name: "Retry catch-up" }),
+    ).not.toBeInTheDocument();
     expect(add).toBeEnabled();
   });
 
@@ -613,7 +622,7 @@ describe("App catch-up", () => {
       expect.objectContaining({ type: "catchUp.run" }),
     ));
 
-    expect(screen.queryByTestId("catch-up-summary")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("catch-up-toast")).not.toBeInTheDocument();
   });
 });
 
@@ -853,6 +862,7 @@ describe("App Actual persistence", () => {
   });
 
   it("keeps a failed optimistic Actual visible and lets Calendar saving retry storage", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
@@ -872,9 +882,10 @@ describe("App Actual persistence", () => {
     fireEvent.click(add);
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
-    expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
-      "Unable to save local changes.",
-    );
+    await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+      "day-record-write-failed",
+      expect.objectContaining({ date: "2026-07-15" }),
+    ));
     expect(screen.getByTestId("actual-block")).toHaveTextContent("Untitled");
     const save = screen.getByRole("button", {
       name: "Save Actual to calendar",
@@ -882,13 +893,10 @@ describe("App Actual persistence", () => {
     expect(save).toBeEnabled();
     fireEvent.click(save);
 
-    await waitFor(() =>
-      expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument(),
+    expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
+      "Saved 1 Actual to Calendar.",
     );
     expect(chrome.storage.local.set).toHaveBeenCalledTimes(2);
-    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
-      "Saved 1",
-    );
   });
 
   it("allows Calendar saving while an optimistic Actual write is pending", async () => {
@@ -926,6 +934,7 @@ describe("App Actual persistence", () => {
   });
 
   it("treats a rare storage read failure as an empty usable day", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return { ok: true, value: { events: [timedEvent], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
@@ -938,9 +947,10 @@ describe("App Actual persistence", () => {
 
     render(<App now={now} />);
 
-    expect(await screen.findByTestId("actual-storage-error")).toHaveTextContent(
-      "Unable to load local changes.",
-    );
+    await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+      "day-record-load-failed",
+      expect.objectContaining({ date: "2026-07-15" }),
+    ));
     const add = screen.getByRole("button", { name: "Add Actual" });
     expect(add).toBeEnabled();
     expect(screen.getByTestId("plan-event-design-review")).toHaveAttribute(
@@ -954,9 +964,6 @@ describe("App Actual persistence", () => {
     fireEvent.click(screen.getByRole("button", { name: "Save" }));
 
     expect(await screen.findByTestId("actual-block")).toHaveTextContent("Untitled");
-    await waitFor(() =>
-      expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument(),
-    );
     expect(chrome.storage.local.set).toHaveBeenCalledTimes(1);
   });
 
@@ -1498,9 +1505,12 @@ describe("App Slack audit", () => {
 
   it("keeps the Slack Actual and warns when launching throws", async () => {
     const stored = connectCalendar();
-    const launchSlack = vi.fn(() => {
-      throw new Error("Protocol blocked");
-    });
+    const launchSlack = vi
+      .fn()
+      .mockImplementationOnce(() => {
+        throw new Error("Protocol blocked");
+      })
+      .mockImplementationOnce(() => undefined);
 
     render(<App now={now} launchSlack={launchSlack} />);
     const logSlack = await screen.findByRole("button", {
@@ -1522,6 +1532,17 @@ describe("App Slack audit", () => {
     expect(stored["dayRecord:2026-07-15"]).toMatchObject({
       actual: [{ isSlack: true }],
     });
+
+    fireEvent.click(logSlack);
+    fireEvent.change(screen.getByPlaceholderText("attention is devotion :)"), {
+      target: { value: "Follow-up" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Open Slack" }));
+
+    expect(launchSlack).toHaveBeenCalledTimes(2);
+    expect(screen.getByTestId("slack-launch-toast")).toHaveTextContent(
+      "Slack may not have opened. Your time was still logged.",
+    );
   });
 
   it("bounds a late-night Slack Actual at midnight", async () => {
@@ -1616,8 +1637,8 @@ describe("App Actual Calendar saving", () => {
       },
     });
 
-    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
-      "1 matched Plan",
+    expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
+      "1 Actual matched Plan.",
     );
     await waitFor(() => expect(add).toBeEnabled());
     expect(resize).toBeEnabled();
@@ -1637,8 +1658,8 @@ describe("App Actual Calendar saving", () => {
     render(<App now={now} />);
     fireEvent.click(await screen.findByRole("button", { name: "Save Actual to calendar" }));
 
-    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
-      "1 matched Plan",
+    expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
+      "1 Actual matched Plan.",
     );
     expect(stored["dayRecord:2026-07-15"]).toMatchObject({
       actual: [{ saveDisposition: "planMatched" }],
@@ -1667,8 +1688,8 @@ describe("App Actual Calendar saving", () => {
     render(<App now={now} />);
     fireEvent.click(await screen.findByRole("button", { name: "Save Actual to calendar" }));
 
-    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
-      "Saved 1",
+    expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
+      "Saved 1 Actual to Calendar.",
     );
     expect(stored["dayRecord:2026-07-15"]).toMatchObject({
       actual: [{
@@ -1706,8 +1727,8 @@ describe("App Actual Calendar saving", () => {
     const save = await screen.findByRole("button", { name: "Save Actual to calendar" });
     fireEvent.click(save);
 
-    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
-      "Failed 1",
+    expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
+      "1 Actual couldn’t be saved.",
     );
     expect(stored["dayRecord:2026-07-15"]).toMatchObject({
       actual: [{
@@ -1739,10 +1760,9 @@ describe("App Actual Calendar saving", () => {
       await screen.findByRole("button", { name: "Save Actual to calendar" }),
     );
 
-    expect(await screen.findByTestId("actual-save-summary")).toHaveTextContent(
-      "Failed 1",
+    expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
+      "1 Actual couldn’t be saved.",
     );
-    expect(screen.queryByTestId("actual-storage-error")).not.toBeInTheDocument();
     expect(stored["dayRecord:2026-07-15"]).toMatchObject({
       actual: [{
         saveDisposition: "unsaved",
@@ -1965,7 +1985,8 @@ describe("App Plan copy dragging", () => {
     );
   });
 
-  it("keeps a failed Plan copy visible and surfaces the storage warning", async () => {
+  it("keeps a failed Plan copy visible and logs the storage failure", async () => {
+    const consoleError = vi.spyOn(console, "error").mockImplementation(() => undefined);
     mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
         return {
@@ -2018,8 +2039,13 @@ describe("App Plan copy dragging", () => {
     expect(await screen.findByTestId("actual-block")).toHaveTextContent(
       "Design review",
     );
-    expect(await screen.findByTestId("actual-storage-error"))
-      .toHaveTextContent("Unable to save local changes.");
+    await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
+      "day-record-write-failed",
+      expect.objectContaining({ date: "2026-07-15" }),
+    ));
+    expect(screen.queryByTestId("calendar-save-toast")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("catch-up-toast")).not.toBeInTheDocument();
+    expect(screen.queryByTestId("slack-launch-toast")).not.toBeInTheDocument();
   });
 });
 

@@ -82,10 +82,10 @@ test("an exact Plan match is classified once and never inserted", async () => {
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
-    await expect(page.getByTestId("actual-save-summary")).toContainText("1 matched Plan");
+    await expect(page.getByTestId("calendar-save-toast")).toHaveText("1 Actual matched Plan.");
     await page.reload();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
-    await expect(page.getByTestId("actual-save-summary")).toHaveText("Nothing new to save");
+    await expect(page.getByTestId("calendar-save-toast")).toHaveText("Nothing new to save.");
     expect(await readStorage(page, "test:insertAttemptCount")).toBeUndefined();
   } finally {
     await context.close();
@@ -103,7 +103,7 @@ test("a Calendar-saved Actual becomes a new insert after a meaningful edit", asy
       .getByTestId("actual-block")
       .getAttribute("data-actual-id");
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
-    await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
+    await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
       summary: "[Actual] Untitled",
       start: {
@@ -144,7 +144,7 @@ test("a Calendar-saved Actual becomes a new insert after a meaningful edit", asy
     });
 
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
-    await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
+    await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
       id: `par${editedActualId?.toLowerCase().replaceAll("-", "")}`,
       summary: "[Actual] Edited Actual",
@@ -168,10 +168,9 @@ test("an ambiguous insert remains unsaved and retries without a duplicate", asyn
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
-    await expect(page.getByTestId("actual-save-summary")).toContainText("Failed 1");
-    await page.reload();
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
-    await expect(page.getByTestId("actual-save-summary")).toContainText("Saved 1");
+    await expect(page.getByTestId("calendar-save-toast")).toContainText("1 Actual couldn’t be saved");
+    await page.getByRole("button", { name: "Retry save" }).click();
+    await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
     expect(await readStorage(page, "test:insertAttemptCount")).toBe(2);
     expect(await readStorage(page, "test:uniqueInsertCount")).toBe(1);
   } finally {

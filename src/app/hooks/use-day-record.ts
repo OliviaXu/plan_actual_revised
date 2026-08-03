@@ -20,11 +20,9 @@ type DayRecordLoadState = {
 export function useDayRecord(calendarDay?: CalendarDay) {
   const [dayRecordState, setDayRecordState] = useState<DayRecordState>();
   const [loadState, setLoadState] = useState<DayRecordLoadState>();
-  const [storageError, setStorageError] = useState<string>();
   const writeQueueRef = useRef<
     ReturnType<typeof createDayRecordWriteQueue>
   >(createDayRecordWriteQueue());
-  const latestWriteIdRef = useRef(0);
   const calendarDate = calendarDay?.date;
   const calendarDayKey = calendarDay
     ? `${calendarDay.date}:${calendarDay.timeZone}`
@@ -52,15 +50,13 @@ export function useDayRecord(calendarDay?: CalendarDay) {
           record,
         });
         setLoadState({ key: calendarDayKey, status: "loaded" });
-        setStorageError(undefined);
       })
       .catch((error: unknown) => {
         if (!active) return;
-        setStorageError(
-          error instanceof Error
-            ? error.message
-            : "Unable to load local changes.",
-        );
+        console.error("day-record-load-failed", {
+          date: calendarDate,
+          error,
+        });
         setDayRecordState({
           key: calendarDayKey,
           record: null,
@@ -74,31 +70,22 @@ export function useDayRecord(calendarDay?: CalendarDay) {
   }, [calendarDate, calendarDayKey]);
 
   async function persistDayRecord(record: DayRecord) {
-    const writeId = ++latestWriteIdRef.current;
     const recordKey = `${record.date}:${record.timezone}`;
     setDayRecordState({ key: recordKey, record });
-    setStorageError(undefined);
 
     try {
       await writeQueueRef.current(record);
-      if (writeId === latestWriteIdRef.current) {
-        setStorageError(undefined);
-      }
     } catch (error) {
-      if (writeId === latestWriteIdRef.current) {
-        setStorageError(
-          error instanceof Error
-            ? error.message
-            : "Unable to save local changes.",
-        );
-      }
+      console.error("day-record-write-failed", {
+        date: record.date,
+        error,
+      });
     }
   }
 
   return {
     dayRecord,
     loadStatus,
-    storageError,
     persistDayRecord,
   };
 }

@@ -148,8 +148,8 @@ test("Slack audit validates, launches from the click, persists, and saves as an 
     await page
       .getByRole("button", { name: "Save Actual to calendar" })
       .click();
-    await expect(page.getByTestId("actual-save-summary")).toContainText(
-      "Saved 1",
+    await expect(page.getByTestId("calendar-save-toast")).toContainText(
+      "Saved 1 Actual",
     );
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
       summary: "[s] Check release channel",

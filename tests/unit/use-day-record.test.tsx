@@ -21,6 +21,7 @@ function dayRecord(updatedAt: string): DayRecord {
 }
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -46,8 +47,8 @@ describe("useDayRecord", () => {
     expect(result.current).toMatchObject({
       dayRecord: null,
       loadStatus: "loading",
-      storageError: undefined,
     });
+    expect(result.current).not.toHaveProperty("storageError");
     expect(get).not.toHaveBeenCalled();
 
     rerender({ day: calendarDay });
@@ -58,6 +59,7 @@ describe("useDayRecord", () => {
   });
 
   it("does not classify a failed canonical read as successful", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     vi.stubGlobal("chrome", {
       storage: {
         local: {
@@ -70,6 +72,13 @@ describe("useDayRecord", () => {
     const { result } = renderHook(() => useDayRecord(calendarDay));
 
     await waitFor(() => expect(result.current.loadStatus).toBe("failed"));
+    expect(error).toHaveBeenCalledWith(
+      "day-record-load-failed",
+      expect.objectContaining({
+        date: "2026-07-15",
+        error: expect.any(Error),
+      }),
+    );
   });
 
   it("keeps the read failed after a later optimistic write succeeds", async () => {
@@ -151,7 +160,8 @@ describe("useDayRecord", () => {
     await waitFor(() => expect(result.current.loadStatus).toBe("loaded"));
   });
 
-  it("updates optimistically, serializes writes, and reports only the latest failure", async () => {
+  it("updates optimistically, serializes writes, and logs every failed write", async () => {
+    const error = vi.spyOn(console, "error").mockImplementation(() => undefined);
     const pendingWrites: Array<{
       reject: (reason: unknown) => void;
     }> = [];
@@ -188,13 +198,21 @@ describe("useDayRecord", () => {
     await act(async () => {
       await firstWrite;
     });
-    expect(result.current.storageError).toBeUndefined();
     expect(set).toHaveBeenCalledTimes(2);
 
     pendingWrites[1]?.reject(new Error("latest failed"));
     await act(async () => {
       await latestWrite;
     });
-    expect(result.current.storageError).toBe("Unable to save local changes.");
+    expect(result.current).not.toHaveProperty("storageError");
+    expect(error).toHaveBeenCalledTimes(2);
+    expect(error).toHaveBeenNthCalledWith(
+      1,
+      "day-record-write-failed",
+      expect.objectContaining({
+        date: "2026-07-15",
+        error: expect.any(Error),
+      }),
+    );
   });
 });

@@ -1,7 +1,8 @@
-import { CalendarDays, CircleAlert, X } from "lucide-react";
-import { useEffect, useState } from "react";
+import { CalendarDays, CircleAlert } from "lucide-react";
+import { useCallback, useEffect, useRef, useState } from "react";
 
 import { Button } from "./components/ui/button";
+import { Toast, type ToastAction } from "./components/ui/toast";
 import { CalendarSurfaceTransition } from "./components/CalendarSurfaceTransition";
 import { DayGrid } from "./components/DayGrid";
 import type { DayGridDropOperation } from "./components/day-grid-drag";
@@ -24,15 +25,17 @@ import {
 import { buildPlanCopy } from "../domain/editable-event-drag";
 import { defaultSettings } from "../domain/settings";
 import { buildEditedActual } from "../domain/actual-edit";
-import {
-  runtimeCalendarEventClient,
-  saveActualsToCalendar,
-} from "./workflows/save-actuals-to-calendar";
+import { runtimeCalendarEventClient } from "./runtime-calendar-event-client";
 import { useCalendarPlan } from "./hooks/use-calendar-plan";
 import { useDayRecord } from "./hooks/use-day-record";
 import { getCalendarTime } from "../calendar/calendar-time";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
+import type { Result } from "../shared/result";
 import { sendRuntimeMessage } from "../shared/runtime-messages";
+import {
+  syncDayActualsToCalendar,
+  type SyncDayActualsResult,
+} from "../workflows/sync-day-actuals-to-calendar";
 import {
   useDayGridLayoutMode,
   type AppSurface,
@@ -42,12 +45,23 @@ type EditableEventEditorState =
   | { mode: "create"; column: "actual"; event: ActualEvent }
   | { mode: "edit"; column: EditableColumn; event: EditableEvent };
 
+type AppToast = {
+  id: number;
+  source: "calendar-save" | "catch-up" | "slack-launch";
+  message: string;
+  tone: "plain" | "warning";
+  durationMs?: number;
+};
+
+type AppToastContent = Omit<AppToast, "id">;
+
 const readSystemTime = () => new Date();
 const openSlackProtocol = () => {
   window.open("slack://open", "_self");
 };
 const reloadAppPage = () => window.location.reload();
 const defaultActualDurationMinutes = 30;
+const transientToastDurationMs = 5_000;
 
 export function App({
   now = readSystemTime,
@@ -69,17 +83,12 @@ export function App({
   const {
     dayRecord,
     loadStatus: actualLoadStatus,
-    storageError: actualStorageError,
     persistDayRecord,
   } = useDayRecord(canonicalCalendarDay);
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
-  const [calendarSaveSummary, setCalendarSaveSummary] = useState<string>();
-  const [slackLaunchWarning, setSlackLaunchWarning] = useState(false);
-  const [catchUpFeedback, setCatchUpFeedback] = useState<{
-    message: string;
-    warning: boolean;
-  }>();
+  const [toast, setToast] = useState<AppToast>();
+  const nextToastIdRef = useRef(0);
   const [editableEventEditorState, setEditableEventEditorState] =
     useState<EditableEventEditorState>();
   const currentDate = now();
@@ -101,37 +110,24 @@ export function App({
     ? "check-in"
     : calendarState.status;
 
+  const showToast = useCallback((content: AppToastContent) => {
+    setToast({ id: ++nextToastIdRef.current, ...content });
+  }, []);
+  const clearToast = useCallback(() => setToast(undefined), []);
   useEffect(() => {
     if (!calendarConnected || actualLoadStatus !== "loaded") return;
 
     let active = true;
-    void sendRuntimeMessage({
-      type: "catchUp.run",
-      todayDate: calendarDay.date,
-    })
-      .then((response) => {
-        if (!active) return;
-        if (!response.ok) {
-          setCatchUpFeedback({
-            message: `Catch-up unavailable: ${response.error.message}`,
-            warning: true,
-          });
-          return;
-        }
-        setCatchUpFeedback(getCatchUpFeedback(response.value));
-      })
-      .catch(() => {
-        if (!active) return;
-        setCatchUpFeedback({
-          message: "Catch-up unavailable: unable to reach the background service.",
-          warning: true,
-        });
-      });
+    void requestCatchUp(calendarDay.date).then((response) => {
+      if (!active) return;
+      const feedback = getCatchUpToast(response);
+      if (feedback) showToast(feedback);
+    });
 
     return () => {
       active = false;
     };
-  }, [actualLoadStatus, calendarConnected, calendarDay.date]);
+  }, [actualLoadStatus, calendarConnected, calendarDay.date, showToast]);
 
   function buildNewActual({
     summary,
@@ -199,11 +195,15 @@ export function App({
       createdAt,
     });
     persistAddedEditableEvent({ column: "actual", event: newActual });
-    setSlackLaunchWarning(false);
     try {
       launchSlack();
     } catch {
-      setSlackLaunchWarning(true);
+      showToast({
+        source: "slack-launch",
+        message: "Slack may not have opened. Your time was still logged.",
+        tone: "warning",
+        durationMs: transientToastDurationMs,
+      });
     }
   }
 
@@ -376,20 +376,29 @@ export function App({
     if (!dayRecord || isSavingActualsToCalendar) return;
 
     setIsSavingActualsToCalendar(true);
-    setCalendarSaveSummary(undefined);
 
     try {
-      const result = await saveActualsToCalendar({
+      const result = await syncDayActualsToCalendar({
         record: dayRecord,
         now,
         persistDayRecord,
         ...runtimeCalendarEventClient,
       });
-      setCalendarSaveSummary(result.summary);
+      showToast(getCalendarSaveToast(result));
     } finally {
       setIsSavingActualsToCalendar(false);
     }
   }
+
+  const toastAction: ToastAction | undefined =
+    toast?.source === "calendar-save" && toast.tone === "warning"
+      ? {
+          label: "Retry save",
+          pending: isSavingActualsToCalendar,
+          pendingLabel: "Retrying…",
+          onClick: () => void handleSaveActualsToCalendar(),
+        }
+      : undefined;
 
   return (
     <main
@@ -423,29 +432,6 @@ export function App({
             </div>
           </div>
         </header>
-
-        {actualStorageError ? (
-          <p
-            className="rounded-md border border-destructive bg-white px-4 py-3 text-sm font-medium text-destructive"
-            data-testid="actual-storage-error"
-          >
-            {actualStorageError}
-          </p>
-        ) : null}
-
-        {catchUpFeedback ? (
-          <p
-            className={
-              catchUpFeedback.warning
-                ? "rounded-md border border-destructive bg-white px-4 py-3 text-sm font-medium text-destructive"
-                : "rounded-md border border-border bg-white px-4 py-3 text-sm text-muted-foreground"
-            }
-            data-testid="catch-up-summary"
-            role={catchUpFeedback.warning ? "alert" : "status"}
-          >
-            {catchUpFeedback.message}
-          </p>
-        ) : null}
 
         <CalendarSurfaceTransition surfaceKey={calendarSurfaceKey}>
           {isCalendarCheckingIn ? (
@@ -546,7 +532,7 @@ export function App({
         </CalendarSurfaceTransition>
 
         {dayRecord?.actual.length ? (
-          <footer className="flex items-center gap-4">
+          <footer className="flex items-center">
             <Button
               disabled={
                 isSavingActualsToCalendar ||
@@ -559,11 +545,6 @@ export function App({
                 ? "Saving Actual"
                 : "Save Actual to calendar"}
             </Button>
-            {calendarSaveSummary ? (
-              <p className="text-sm text-muted-foreground" data-testid="actual-save-summary">
-                {calendarSaveSummary}
-              </p>
-            ) : null}
           </footer>
         ) : null}
       </section>
@@ -578,21 +559,17 @@ export function App({
           paletteColorIds={defaultSettings.actualPaletteColorIds}
         />
       ) : null}
-      {slackLaunchWarning ? (
-        <div
-          className="fixed bottom-4 right-4 z-50 flex max-w-sm items-start gap-3 rounded-md border border-border bg-white px-4 py-3 text-sm shadow-soft"
-          role="alert"
-        >
-          <span>Slack may not have opened. Your time was still logged.</span>
-          <button
-            aria-label="Dismiss Slack warning"
-            className="-mr-1 rounded-sm p-1 text-muted-foreground hover:bg-muted focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
-            onClick={() => setSlackLaunchWarning(false)}
-            type="button"
-          >
-            <X aria-hidden="true" className="h-4 w-4" />
-          </button>
-        </div>
+      {toast ? (
+        <Toast
+          action={toastAction}
+          durationMs={toast.durationMs}
+          key={toast.id}
+          message={toast.message}
+          onDismiss={clearToast}
+          onDurationEnd={clearToast}
+          testId={`${toast.source}-toast`}
+          tone={toast.tone}
+        />
       ) : null}
     </main>
   );
@@ -625,9 +602,55 @@ function getNewActualTiming(
   };
 }
 
-function getCatchUpFeedback(
-  result: CatchUpRunResult,
-): { message: string; warning: boolean } | undefined {
+function getCalendarSaveToast(result: SyncDayActualsResult): AppToastContent {
+  if (result.status === "nothingToSync") {
+    return {
+      source: "calendar-save",
+      message: "Nothing new to save.",
+      tone: "plain",
+      durationMs: transientToastDurationMs,
+    };
+  }
+  if (result.status === "planLookupFailed") {
+    return {
+      source: "calendar-save",
+      message:
+        `Unable to check Calendar. ${formatActualCount(result.failed)} ` +
+        `${result.failed === 1 ? "wasn’t" : "weren’t"} saved.`,
+      tone: "warning",
+    };
+  }
+
+  const clauses: string[] = [];
+  if (result.saved) {
+    clauses.push(`Saved ${formatActualCount(result.saved)} to Calendar`);
+  }
+  if (result.matched) {
+    clauses.push(`${formatActualCount(result.matched)} matched Plan`);
+  }
+  if (result.failed) {
+    clauses.push(`${formatActualCount(result.failed)} couldn’t be saved`);
+  }
+  return {
+    source: "calendar-save",
+    message: `${clauses.join("; ")}.`,
+    tone: result.failed ? "warning" : "plain",
+    ...(!result.failed ? { durationMs: transientToastDurationMs } : {}),
+  };
+}
+
+function getCatchUpToast(
+  response: Result<CatchUpRunResult>,
+): AppToastContent | undefined {
+  if (!response.ok) {
+    return {
+      source: "catch-up",
+      message: `Catch-up unavailable: ${response.error.message}`,
+      tone: "warning",
+    };
+  }
+
+  const result = response.value;
   const clauses: string[] = [];
   if (result.saved) {
     clauses.push(
@@ -637,7 +660,7 @@ function getCatchUpFeedback(
   if (result.failed) {
     clauses.push(
       `${result.failed} ${result.failed === 1 ? "Actual" : "Actuals"} ` +
-        "couldn't be saved and will be retried next time",
+        "couldn’t be saved",
     );
   }
   if (result.discarded) {
@@ -648,7 +671,31 @@ function getCatchUpFeedback(
   }
   if (clauses.length === 0) return undefined;
   return {
+    source: "catch-up",
     message: `Catch-up: ${clauses.join("; ")}.`,
-    warning: Boolean(result.failed || result.discarded),
+    tone: result.failed || result.discarded ? "warning" : "plain",
+    ...(result.failed || result.discarded
+      ? {}
+      : { durationMs: transientToastDurationMs }),
   };
+}
+
+function formatActualCount(count: number) {
+  return `${count} ${count === 1 ? "Actual" : "Actuals"}`;
+}
+
+async function requestCatchUp(
+  todayDate: string,
+): Promise<Result<CatchUpRunResult>> {
+  try {
+    return await sendRuntimeMessage({ type: "catchUp.run", todayDate });
+  } catch {
+    return {
+      ok: false,
+      error: {
+        code: "CATCH_UP_BOUNDARY_UNAVAILABLE",
+        message: "Unable to reach the background service.",
+      },
+    };
+  }
 }

@@ -142,7 +142,7 @@ test("saves yesterday and removes it without retrying terminal blocks", async ()
   });
 
   try {
-    await expect(page.getByTestId("catch-up-summary")).toHaveText(
+    await expect(page.getByTestId("catch-up-toast")).toHaveText(
       "Catch-up: saved 1 Actual to Calendar.",
     );
     expect(await readStorage(page, yesterdayKey)).toBeUndefined();
@@ -164,7 +164,7 @@ test("saves yesterday and removes it without retrying terminal blocks", async ()
   }
 });
 
-test("keeps a retained failure and retries it after refresh", async () => {
+test("keeps a retained failure and retries it after a future page load", async () => {
   const extensionPath = await createExtension("retry");
   const yesterdayKey = "dayRecord:2026-07-14";
   const { context, page } = await openExtension(extensionPath, {
@@ -172,8 +172,8 @@ test("keeps a retained failure and retries it after refresh", async () => {
   });
 
   try {
-    await expect(page.getByTestId("catch-up-summary")).toHaveText(
-      "Catch-up: 1 Actual couldn't be saved and will be retried next time.",
+    await expect(page.getByTestId("catch-up-toast")).toContainText(
+      "Catch-up: 1 Actual couldn’t be saved.",
     );
     expect(await readStorage(page, yesterdayKey)).toMatchObject({
       actual: [{
@@ -183,8 +183,11 @@ test("keeps a retained failure and retries it after refresh", async () => {
       }],
     });
 
+    await expect(
+      page.getByRole("button", { name: "Retry catch-up" }),
+    ).toHaveCount(0);
     await page.reload();
-    await expect(page.getByTestId("catch-up-summary")).toHaveText(
+    await expect(page.getByTestId("catch-up-toast")).toHaveText(
       "Catch-up: saved 1 Actual to Calendar.",
     );
     expect(await readStorage(page, yesterdayKey)).toBeUndefined();
@@ -207,7 +210,7 @@ test("processes an expired record once, deletes it, and reports discarded work",
   const { context, page } = await openExtension(extensionPath, records);
 
   try {
-    await expect(page.getByTestId("catch-up-summary")).toHaveText(
+    await expect(page.getByTestId("catch-up-toast")).toHaveText(
       "Catch-up: saved 2 Actuals to Calendar; 1 older Actual was discarded.",
     );
     for (const key of Object.keys(records)) {
