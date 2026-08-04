@@ -44,7 +44,7 @@ const REVEAL_RAIL_WIDTH = "23px";
 const DAY_GRID_DROP_TARGET_CLASS_NAME = "bg-accent/15";
 const readSystemTime = () => new Date();
 
-type DayGridProps = {
+type DayCanvasProps = {
   actuals?: ActualEvent[];
   revised?: RevisedEvent[];
   dragDisabled?: boolean;
@@ -66,7 +66,7 @@ type DayGridProps = {
   timeZone: string;
 };
 
-export function DayGrid({
+export function DayCanvas({
   actuals,
   revised,
   dragDisabled,
@@ -82,7 +82,7 @@ export function DayGrid({
   onDropEditable,
   date,
   timeZone,
-}: DayGridProps) {
+}: DayCanvasProps) {
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
   const [frontActualId, setFrontActualId] = useState<string | null>(null);
   const [frontRevisedId, setFrontRevisedId] = useState<string | null>(null);

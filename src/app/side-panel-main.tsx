@@ -6,6 +6,6 @@ import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App surface="side-panel" />
+    <App appSurface="side-panel" />
   </React.StrictMode>,
 );

@@ -10,7 +10,7 @@ export const calendarSurfaceTransitionDurationMs = 240;
 
 type CalendarSurfaceTransitionProps = {
   children: ReactNode;
-  surfaceKey: string;
+  transitionKey: string;
 };
 
 type CalendarSurface = {
@@ -20,11 +20,11 @@ type CalendarSurface = {
 
 export function CalendarSurfaceTransition({
   children,
-  surfaceKey,
+  transitionKey,
 }: CalendarSurfaceTransitionProps) {
   const previousSurfaceRef = useRef<CalendarSurface>({
     children,
-    key: surfaceKey,
+    key: transitionKey,
   });
   const removalTimeoutRef = useRef<number | undefined>(undefined);
   const [outgoingSurface, setOutgoingSurface] =
@@ -32,7 +32,7 @@ export function CalendarSurfaceTransition({
 
   useLayoutEffect(() => {
     const previousSurface = previousSurfaceRef.current;
-    if (previousSurface.key !== surfaceKey) {
+    if (previousSurface.key !== transitionKey) {
       window.clearTimeout(removalTimeoutRef.current);
       setOutgoingSurface(previousSurface);
       removalTimeoutRef.current = window.setTimeout(
@@ -40,8 +40,8 @@ export function CalendarSurfaceTransition({
         calendarSurfaceTransitionDurationMs,
       );
     }
-    previousSurfaceRef.current = { children, key: surfaceKey };
-  }, [children, surfaceKey]);
+    previousSurfaceRef.current = { children, key: transitionKey };
+  }, [children, transitionKey]);
 
   useEffect(
     () => () => window.clearTimeout(removalTimeoutRef.current),
@@ -67,7 +67,7 @@ export function CalendarSurfaceTransition({
             ? "calendar-surface-enter col-start-1 row-start-1 min-w-0"
             : "col-start-1 row-start-1 min-w-0"
         }
-        key={surfaceKey}
+        key={transitionKey}
       >
         {children}
       </div>

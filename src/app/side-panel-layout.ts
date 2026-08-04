@@ -10,10 +10,10 @@ export function getSidePanelLayoutMode(width: number): DayGridLayoutMode {
 }
 
 export function useDayGridLayoutMode(
-  surface: AppSurface,
+  appSurface: AppSurface,
 ): DayGridLayoutMode {
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
-  const isSidePanel = surface === "side-panel";
+  const isSidePanel = appSurface === "side-panel";
 
   useEffect(() => {
     if (!isSidePanel) return;

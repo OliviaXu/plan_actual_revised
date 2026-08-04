@@ -13,7 +13,7 @@ import type {
   PlanEvent,
   RevisedEvent,
 } from "../../src/domain/day-event";
-import { DayGrid } from "../../src/app/components/DayGrid";
+import { DayCanvas } from "../../src/app/components/DayCanvas";
 
 const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
 
@@ -91,10 +91,10 @@ afterEach(() => {
   vi.useRealTimers();
 });
 
-describe("DayGrid", () => {
+describe("DayCanvas", () => {
   it("shows only Actual with a non-interactive Revised reveal rail", () => {
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("actual", 540, 30)]}
         layoutMode="actual"
         planEvents={[planEvent("plan", 480, 30)]}
@@ -127,7 +127,7 @@ describe("DayGrid", () => {
 
   it("shows Actual and Revised with the Plan reveal rail on the left", () => {
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("actual", 540, 30)]}
         layoutMode="actual-revised"
         planEvents={[planEvent("plan", 480, 30)]}
@@ -151,7 +151,7 @@ describe("DayGrid", () => {
 
   it("shows all columns without a reveal rail in full mode", () => {
     render(
-      <DayGrid layoutMode="full" planEvents={[]} {...calendarDay} />,
+      <DayCanvas layoutMode="full" planEvents={[]} {...calendarDay} />,
     );
 
     expect(screen.getByRole("heading", { name: "Plan" })).toBeVisible();
@@ -163,7 +163,7 @@ describe("DayGrid", () => {
 
   it("preserves the shared timeline and scroll position when columns appear", () => {
     const { rerender } = render(
-      <DayGrid
+      <DayCanvas
         layoutMode="actual"
         planEvents={[planEvent("late-plan", 1200, 60)]}
         {...calendarDay}
@@ -175,7 +175,7 @@ describe("DayGrid", () => {
     const bodyHeight = screen.getByTestId("day-grid-body").style.height;
 
     rerender(
-      <DayGrid
+      <DayCanvas
         layoutMode="actual-revised"
         planEvents={[planEvent("late-plan", 1200, 60)]}
         {...calendarDay}
@@ -189,7 +189,7 @@ describe("DayGrid", () => {
   });
 
   it("renders the complete default hour axis without full-width grid lines", () => {
-    render(<DayGrid planEvents={[]} {...calendarDay} />);
+    render(<DayCanvas planEvents={[]} {...calendarDay} />);
 
     expect(screen.queryByTestId("plan-hour-line")).not.toBeInTheDocument();
     expect(screen.getAllByTestId("plan-hour-tick")).toHaveLength(15);
@@ -208,7 +208,7 @@ describe("DayGrid", () => {
 
   it("renders title, duration, exact geometry, and a tall-block time range", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[
           planEvent("Design review", 540, 60),
         ]}
@@ -225,7 +225,7 @@ describe("DayGrid", () => {
 
   it("renders shared event content and appearance in Plan and Actual", () => {
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[
           { ...actualEvent("actual-empty", 540, 60), summary: "" },
         ]}
@@ -256,7 +256,7 @@ describe("DayGrid", () => {
     const onEditEditable = vi.fn();
     const onEditableResizeEnd = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("actual", 540, 30)]}
         revised={[revisedEvent("revised", 600, 30)]}
         onEditEditable={onEditEditable}
@@ -297,7 +297,7 @@ describe("DayGrid", () => {
   it("previews and emits a snapped Plan copy over valid editable targets", () => {
     const onDropEditable = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         onDropEditable={onDropEditable}
         planEvents={[planEvent("plan-copy", 540, 60)]}
         {...calendarDay}
@@ -364,7 +364,7 @@ describe("DayGrid", () => {
   it("disables every Plan drag source and drop target while dragging is disabled", () => {
     const onDropEditable = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("disabled-actual", 600, 30)]}
         dragDisabled
         onDropEditable={onDropEditable}
@@ -400,7 +400,7 @@ describe("DayGrid", () => {
     const onDropEditable = vi.fn();
     const onEditEditable = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("actual-source", 600, 30)]}
         onDropEditable={onDropEditable}
         onEditEditable={onEditEditable}
@@ -461,7 +461,7 @@ describe("DayGrid", () => {
   it("emits same-column editable drops as reposition operations", () => {
     const onDropEditable = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         revised={[revisedEvent("revised-source", 600, 30)]}
         onDropEditable={onDropEditable}
         planEvents={[]}
@@ -510,7 +510,7 @@ describe("DayGrid", () => {
 
   it("clears a valid drop preview when a drag leaves or is canceled", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[planEvent("cancel-plan", 540, 60)]}
         {...calendarDay}
       />,
@@ -535,7 +535,7 @@ describe("DayGrid", () => {
 
   it("places the first-slot time label below its unclipped grid edge", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[planEvent("grid-start-plan", 540, 60)]}
         {...calendarDay}
       />,
@@ -579,7 +579,7 @@ describe("DayGrid", () => {
 
   it("hides the time range below 40px and shows it above 40px", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[
           planEvent("Below threshold", 540, 20),
           planEvent("Above threshold", 600, 30),
@@ -602,7 +602,7 @@ describe("DayGrid", () => {
 
   it("clips a minimum-height Plan block at the final grid boundary", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[
           planEvent("Final five minutes", 1_255, 5),
         ]}
@@ -622,7 +622,7 @@ describe("DayGrid", () => {
 
   it("renders normalized titles and Calendar colors", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[
           planEvent("visible-color", 540, 60, { colorId: "1" }),
           planEvent("untitled-neutral", 660, 30, {
@@ -655,7 +655,7 @@ describe("DayGrid", () => {
 
   it("cascades overlapping blocks and brings a clicked block to the front", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[
           planEvent("base", 540, 120),
           planEvent("nested", 570, 60),
@@ -698,7 +698,7 @@ describe("DayGrid", () => {
 
   it("cascades overlapping Actuals and brings a clicked Actual to the front", () => {
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[
           actualEvent("base-actual", 540, 120),
           actualEvent("nested-actual", 570, 60),
@@ -762,7 +762,7 @@ describe("DayGrid", () => {
     const onEditEditable = vi.fn();
     const onEditableResizeEnd = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("resized-actual", 540, 30)]}
         onEditEditable={onEditEditable}
         onEditableResizeEnd={onEditableResizeEnd}
@@ -798,7 +798,7 @@ describe("DayGrid", () => {
   it("enforces the minimum resize duration and restores on cancellation", () => {
     const onEditableResizeEnd = vi.fn();
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("cancelled-actual", 540, 30)]}
         onEditableResizeEnd={onEditableResizeEnd}
         planEvents={[]}
@@ -826,7 +826,7 @@ describe("DayGrid", () => {
 
   it("clips minimum-height Plan and Actual blocks at midnight", () => {
     render(
-      <DayGrid
+      <DayCanvas
         actuals={[actualEvent("midnight-actual", 1_435, 60)]}
         planEvents={[
           planEvent("midnight-plan", 1_435, 5),
@@ -852,7 +852,7 @@ describe("DayGrid", () => {
     vi.useFakeTimers();
     let currentTime = new Date(2026, 6, 15, 12, 34);
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[]}
         now={() => currentTime}
         {...calendarDay}
@@ -878,7 +878,7 @@ describe("DayGrid", () => {
 
   it("keeps the Now label inside the first visible grid slot", () => {
     render(
-      <DayGrid
+      <DayCanvas
         planEvents={[]}
         now={() => new Date(2026, 6, 15, 7)}
         {...calendarDay}
@@ -904,14 +904,14 @@ describe("DayGrid", () => {
     ).mockReturnValue(35);
 
     const { rerender } = render(
-      <DayGrid planEvents={[]} now={now} {...calendarDay} />,
+      <DayCanvas planEvents={[]} now={now} {...calendarDay} />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
     expect(viewport.scrollTop).toBe(305);
 
     viewport.scrollTop = 700;
     rerender(
-      <DayGrid
+      <DayCanvas
         planEvents={[
           planEvent("Later event", 840, 60),
         ]}
