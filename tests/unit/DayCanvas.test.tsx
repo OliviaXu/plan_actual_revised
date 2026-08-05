@@ -15,7 +15,11 @@ import type {
 } from "../../src/domain/day-event";
 import { DayCanvas } from "../../src/app/components/DayCanvas";
 
-const calendarDay = { date: "2026-07-15", timeZone: "America/Los_Angeles" };
+const displayedCalendarDay = {
+  date: "2026-07-15",
+  timeZone: "America/Los_Angeles",
+};
+const calendarDay = { calendarDay: displayedCalendarDay };
 
 function planEvent(
   id: string,
@@ -884,7 +888,7 @@ describe("DayCanvas", () => {
       <DayCanvas
         planEvents={[]}
         now={() => new Date(2026, 6, 15, 7)}
-        {...calendarDay}
+        calendarDay={displayedCalendarDay}
       />,
     );
 
@@ -907,7 +911,11 @@ describe("DayCanvas", () => {
     ).mockReturnValue(35);
 
     const { rerender } = render(
-      <DayCanvas planEvents={[]} now={now} {...calendarDay} />,
+      <DayCanvas
+        planEvents={[]}
+        now={now}
+        {...calendarDay}
+      />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
     expect(viewport.scrollTop).toBe(305);

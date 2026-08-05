@@ -78,19 +78,18 @@ export function DayPlanner({
         : "flex min-w-0 flex-col gap-6"}
     >
       <DayCanvas
+        calendarDay={calendarDay}
+        now={now}
+        planEvents={planEvents}
         actuals={dayRecord?.actual ?? []}
         revised={dayRecord?.revised ?? []}
-        mutationsDisabled={editableMutationsDisabled}
         layoutMode={dayGridLayoutMode}
-        planEvents={planEvents}
-        now={now}
+        mutationsDisabled={editableMutationsDisabled}
         onAddActual={editableDay.addActual}
         onStartSlack={editableDay.startSlack}
         onEditEditable={editableDay.editEditableEvent}
         onEditableResizeEnd={editableDay.persistResizedEditableEvent}
         onDropEditable={editableDay.persistEditableDrop}
-        date={calendarDay.date}
-        timeZone={calendarDay.timeZone}
       />
       {dayRecord?.actual.length ? (
         <footer className="flex items-center">

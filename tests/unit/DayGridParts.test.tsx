@@ -34,7 +34,7 @@ describe("DayGridTimeAxis", () => {
 });
 
 describe("DayGrid event blocks", () => {
-  it("uses draggable to disable dragging without removing drag handlers", () => {
+  it("marks editable blocks disabled and non-draggable with one flag", () => {
     const plan = dayGridBlock<PlanEvent>({
       id: "plan",
       summary: "Plan event",
@@ -66,15 +66,15 @@ describe("DayGrid event blocks", () => {
           onGrabOffsetCapture={onGrabOffsetCapture}
         />
         <EditableGridBlock
-          block={actual}
           column="actual"
-          dragDisabled
+          block={actual}
           frontZIndex={2}
           isFront
-          onDragStart={onActualDragStart}
-          onGrabOffsetCapture={onGrabOffsetCapture}
-          onResizeStart={vi.fn()}
+          disabled
           onSelect={vi.fn()}
+          onResizeStart={vi.fn()}
+          onGrabOffsetCapture={onGrabOffsetCapture}
+          onDragStart={onActualDragStart}
         />
       </>,
     );
@@ -85,7 +85,9 @@ describe("DayGrid event blocks", () => {
     });
 
     expect(planButton).toHaveAttribute("draggable", "false");
+    expect(planButton).not.toBeDisabled();
     expect(actualButton).toHaveAttribute("draggable", "false");
+    expect(actualButton).toBeDisabled();
 
     fireEvent.dragStart(planButton);
     fireEvent.dragStart(actualButton);
@@ -127,12 +129,12 @@ describe("DayGrid event blocks", () => {
           onBringToFront={onBringToFront}
         />
         <EditableGridBlock
-          block={actual}
           column="actual"
+          block={actual}
           frontZIndex={2}
           isFront
-          onResizeStart={onResizeStart}
           onSelect={onSelect}
+          onResizeStart={onResizeStart}
         />
       </>,
     );

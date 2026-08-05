@@ -18,31 +18,29 @@ import {
 } from "./day-grid-layout";
 
 export function EditableGridBlock({
-  block,
   column,
-  dragDisabled,
+  block,
   frontZIndex,
   isFront,
-  mutationsDisabled,
-  onDragEnd,
-  onDragStart,
-  onGrabOffsetCapture,
-  onResizeStart,
+  disabled,
   onSelect,
+  onResizeStart,
+  onGrabOffsetCapture,
+  onDragStart,
+  onDragEnd,
 }: {
-  block: DayGridBlock<EditableEvent>;
   column: EditableColumn;
-  dragDisabled?: boolean;
+  block: DayGridBlock<EditableEvent>;
   frontZIndex: number;
   isFront: boolean;
-  mutationsDisabled?: boolean;
-  onDragEnd?: (event: ReactDragEvent<HTMLButtonElement>) => void;
-  onDragStart?: (event: ReactDragEvent<HTMLButtonElement>) => void;
+  disabled?: boolean;
+  onSelect: () => void;
+  onResizeStart: (event: EditableEvent, pointer: PointerEvent) => void;
   onGrabOffsetCapture?: (
     event: ReactMouseEvent<HTMLButtonElement>,
   ) => void;
-  onResizeStart: (event: EditableEvent, pointer: PointerEvent) => void;
-  onSelect: () => void;
+  onDragStart?: (event: ReactDragEvent<HTMLButtonElement>) => void;
+  onDragEnd?: (event: ReactDragEvent<HTMLButtonElement>) => void;
 }) {
   const suppressSelectRef = useRef(false);
   const appearance = getDayGridBlockAppearance(
@@ -64,8 +62,8 @@ export function EditableGridBlock({
       <button
         aria-label={`Edit ${block.event.summary || "Untitled event"}`}
         className="flex h-full w-full flex-col items-stretch justify-start px-2 py-px pb-2 text-left text-xs leading-4 disabled:cursor-default"
-        disabled={mutationsDisabled}
-        draggable={!dragDisabled}
+        disabled={disabled}
+        draggable={!disabled}
         onClick={() => {
           if (suppressSelectRef.current) {
             suppressSelectRef.current = false;
@@ -83,9 +81,7 @@ export function EditableGridBlock({
           suppressSelectRef.current = true;
           onDragStart?.(event);
         }}
-        onMouseDown={
-          dragDisabled ? undefined : onGrabOffsetCapture
-        }
+        onMouseDown={disabled ? undefined : onGrabOffsetCapture}
         type="button"
       >
         <DayGridBlockContent
@@ -96,7 +92,7 @@ export function EditableGridBlock({
       <button
         aria-label={`Resize ${block.event.summary || "Untitled event"}`}
         className="absolute inset-x-0 bottom-0 z-10 flex h-2 cursor-ns-resize touch-none items-end justify-center disabled:cursor-default"
-        disabled={mutationsDisabled}
+        disabled={disabled}
         draggable={false}
         onClick={(event) => event.stopPropagation()}
         onPointerDown={(event) => {

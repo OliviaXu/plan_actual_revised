@@ -24,12 +24,9 @@ import {
   formatMinuteOfDay,
   getCalendarTime,
 } from "../../calendar/calendar-time";
-import { useEditableEventResize } from "../hooks/use-editable-event-resize";
-import {
-  EditableGridBlock,
-  PlanGridBlock,
-} from "./DayGridEventBlock";
+import { PlanGridBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
+import { EditableDayGridColumn } from "./EditableDayGridColumn";
 import { SlackAuditPopover } from "./SlackAuditPopover";
 import {
   calculateDroppedStartMinutes,
@@ -38,19 +35,20 @@ import {
   type DayGridDropTargetColumn,
 } from "./day-grid-drag";
 import type { DayGridLayoutMode } from "../side-panel-layout";
+import type { CalendarDay } from "../hooks/use-calendar-plan";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const REVEAL_RAIL_WIDTH = "23px";
-const DAY_GRID_DROP_TARGET_CLASS_NAME = "bg-accent/15";
 const readSystemTime = () => new Date();
 
 type DayCanvasProps = {
+  calendarDay: CalendarDay;
+  now?: () => Date;
+  planEvents: PlanEvent[];
   actuals?: ActualEvent[];
   revised?: RevisedEvent[];
-  mutationsDisabled?: boolean;
   layoutMode?: DayGridLayoutMode;
-  planEvents: PlanEvent[];
-  now?: () => Date;
+  mutationsDisabled?: boolean;
   onAddActual?: () => void;
   onStartSlack?: (reason: string) => void;
   onEditEditable?: (column: EditableColumn, event: EditableEvent) => void;
@@ -60,28 +58,23 @@ type DayCanvasProps = {
     durationMinutes: number,
   ) => void;
   onDropEditable?: (operation: DayGridDropOperation) => void;
-  date: string;
-  timeZone: string;
 };
 
 export function DayCanvas({
+  calendarDay,
+  now = readSystemTime,
+  planEvents,
   actuals,
   revised,
-  mutationsDisabled,
   layoutMode = "full",
-  planEvents,
-  now = readSystemTime,
+  mutationsDisabled,
   onAddActual,
   onStartSlack,
   onEditEditable,
   onEditableResizeEnd,
   onDropEditable,
-  date,
-  timeZone,
 }: DayCanvasProps) {
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
-  const [frontActualId, setFrontActualId] = useState<string | null>(null);
-  const [frontRevisedId, setFrontRevisedId] = useState<string | null>(null);
   const [dragSession, setDragSession] = useState<{
     sourceColumn: DayGridDragSourceColumn;
     sourceEventId: string;
@@ -102,26 +95,6 @@ export function DayCanvas({
       grabOffsetYPx: number;
     } | undefined
   >(undefined);
-  const {
-    displayedEvents: displayedActuals,
-    startResize: startActualResize,
-  } = useEditableEventResize({
-    events: actuals ?? [],
-    disabled: mutationsDisabled,
-    onResizeEnd: (eventId, durationMinutes) =>
-      onEditableResizeEnd?.("actual", eventId, durationMinutes),
-    settings: defaultSettings,
-  });
-  const {
-    displayedEvents: displayedRevised,
-    startResize: startRevisedResize,
-  } = useEditableEventResize({
-    events: revised ?? [],
-    disabled: mutationsDisabled,
-    onResizeEnd: (eventId, durationMinutes) =>
-      onEditableResizeEnd?.("revised", eventId, durationMinutes),
-    settings: defaultSettings,
-  });
   const gridRange = calculateDayGridRange(
     planEvents,
     defaultSettings,
@@ -132,23 +105,11 @@ export function DayCanvas({
     gridRange.endHour,
     defaultSettings,
   );
-  const actualBlocks = calculateDayGridBlocks(
-    displayedActuals,
-    gridRange.startHour,
-    gridRange.endHour,
-    defaultSettings,
-  );
-  const revisedBlocks = calculateDayGridBlocks(
-    displayedRevised,
-    gridRange.startHour,
-    gridRange.endHour,
-    defaultSettings,
-  );
   const hourHeightPx = 60 * defaultSettings.pixelsPerMinute;
   const nowIndicatorTopPx = calculateDayGridNowIndicatorTopPx(
     currentTime,
-    date,
-    timeZone,
+    calendarDay.date,
+    calendarDay.timeZone,
     gridRange.startHour,
     gridRange.endHour,
     defaultSettings.pixelsPerMinute,
@@ -165,7 +126,10 @@ export function DayCanvas({
   const gridTemplateColumns = getDayGridTemplateColumns(layoutMode);
 
   useEffect(() => {
-    const intervalId = window.setInterval(() => setCurrentTime(now()), 60_000);
+    const intervalId = window.setInterval(
+      () => setCurrentTime(now()),
+      60_000,
+    );
     return () => window.clearInterval(intervalId);
   }, [now]);
 
@@ -380,8 +344,8 @@ export function DayCanvas({
                 zIndex:
                   Math.max(
                     planBlocks.length,
-                    actualBlocks.length,
-                    revisedBlocks.length,
+                    actuals?.length ?? 0,
+                    revised?.length ?? 0,
                   ) + 1,
               }}
             >
@@ -396,7 +360,7 @@ export function DayCanvas({
                   nowIndicatorTopPx === 0 ? "" : "-translate-y-full"
                 }`}
               >
-                {formatTime(currentTime, timeZone)}
+                {formatTime(currentTime, calendarDay.timeZone)}
               </span>
             </div>
           ) : null}
@@ -443,98 +407,62 @@ export function DayCanvas({
             {revealColumn === "plan" ? (
               <RevealRailBody column="plan" hourHeightPx={hourHeightPx} />
             ) : null}
-            <div
-              className={`day-grid-column-enter relative overflow-hidden border-l border-border ${
+            <EditableDayGridColumn
+              column="actual"
+              gridStartHour={gridRange.startHour}
+              gridEndHour={gridRange.endHour}
+              events={actuals ?? []}
+              dropPreviewStartMinutes={
                 dropPreview?.targetColumn === "actual"
-                  ? DAY_GRID_DROP_TARGET_CLASS_NAME
-                  : ""
-              }`}
-              data-testid="actual-column"
-              onDragLeave={clearDropPreviewOnLeave}
+                  ? dropPreview.startMinutes
+                  : undefined
+              }
+              mutationsDisabled={mutationsDisabled}
+              onSelectEvent={(event) => onEditEditable?.("actual", event)}
+              onResizeEnd={(eventId, durationMinutes) =>
+                onEditableResizeEnd?.("actual", eventId, durationMinutes)
+              }
+              onGrabOffsetCapture={(event, eventId) =>
+                captureGrabOffset(event, "actual", eventId)
+              }
+              onDragStart={(event, eventId) =>
+                startDrag(event, "actual", eventId)
+              }
               onDragOver={(event) => previewEditableDrop(event, "actual")}
+              onDragLeave={clearDropPreviewOnLeave}
               onDrop={(event) => finishEditableDrop(event, "actual")}
-            >
-              {dropPreview?.targetColumn === "actual" ? (
-                <DropTimeIndicator
-                  gridStartMinutes={gridStartMinutes}
-                  startMinutes={dropPreview.startMinutes}
-                />
-              ) : null}
-              {actualBlocks.map((block) => (
-                <EditableGridBlock
-                  block={block}
-                  column="actual"
-                  dragDisabled={mutationsDisabled}
-                  frontZIndex={actualBlocks.length}
-                  isFront={frontActualId === block.event.id}
-                  key={block.event.id}
-                  mutationsDisabled={mutationsDisabled}
-                  onDragEnd={clearDragState}
-                  onDragStart={(event) =>
-                    startDrag(event, "actual", block.event.id)
-                  }
-                  onGrabOffsetCapture={(event) =>
-                    captureGrabOffset(event, "actual", block.event.id)
-                  }
-                  onResizeStart={(actual, pointer) => {
-                    setFrontActualId(actual.id);
-                    startActualResize(actual, pointer);
-                  }}
-                  onSelect={() => {
-                    setFrontActualId(block.event.id);
-                    onEditEditable?.("actual", block.event);
-                  }}
-                />
-              ))}
-            </div>
+              onDragEnd={clearDragState}
+            />
             {revealColumn === "revised" ? (
               <RevealRailBody column="revised" hourHeightPx={hourHeightPx} />
             ) : null}
             {showRevised ? (
-              <div
-              className={`relative overflow-hidden border-l border-border ${
-                dropPreview?.targetColumn === "revised"
-                  ? DAY_GRID_DROP_TARGET_CLASS_NAME
-                  : ""
-              }`}
-              data-testid="revised-column"
-              onDragLeave={clearDropPreviewOnLeave}
-              onDragOver={(event) => previewEditableDrop(event, "revised")}
-              onDrop={(event) => finishEditableDrop(event, "revised")}
-            >
-              {dropPreview?.targetColumn === "revised" ? (
-                <DropTimeIndicator
-                  gridStartMinutes={gridStartMinutes}
-                  startMinutes={dropPreview.startMinutes}
-                />
-              ) : null}
-              {revisedBlocks.map((block) => (
-                <EditableGridBlock
-                  block={block}
-                  column="revised"
-                  dragDisabled={mutationsDisabled}
-                  frontZIndex={revisedBlocks.length}
-                  isFront={frontRevisedId === block.event.id}
-                  key={block.event.id}
-                  mutationsDisabled={mutationsDisabled}
-                  onDragEnd={clearDragState}
-                  onDragStart={(event) =>
-                    startDrag(event, "revised", block.event.id)
-                  }
-                  onGrabOffsetCapture={(event) =>
-                    captureGrabOffset(event, "revised", block.event.id)
-                  }
-                  onResizeStart={(event, pointer) => {
-                    setFrontRevisedId(event.id);
-                    startRevisedResize(event, pointer);
-                  }}
-                  onSelect={() => {
-                    setFrontRevisedId(block.event.id);
-                    onEditEditable?.("revised", block.event);
-                  }}
-                />
-              ))}
-              </div>
+              <EditableDayGridColumn
+                column="revised"
+                gridStartHour={gridRange.startHour}
+                gridEndHour={gridRange.endHour}
+                events={revised ?? []}
+                dropPreviewStartMinutes={
+                  dropPreview?.targetColumn === "revised"
+                    ? dropPreview.startMinutes
+                    : undefined
+                }
+                mutationsDisabled={mutationsDisabled}
+                onSelectEvent={(event) => onEditEditable?.("revised", event)}
+                onResizeEnd={(eventId, durationMinutes) =>
+                  onEditableResizeEnd?.("revised", eventId, durationMinutes)
+                }
+                onGrabOffsetCapture={(event, eventId) =>
+                  captureGrabOffset(event, "revised", eventId)
+                }
+                onDragStart={(event, eventId) =>
+                  startDrag(event, "revised", eventId)
+                }
+                onDragOver={(event) => previewEditableDrop(event, "revised")}
+                onDragLeave={clearDropPreviewOnLeave}
+                onDrop={(event) => finishEditableDrop(event, "revised")}
+                onDragEnd={clearDragState}
+              />
             ) : null}
           </div>
         </div>
@@ -593,39 +521,6 @@ function RevealRailBody({
       >
         •••
       </span>
-    </div>
-  );
-}
-
-function DropTimeIndicator({
-  gridStartMinutes,
-  startMinutes,
-}: {
-  gridStartMinutes: number;
-  startMinutes: number;
-}) {
-  return (
-    <div
-      className="pointer-events-none absolute inset-x-0 z-20 flex items-start"
-      data-testid="drop-time-indicator"
-      style={{
-        top:
-          (startMinutes - gridStartMinutes) *
-          defaultSettings.pixelsPerMinute,
-      }}
-    >
-      <span
-        className={`shrink-0 px-1 text-[10px] font-medium text-now/80 ${
-          startMinutes === gridStartMinutes ? "" : "-translate-y-full"
-        }`}
-      >
-        {formatMinuteOfDay(startMinutes)}
-      </span>
-      <span
-        aria-hidden="true"
-        className="min-w-0 flex-1 border-t border-now/40"
-        data-testid="drop-time-trace"
-      />
     </div>
   );
 }
