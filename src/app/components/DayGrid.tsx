@@ -34,7 +34,7 @@ import { useDayGridDragDrop } from "../hooks/use-day-grid-drag-drop";
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const REVEAL_RAIL_WIDTH = "23px";
 
-type DayCanvasProps = {
+type DayGridProps = {
   calendarDay: CalendarDay;
   now: () => Date;
   planEvents: PlanEvent[];
@@ -53,7 +53,7 @@ type DayCanvasProps = {
   onDropEditable?: (operation: DayGridDropOperation) => void;
 };
 
-export function DayCanvas({
+export function DayGrid({
   calendarDay,
   now,
   planEvents,
@@ -66,7 +66,7 @@ export function DayCanvas({
   onEditEditable,
   onEditableResizeEnd,
   onDropEditable,
-}: DayCanvasProps) {
+}: DayGridProps) {
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(now);
   const scrollViewportRef = useRef<HTMLDivElement>(null);

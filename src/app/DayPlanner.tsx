@@ -1,6 +1,6 @@
 import { Button } from "./components/ui/button";
 import { Toast, type ToastAction } from "./components/ui/toast";
-import { DayCanvas } from "./components/DayCanvas";
+import { DayGrid } from "./components/DayGrid";
 import { EditableEventDialog } from "./components/EditableEventDialog";
 import {
   slackLaunchFailureToastContent,
@@ -77,7 +77,7 @@ export function DayPlanner({
         ? "flex min-w-0 flex-col gap-3"
         : "flex min-w-0 flex-col gap-6"}
     >
-      <DayCanvas
+      <DayGrid
         calendarDay={calendarDay}
         now={now}
         planEvents={planEvents}
