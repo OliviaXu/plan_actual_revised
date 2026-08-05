@@ -1,7 +1,3 @@
-import type {
-  DragEvent as ReactDragEvent,
-  MouseEvent as ReactMouseEvent,
-} from "react";
 import { useState } from "react";
 
 import { formatMinuteOfDay } from "../../calendar/calendar-time";
@@ -10,6 +6,7 @@ import type {
   EditableEvent,
 } from "../../domain/day-event";
 import { defaultSettings } from "../../domain/settings";
+import type { DayGridDragDropController } from "../hooks/use-day-grid-drag-drop";
 import { useEditableEventResize } from "../hooks/use-editable-event-resize";
 import { EditableGridBlock } from "./DayGridEventBlock";
 import { calculateDayGridBlocks } from "./day-grid-layout";
@@ -21,22 +18,14 @@ type EditableDayGridColumnProps = {
   gridStartHour: number;
   gridEndHour: number;
   events: EditableEvent[];
-  dropPreviewStartMinutes?: number;
+  dragDrop: DayGridDragDropController;
   mutationsDisabled?: boolean;
-  onSelectEvent: (event: EditableEvent) => void;
-  onResizeEnd: (eventId: string, durationMinutes: number) => void;
-  onGrabOffsetCapture: (
-    event: ReactMouseEvent<HTMLButtonElement>,
+  onSelectEvent?: (column: EditableColumn, event: EditableEvent) => void;
+  onResizeEnd?: (
+    column: EditableColumn,
     eventId: string,
+    durationMinutes: number,
   ) => void;
-  onDragStart: (
-    event: ReactDragEvent<HTMLButtonElement>,
-    eventId: string,
-  ) => void;
-  onDragOver: (event: ReactDragEvent<HTMLDivElement>) => void;
-  onDragLeave: (event: ReactDragEvent<HTMLDivElement>) => void;
-  onDrop: (event: ReactDragEvent<HTMLDivElement>) => void;
-  onDragEnd: (event: ReactDragEvent<HTMLButtonElement>) => void;
 };
 
 export function EditableDayGridColumn({
@@ -44,22 +33,17 @@ export function EditableDayGridColumn({
   gridStartHour,
   gridEndHour,
   events,
-  dropPreviewStartMinutes,
+  dragDrop,
   mutationsDisabled,
   onSelectEvent,
   onResizeEnd,
-  onGrabOffsetCapture,
-  onDragStart,
-  onDragOver,
-  onDragLeave,
-  onDrop,
-  onDragEnd,
 }: EditableDayGridColumnProps) {
   const [frontEventId, setFrontEventId] = useState<string | null>(null);
   const { displayedEvents, startResize } = useEditableEventResize({
     events,
     disabled: mutationsDisabled,
-    onResizeEnd,
+    onResizeEnd: (eventId, durationMinutes) =>
+      onResizeEnd?.(column, eventId, durationMinutes),
     settings: defaultSettings,
   });
   const blocks = calculateDayGridBlocks(
@@ -69,6 +53,10 @@ export function EditableDayGridColumn({
     defaultSettings,
   );
   const gridStartMinutes = gridStartHour * 60;
+  const dropPreviewStartMinutes =
+    dragDrop.dropPreview?.targetColumn === column
+      ? dragDrop.dropPreview.startMinutes
+      : undefined;
 
   return (
     <div
@@ -78,9 +66,9 @@ export function EditableDayGridColumn({
           : DAY_GRID_DROP_TARGET_CLASS_NAME
       }`}
       data-testid={`${column}-column`}
-      onDragLeave={onDragLeave}
-      onDragOver={onDragOver}
-      onDrop={onDrop}
+      onDragLeave={dragDrop.clearDropPreview}
+      onDragOver={(event) => dragDrop.previewDrop(event, column)}
+      onDrop={(event) => dragDrop.finishDrop(event, column)}
     >
       {dropPreviewStartMinutes !== undefined ? (
         <DropTimeIndicator
@@ -98,17 +86,19 @@ export function EditableDayGridColumn({
           disabled={mutationsDisabled}
           onSelect={() => {
             setFrontEventId(block.event.id);
-            onSelectEvent(block.event);
+            onSelectEvent?.(column, block.event);
           }}
           onResizeStart={(event, pointer) => {
             setFrontEventId(event.id);
             startResize(event, pointer);
           }}
           onGrabOffsetCapture={(event) =>
-            onGrabOffsetCapture(event, block.event.id)
+            dragDrop.captureGrabOffset(event, column, block.event.id)
           }
-          onDragStart={(event) => onDragStart(event, block.event.id)}
-          onDragEnd={onDragEnd}
+          onDragStart={(event) =>
+            dragDrop.startDrag(event, column, block.event.id)
+          }
+          onDragEnd={dragDrop.clearDragState}
         />
       ))}
     </div>

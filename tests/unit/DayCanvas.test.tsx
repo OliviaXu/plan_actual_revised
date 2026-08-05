@@ -19,7 +19,10 @@ const displayedCalendarDay = {
   date: "2026-07-15",
   timeZone: "America/Los_Angeles",
 };
-const calendarDay = { calendarDay: displayedCalendarDay };
+const calendarDay = {
+  calendarDay: displayedCalendarDay,
+  now: () => new Date(2026, 6, 15, 12),
+};
 
 function planEvent(
   id: string,
@@ -861,8 +864,8 @@ describe("DayCanvas", () => {
     render(
       <DayCanvas
         planEvents={[]}
-        now={() => currentTime}
         {...calendarDay}
+        now={() => currentTime}
       />,
     );
 
@@ -913,8 +916,8 @@ describe("DayCanvas", () => {
     const { rerender } = render(
       <DayCanvas
         planEvents={[]}
-        now={now}
         {...calendarDay}
+        now={now}
       />,
     );
     const viewport = screen.getByTestId("plan-scroll-viewport");
@@ -926,8 +929,8 @@ describe("DayCanvas", () => {
         planEvents={[
           planEvent("Later event", 840, 60),
         ]}
-        now={now}
         {...calendarDay}
+        now={now}
       />,
     );
     expect(viewport.scrollTop).toBe(700);

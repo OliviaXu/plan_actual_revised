@@ -4,8 +4,6 @@ import {
   useLayoutEffect,
   useRef,
   useState,
-  type DragEvent as ReactDragEvent,
-  type MouseEvent as ReactMouseEvent,
 } from "react";
 import {
   calculateDayGridBlocks,
@@ -28,22 +26,17 @@ import { PlanGridBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableDayGridColumn } from "./EditableDayGridColumn";
 import { SlackAuditPopover } from "./SlackAuditPopover";
-import {
-  calculateDroppedStartMinutes,
-  type DayGridDragSourceColumn,
-  type DayGridDropOperation,
-  type DayGridDropTargetColumn,
-} from "./day-grid-drag";
+import type { DayGridDropOperation } from "./day-grid-drag";
 import type { DayGridLayoutMode } from "../side-panel-layout";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
+import { useDayGridDragDrop } from "../hooks/use-day-grid-drag-drop";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const REVEAL_RAIL_WIDTH = "23px";
-const readSystemTime = () => new Date();
 
 type DayCanvasProps = {
   calendarDay: CalendarDay;
-  now?: () => Date;
+  now: () => Date;
   planEvents: PlanEvent[];
   actuals?: ActualEvent[];
   revised?: RevisedEvent[];
@@ -62,7 +55,7 @@ type DayCanvasProps = {
 
 export function DayCanvas({
   calendarDay,
-  now = readSystemTime,
+  now,
   planEvents,
   actuals,
   revised,
@@ -75,26 +68,10 @@ export function DayCanvas({
   onDropEditable,
 }: DayCanvasProps) {
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
-  const [dragSession, setDragSession] = useState<{
-    sourceColumn: DayGridDragSourceColumn;
-    sourceEventId: string;
-    grabOffsetYPx: number;
-  }>();
-  const [dropPreview, setDropPreview] = useState<{
-    targetColumn: DayGridDropTargetColumn;
-    startMinutes: number;
-  }>();
   const [currentTime, setCurrentTime] = useState(now);
   const scrollViewportRef = useRef<HTMLDivElement>(null);
   const gridHeaderRef = useRef<HTMLDivElement>(null);
   const didAutoScrollRef = useRef(false);
-  const pendingGrabRef = useRef<
-    {
-      sourceColumn: DayGridDragSourceColumn;
-      sourceEventId: string;
-      grabOffsetYPx: number;
-    } | undefined
-  >(undefined);
   const gridRange = calculateDayGridRange(
     planEvents,
     defaultSettings,
@@ -116,6 +93,13 @@ export function DayCanvas({
   );
   const gridStartMinutes = gridRange.startHour * 60;
   const gridEndMinutes = gridRange.endHour * 60;
+  const dragDrop = useDayGridDragDrop({
+    gridStartMinutes,
+    gridEndMinutes,
+    disabled: mutationsDisabled,
+    onDrop: onDropEditable,
+    settings: defaultSettings,
+  });
   const showPlan = layoutMode === "full";
   const showRevised = layoutMode !== "actual";
   const revealColumn = layoutMode === "actual"
@@ -152,123 +136,6 @@ export function DayCanvas({
     );
     didAutoScrollRef.current = true;
   }, [nowIndicatorTopPx]);
-
-  function clearDragState() {
-    pendingGrabRef.current = undefined;
-    setDragSession(undefined);
-    setDropPreview(undefined);
-  }
-
-  function captureGrabOffset(
-    event: ReactMouseEvent<HTMLButtonElement>,
-    sourceColumn: DayGridDragSourceColumn,
-    sourceEventId: string,
-  ) {
-    const blockViewportTopPx =
-      event.currentTarget.getBoundingClientRect().top;
-    pendingGrabRef.current = {
-      sourceColumn,
-      sourceEventId,
-      grabOffsetYPx: event.clientY - blockViewportTopPx,
-    };
-  }
-
-  function startDrag(
-    event: ReactDragEvent<HTMLButtonElement>,
-    sourceColumn: DayGridDragSourceColumn,
-    sourceEventId: string,
-  ) {
-    event.dataTransfer.effectAllowed =
-      sourceColumn === "plan" ? "copy" : "move";
-    event.dataTransfer.setData("text/plain", sourceEventId);
-    const blockRect = event.currentTarget.getBoundingClientRect();
-    const recordedGrab = pendingGrabRef.current;
-    setDragSession({
-      sourceColumn,
-      sourceEventId,
-      grabOffsetYPx:
-        recordedGrab?.sourceColumn === sourceColumn &&
-        recordedGrab.sourceEventId === sourceEventId
-          ? recordedGrab.grabOffsetYPx
-          : blockRect.height / 2,
-    });
-  }
-
-  function getDroppedStartMinutes(
-    event: ReactDragEvent<HTMLDivElement>,
-    grabOffsetYPx: number,
-  ) {
-    const columnViewportTopPx =
-      event.currentTarget.getBoundingClientRect().top;
-    return calculateDroppedStartMinutes({
-      pointerClientY: event.clientY,
-      columnViewportTopPx,
-      grabOffsetYPx,
-      gridStartMinutes,
-      gridEndMinutes,
-      pixelsPerMinute: defaultSettings.pixelsPerMinute,
-      snapMinutes: defaultSettings.snapMinutes,
-    });
-  }
-
-  function previewEditableDrop(
-    event: ReactDragEvent<HTMLDivElement>,
-    targetColumn: DayGridDropTargetColumn,
-  ) {
-    if (
-      mutationsDisabled ||
-      !dragSession
-    ) {
-      return;
-    }
-
-    event.preventDefault();
-    event.dataTransfer.dropEffect =
-      dragSession.sourceColumn === "plan" ? "copy" : "move";
-    const startMinutes = getDroppedStartMinutes(
-      event,
-      dragSession.grabOffsetYPx,
-    );
-    setDropPreview({ targetColumn, startMinutes });
-  }
-
-  function finishEditableDrop(
-    event: ReactDragEvent<HTMLDivElement>,
-    targetColumn: DayGridDropTargetColumn,
-  ) {
-    if (
-      mutationsDisabled ||
-      !dragSession
-    ) {
-      clearDragState();
-      return;
-    }
-
-    event.preventDefault();
-    const startMinutes = getDroppedStartMinutes(
-      event,
-      dragSession.grabOffsetYPx,
-    );
-    onDropEditable?.({
-      sourceColumn: dragSession.sourceColumn,
-      sourceEventId: dragSession.sourceEventId,
-      targetColumn,
-      startMinutes,
-    });
-    clearDragState();
-  }
-
-  function clearDropPreviewOnLeave(
-    event: ReactDragEvent<HTMLDivElement>,
-  ) {
-    if (
-      event.relatedTarget instanceof Node &&
-      event.currentTarget.contains(event.relatedTarget)
-    ) {
-      return;
-    }
-    setDropPreview(undefined);
-  }
 
   return (
     <section
@@ -393,12 +260,16 @@ export function DayCanvas({
                     isFront={frontPlanId === block.event.id}
                     key={block.event.id}
                     onBringToFront={() => setFrontPlanId(block.event.id)}
-                    onDragEnd={clearDragState}
+                    onDragEnd={dragDrop.clearDragState}
                     onDragStart={(event) =>
-                      startDrag(event, "plan", block.event.id)
+                      dragDrop.startDrag(event, "plan", block.event.id)
                     }
                     onGrabOffsetCapture={(event) =>
-                      captureGrabOffset(event, "plan", block.event.id)
+                      dragDrop.captureGrabOffset(
+                        event,
+                        "plan",
+                        block.event.id,
+                      )
                     }
                   />
                 ))}
@@ -412,26 +283,10 @@ export function DayCanvas({
               gridStartHour={gridRange.startHour}
               gridEndHour={gridRange.endHour}
               events={actuals ?? []}
-              dropPreviewStartMinutes={
-                dropPreview?.targetColumn === "actual"
-                  ? dropPreview.startMinutes
-                  : undefined
-              }
+              dragDrop={dragDrop}
               mutationsDisabled={mutationsDisabled}
-              onSelectEvent={(event) => onEditEditable?.("actual", event)}
-              onResizeEnd={(eventId, durationMinutes) =>
-                onEditableResizeEnd?.("actual", eventId, durationMinutes)
-              }
-              onGrabOffsetCapture={(event, eventId) =>
-                captureGrabOffset(event, "actual", eventId)
-              }
-              onDragStart={(event, eventId) =>
-                startDrag(event, "actual", eventId)
-              }
-              onDragOver={(event) => previewEditableDrop(event, "actual")}
-              onDragLeave={clearDropPreviewOnLeave}
-              onDrop={(event) => finishEditableDrop(event, "actual")}
-              onDragEnd={clearDragState}
+              onSelectEvent={onEditEditable}
+              onResizeEnd={onEditableResizeEnd}
             />
             {revealColumn === "revised" ? (
               <RevealRailBody column="revised" hourHeightPx={hourHeightPx} />
@@ -442,26 +297,10 @@ export function DayCanvas({
                 gridStartHour={gridRange.startHour}
                 gridEndHour={gridRange.endHour}
                 events={revised ?? []}
-                dropPreviewStartMinutes={
-                  dropPreview?.targetColumn === "revised"
-                    ? dropPreview.startMinutes
-                    : undefined
-                }
+                dragDrop={dragDrop}
                 mutationsDisabled={mutationsDisabled}
-                onSelectEvent={(event) => onEditEditable?.("revised", event)}
-                onResizeEnd={(eventId, durationMinutes) =>
-                  onEditableResizeEnd?.("revised", eventId, durationMinutes)
-                }
-                onGrabOffsetCapture={(event, eventId) =>
-                  captureGrabOffset(event, "revised", eventId)
-                }
-                onDragStart={(event, eventId) =>
-                  startDrag(event, "revised", eventId)
-                }
-                onDragOver={(event) => previewEditableDrop(event, "revised")}
-                onDragLeave={clearDropPreviewOnLeave}
-                onDrop={(event) => finishEditableDrop(event, "revised")}
-                onDragEnd={clearDragState}
+                onSelectEvent={onEditEditable}
+                onResizeEnd={onEditableResizeEnd}
               />
             ) : null}
           </div>
