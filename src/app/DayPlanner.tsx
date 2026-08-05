@@ -85,11 +85,11 @@ export function DayPlanner({
         revised={dayRecord?.revised ?? []}
         layoutMode={dayGridLayoutMode}
         mutationsDisabled={editableMutationsDisabled}
-        onAddActual={editableDay.addActual}
+        onAddActual={editableDay.openNewActualEditor}
         onStartSlack={editableDay.startSlack}
-        onEditEditable={editableDay.editEditableEvent}
-        onEditableResizeEnd={editableDay.persistResizedEditableEvent}
-        onDropEditable={editableDay.persistEditableDrop}
+        onEditEditable={editableDay.openEventEditor}
+        onEditableResizeEnd={editableDay.resizeEditableEvent}
+        onDropEditable={editableDay.applyEventDrop}
       />
       {dayRecord?.actual.length ? (
         <footer className="flex items-center">
@@ -109,9 +109,9 @@ export function DayPlanner({
           column={editableDay.editorState.column}
           event={editableDay.editorState.event}
           mode={editableDay.editorState.mode}
-          onDelete={editableDay.deleteEditableEventTarget}
-          onDismiss={editableDay.dismissEditor}
-          onSave={editableDay.saveEditableEventDraft}
+          onDelete={editableDay.deleteEditorEvent}
+          onDismiss={editableDay.closeEditor}
+          onSave={editableDay.saveEditorDraft}
           paletteColorIds={defaultSettings.actualPaletteColorIds}
         />
       ) : null}

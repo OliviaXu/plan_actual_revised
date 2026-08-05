@@ -26,7 +26,7 @@ describe("useEditableDayEvents", () => {
       })
     );
 
-    act(() => result.current.addActual());
+    act(() => result.current.openNewActualEditor());
 
     expect(result.current.editorState).toEqual({
       mode: "create",

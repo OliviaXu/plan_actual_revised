@@ -27,21 +27,21 @@ export type EditableEventEditorState =
 
 export type EditableDayEventsResult = {
   editorState: EditableEventEditorState | undefined;
-  addActual: () => void;
-  editEditableEvent: (
+  openNewActualEditor: () => void;
+  openEventEditor: (
     column: EditableColumn,
     event: EditableEvent,
   ) => void;
-  saveEditableEventDraft: (draft: EditableEventDraft) => void;
-  deleteEditableEventTarget: () => void;
-  dismissEditor: () => void;
+  saveEditorDraft: (draft: EditableEventDraft) => void;
+  deleteEditorEvent: () => void;
+  closeEditor: () => void;
   startSlack: (reason: string) => void;
-  persistResizedEditableEvent: (
+  resizeEditableEvent: (
     column: EditableColumn,
     eventId: string,
     durationMinutes: number,
   ) => void;
-  persistEditableDrop: (operation: DayGridDropOperation) => void;
+  applyEventDrop: (operation: DayGridDropOperation) => void;
 };
 
 const defaultActualDurationMinutes = 30;
@@ -95,7 +95,7 @@ export function useEditableDayEvents({
     };
   }
 
-  function persistAddedEditableEvent(addition: EditableEventAddition) {
+  function addEditableEvent(addition: EditableEventAddition) {
     void persistDayRecord(
       appendEditableEvent({
         record: dayRecord,
@@ -106,7 +106,7 @@ export function useEditableDayEvents({
     );
   }
 
-  function addActual() {
+  function openNewActualEditor() {
     if (mutationsDisabled) return;
 
     const newActual = buildNewActual({
@@ -132,7 +132,7 @@ export function useEditableDayEvents({
       isSlack: true,
       createdAt: now(),
     });
-    persistAddedEditableEvent({ column: "actual", event: newActual });
+    addEditableEvent({ column: "actual", event: newActual });
     try {
       launchSlack();
     } catch {
@@ -140,92 +140,92 @@ export function useEditableDayEvents({
     }
   }
 
-  function editEditableEvent(
+  function openEventEditor(
     column: EditableColumn,
     event: EditableEvent,
   ) {
     setEditorState({ mode: "edit", column, event });
   }
 
-  function dismissEditor() {
+  function closeEditor() {
     setEditorState(undefined);
   }
 
-  function saveEditableEventDraft(draft: EditableEventDraft) {
+  function saveEditorDraft(draft: EditableEventDraft) {
     if (!editorState) {
-      dismissEditor();
+      closeEditor();
       return;
     }
-    const editorTarget = editorState.event;
+    const editorEvent = editorState.event;
     if (editorState.mode === "create") {
-      persistAddedEditableEvent({
+      addEditableEvent({
         column: "actual",
         event: { ...editorState.event, ...draft },
       });
-      dismissEditor();
+      closeEditor();
       return;
     }
     if (!dayRecord) {
-      dismissEditor();
+      closeEditor();
       return;
     }
     if (
-      draft.summary === editorTarget.summary &&
-      draft.durationMinutes === editorTarget.durationMinutes &&
-      draft.colorId === editorTarget.colorId
+      draft.summary === editorEvent.summary &&
+      draft.durationMinutes === editorEvent.durationMinutes &&
+      draft.colorId === editorEvent.colorId
     ) {
-      dismissEditor();
+      closeEditor();
       return;
     }
 
-    let editedDayRecord: DayRecord;
+    let nextDayRecord: DayRecord;
     if (editorState.column === "actual") {
       const editedActual = buildEditedActual(
-        editorTarget as ActualEvent,
+        editorEvent as ActualEvent,
         draft,
         () => crypto.randomUUID(),
       );
-      editedDayRecord = {
+      nextDayRecord = {
         ...dayRecord,
         actual: dayRecord.actual.map((actual) =>
-          actual.id === editorTarget.id ? editedActual : actual,
+          actual.id === editorEvent.id ? editedActual : actual,
         ),
       };
     } else {
-      const editedRevised: RevisedEvent = { ...editorTarget, ...draft };
-      editedDayRecord = {
+      const editedRevised: RevisedEvent = { ...editorEvent, ...draft };
+      nextDayRecord = {
         ...dayRecord,
         revised: dayRecord.revised.map((event) =>
-          event.id === editorTarget.id ? editedRevised : event,
+          event.id === editorEvent.id ? editedRevised : event,
         ),
       };
     }
     void persistDayRecord({
-      ...editedDayRecord,
+      ...nextDayRecord,
       updatedAt: now().toISOString(),
     });
-    dismissEditor();
+    closeEditor();
   }
 
-  function deleteEditableEventTarget() {
+  function deleteEditorEvent() {
     if (editorState?.mode !== "edit" || !dayRecord) {
-      dismissEditor();
+      closeEditor();
       return;
     }
 
-    const editorTarget = editorState.event;
+    const editorEvent = editorState.event;
     const column = editorState.column;
     void persistDayRecord({
       ...dayRecord,
       [column]: dayRecord[column].filter(
-        (event) => event.id !== editorTarget.id,
+        (event) => event.id !== editorEvent.id,
       ),
       updatedAt: now().toISOString(),
     });
-    dismissEditor();
+    closeEditor();
   }
 
-  function persistResizedEditableEvent(
+  function resizeEditableEvent(
     column: EditableColumn,
     eventId: string,
     durationMinutes: number,
@@ -237,7 +237,7 @@ export function useEditableDayEvents({
     );
     if (!event || event.durationMinutes === durationMinutes) return;
 
-    let editedDayRecord: DayRecord;
+    let nextDayRecord: DayRecord;
     if (column === "actual") {
       const resizedActual = buildEditedActual(
         event as ActualEvent,
@@ -248,14 +248,14 @@ export function useEditableDayEvents({
         },
         () => crypto.randomUUID(),
       );
-      editedDayRecord = {
+      nextDayRecord = {
         ...dayRecord,
         actual: dayRecord.actual.map((actual) =>
           actual.id === eventId ? resizedActual : actual,
         ),
       };
     } else {
-      editedDayRecord = {
+      nextDayRecord = {
         ...dayRecord,
         revised: dayRecord.revised.map((revised) =>
           revised.id === eventId
@@ -265,12 +265,12 @@ export function useEditableDayEvents({
       };
     }
     void persistDayRecord({
-      ...editedDayRecord,
+      ...nextDayRecord,
       updatedAt: now().toISOString(),
     });
   }
 
-  function persistEditableDrop(operation: DayGridDropOperation) {
+  function applyEventDrop(operation: DayGridDropOperation) {
     if (mutationsDisabled) return;
 
     if (operation.sourceColumn === "plan") {
@@ -291,7 +291,7 @@ export function useEditableDayEvents({
               event: { ...copiedEvent, saveDisposition: "unsaved" },
             }
           : { column: "revised", event: copiedEvent };
-      persistAddedEditableEvent(addition);
+      addEditableEvent(addition);
       return;
     }
 
@@ -312,14 +312,14 @@ export function useEditableDayEvents({
 
   return {
     editorState,
-    addActual,
-    editEditableEvent,
-    saveEditableEventDraft,
-    deleteEditableEventTarget,
-    dismissEditor,
+    openNewActualEditor,
+    openEventEditor,
+    saveEditorDraft,
+    deleteEditorEvent,
+    closeEditor,
     startSlack,
-    persistResizedEditableEvent,
-    persistEditableDrop,
+    resizeEditableEvent,
+    applyEventDrop,
   };
 }
 
