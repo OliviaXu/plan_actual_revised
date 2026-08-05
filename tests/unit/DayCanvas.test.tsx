@@ -361,12 +361,12 @@ describe("DayCanvas", () => {
     expect(actualColumn).not.toHaveClass("bg-accent/15");
   });
 
-  it("disables every Plan drag source and drop target while dragging is disabled", () => {
+  it("disables all day mutations from one policy", () => {
     const onDropEditable = vi.fn();
     render(
       <DayCanvas
         actuals={[actualEvent("disabled-actual", 600, 30)]}
-        dragDisabled
+        mutationsDisabled
         onDropEditable={onDropEditable}
         planEvents={[planEvent("disabled-plan", 540, 60)]}
         {...calendarDay}
@@ -381,7 +381,10 @@ describe("DayCanvas", () => {
     expect(actualBlockButton).toHaveAttribute("draggable", "false");
     expect(screen.getByRole("button", {
       name: "Resize disabled-actual",
-    })).toHaveProperty("draggable", false);
+    })).toBeDisabled();
+    expect(screen.getByRole("button", {
+      name: "Add Actual",
+    })).toBeDisabled();
     fireEvent.dragStart(planBlock, {
       clientY: 210,
       dataTransfer: dataTransfer(),

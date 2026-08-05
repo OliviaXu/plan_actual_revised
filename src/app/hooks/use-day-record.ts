@@ -14,8 +14,10 @@ type DayRecordState = {
 
 type DayRecordLoadState = {
   key: string;
-  status: "loaded" | "failed";
+  status: Exclude<DayRecordLoadStatus, "loading">;
 };
+
+export type DayRecordLoadStatus = "loading" | "loaded" | "failed";
 
 export function useDayRecord(calendarDay?: CalendarDay) {
   const [dayRecordState, setDayRecordState] = useState<DayRecordState>();
@@ -33,7 +35,7 @@ export function useDayRecord(calendarDay?: CalendarDay) {
       ? dayRecordState
       : undefined;
   const dayRecord = activeDayRecordState?.record ?? null;
-  const loadStatus =
+  const loadStatus: DayRecordLoadStatus =
     calendarDayKey && loadState?.key === calendarDayKey
       ? loadState.status
       : "loading";

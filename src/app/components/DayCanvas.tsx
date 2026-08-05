@@ -47,9 +47,7 @@ const readSystemTime = () => new Date();
 type DayCanvasProps = {
   actuals?: ActualEvent[];
   revised?: RevisedEvent[];
-  dragDisabled?: boolean;
-  editableMutationsDisabled?: boolean;
-  canAddActual?: boolean;
+  mutationsDisabled?: boolean;
   layoutMode?: DayGridLayoutMode;
   planEvents: PlanEvent[];
   now?: () => Date;
@@ -69,9 +67,7 @@ type DayCanvasProps = {
 export function DayCanvas({
   actuals,
   revised,
-  dragDisabled,
-  editableMutationsDisabled,
-  canAddActual,
+  mutationsDisabled,
   layoutMode = "full",
   planEvents,
   now = readSystemTime,
@@ -111,7 +107,7 @@ export function DayCanvas({
     startResize: startActualResize,
   } = useEditableEventResize({
     events: actuals ?? [],
-    disabled: editableMutationsDisabled,
+    disabled: mutationsDisabled,
     onResizeEnd: (eventId, durationMinutes) =>
       onEditableResizeEnd?.("actual", eventId, durationMinutes),
     settings: defaultSettings,
@@ -121,7 +117,7 @@ export function DayCanvas({
     startResize: startRevisedResize,
   } = useEditableEventResize({
     events: revised ?? [],
-    disabled: editableMutationsDisabled,
+    disabled: mutationsDisabled,
     onResizeEnd: (eventId, durationMinutes) =>
       onEditableResizeEnd?.("revised", eventId, durationMinutes),
     settings: defaultSettings,
@@ -256,7 +252,7 @@ export function DayCanvas({
     targetColumn: DayGridDropTargetColumn,
   ) {
     if (
-      dragDisabled ||
+      mutationsDisabled ||
       !dragSession
     ) {
       return;
@@ -277,7 +273,7 @@ export function DayCanvas({
     targetColumn: DayGridDropTargetColumn,
   ) {
     if (
-      dragDisabled ||
+      mutationsDisabled ||
       !dragSession
     ) {
       clearDragState();
@@ -346,14 +342,14 @@ export function DayCanvas({
               <button
                 aria-label="Add Actual"
                 className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-white text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
-                disabled={!canAddActual}
+                disabled={mutationsDisabled}
                 onClick={onAddActual}
                 type="button"
               >
                 <Plus aria-hidden="true" className="h-4 w-4" />
               </button>
               <SlackAuditPopover
-                disabled={!canAddActual}
+                disabled={mutationsDisabled}
                 onSubmit={(reason) => onStartSlack?.(reason)}
               />
             </div>
@@ -428,7 +424,7 @@ export function DayCanvas({
                 {planBlocks.map((block) => (
                   <PlanGridBlock
                     block={block}
-                    dragDisabled={dragDisabled}
+                    dragDisabled={mutationsDisabled}
                     frontZIndex={planBlocks.length}
                     isFront={frontPlanId === block.event.id}
                     key={block.event.id}
@@ -468,11 +464,11 @@ export function DayCanvas({
                 <EditableGridBlock
                   block={block}
                   column="actual"
-                  dragDisabled={dragDisabled}
+                  dragDisabled={mutationsDisabled}
                   frontZIndex={actualBlocks.length}
                   isFront={frontActualId === block.event.id}
                   key={block.event.id}
-                  mutationsDisabled={editableMutationsDisabled}
+                  mutationsDisabled={mutationsDisabled}
                   onDragEnd={clearDragState}
                   onDragStart={(event) =>
                     startDrag(event, "actual", block.event.id)
@@ -516,11 +512,11 @@ export function DayCanvas({
                 <EditableGridBlock
                   block={block}
                   column="revised"
-                  dragDisabled={dragDisabled}
+                  dragDisabled={mutationsDisabled}
                   frontZIndex={revisedBlocks.length}
                   isFront={frontRevisedId === block.event.id}
                   key={block.event.id}
-                  mutationsDisabled={editableMutationsDisabled}
+                  mutationsDisabled={mutationsDisabled}
                   onDragEnd={clearDragState}
                   onDragStart={(event) =>
                     startDrag(event, "revised", block.event.id)
