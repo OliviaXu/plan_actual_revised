@@ -7,7 +7,7 @@ import { getExtensionLaunchOptions } from "./extension-launch-options";
 
 async function createExtension() {
   const extensionPath = await fs.mkdtemp(
-    path.join(os.tmpdir(), "slack-audit-extension-"),
+    path.join(os.tmpdir(), "slack-intention-extension-"),
   );
   await fs.cp(path.resolve("dist"), extensionPath, { recursive: true });
   await fs.writeFile(
@@ -89,7 +89,7 @@ async function readStorage(
   );
 }
 
-test("Slack audit validates, launches from the click, persists, and saves as an Actual", async () => {
+test("Slack intention flow validates, launches from the click, persists, and saves as an Actual", async () => {
   const extensionPath = await createExtension();
   const { context, page } = await openExtension(extensionPath, "capture");
 

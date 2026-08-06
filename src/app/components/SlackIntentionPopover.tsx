@@ -9,30 +9,30 @@ import {
 const iconButtonClassName =
   "inline-flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-white text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50";
 
-export function SlackAuditPopover({
+export function SlackIntentionPopover({
   disabled,
   onSubmit,
 }: {
   disabled?: boolean;
-  onSubmit: (reason: string) => void;
+  onSubmit: (intention: string) => void;
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [open, setOpen] = useState(false);
-  const [reason, setReason] = useState("");
+  const [intention, setIntention] = useState("");
 
   function updateOpen(nextOpen: boolean) {
     setOpen(nextOpen);
     if (!nextOpen) {
-      setReason("");
+      setIntention("");
     }
   }
 
-  function submitReason(event: FormEvent<HTMLFormElement>) {
+  function submitIntention(event: FormEvent<HTMLFormElement>) {
     event.preventDefault();
-    const summary = reason.trim();
-    if (!summary) return;
+    const normalizedIntention = intention.trim();
+    if (!normalizedIntention) return;
 
-    onSubmit(summary);
+    onSubmit(normalizedIntention);
     updateOpen(false);
   }
 
@@ -58,26 +58,26 @@ export function SlackAuditPopover({
         }}
         role="dialog"
       >
-        <form className="space-y-2.5" noValidate onSubmit={submitReason}>
+        <form className="space-y-2.5" noValidate onSubmit={submitIntention}>
           <label
             className="block text-sm font-medium"
-            htmlFor="slack-reason"
+            htmlFor="slack-intention"
           >
             What are you up to?
           </label>
           <input
             className="block h-8 w-full border-b border-border bg-transparent px-0 py-1 text-sm caret-primary outline-none placeholder:text-muted-foreground focus:border-primary focus:ring-0"
-            id="slack-reason"
-            onChange={(event) => setReason(event.target.value)}
+            id="slack-intention"
+            onChange={(event) => setIntention(event.target.value)}
             placeholder="attention is devotion :)"
             ref={inputRef}
             type="text"
-            value={reason}
+            value={intention}
           />
           <div className="flex justify-end pt-0.5">
             <button
               className="inline-flex h-8 items-center justify-center rounded-sm bg-muted px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
-              disabled={!reason.trim()}
+              disabled={!intention.trim()}
               type="submit"
             >
               Open Slack

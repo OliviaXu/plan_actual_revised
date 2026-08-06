@@ -35,7 +35,7 @@ export type EditableEventsResult = {
   saveEditorDraft: (draft: EventEditorDraft) => void;
   deleteEditorEvent: () => void;
   closeEditor: () => void;
-  startSlack: (reason: string) => void;
+  startSlack: (intention: string) => void;
   resizeEvent: (
     column: EditableColumn,
     eventId: string,
@@ -122,11 +122,11 @@ export function useEditableEvents({
     });
   }
 
-  function startSlack(reason: string) {
+  function startSlack(intention: string) {
     if (mutationsDisabled) return;
 
     const newActual = buildNewActual({
-      summary: reason,
+      summary: intention,
       requestedDurationMinutes: defaultSettings.slackDefaultDurationMinutes,
       colorId: defaultSettings.slackColorId,
       isSlack: true,

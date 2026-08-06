@@ -232,7 +232,7 @@ changing Phase 7 behavior in:
 
 The following remain outside Phase 7:
 
-- Phase 10 Slack Audit Tracer behavior;
+- Phase 10 Slack Intention Tracer behavior;
 - persisted catch-up history or once-per-day throttling;
 - Calendar batch insertion;
 - a real historical-Calendar smoke test; and

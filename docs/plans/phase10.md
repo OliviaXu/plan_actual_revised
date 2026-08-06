@@ -1,13 +1,13 @@
-# Phase 10 — Slack Audit Tracer
+# Phase 10 — Slack Intention Tracer
 
 ## Goal
 
-Make opening Slack an intentional action by asking for a reason first, logging
-that reason as a normal Actual, and then attempting to open the Slack desktop
-app.
+Make opening Slack an intentional action by asking for an intention first,
+logging that intention as a normal Actual, and then attempting to open the
+Slack desktop app.
 
-The audit record is the durable outcome. Slack launch is best-effort and never
-controls whether the Actual is kept.
+The Slack Actual is the durable outcome. Slack launch is best-effort and never
+controls whether that Actual is kept.
 
 ## User Experience
 
@@ -27,8 +27,8 @@ editor. The Slack mark remains recognizable without competing with the rest of
 the interface.
 
 Whitespace-only input is invalid. Submission stays disabled until the trimmed
-reason is nonempty. Closing or successfully submitting the popover clears the
-draft reason.
+intention is nonempty. Closing or successfully submitting the popover clears
+the draft intention.
 
 ## Actual Creation
 
@@ -36,7 +36,7 @@ Slack does not introduce a separate block type. It creates a standard
 `ActualEvent` through the same creation and persistence path as Add Actual,
 with these Slack-specific values:
 
-- `summary`: the trimmed reason;
+- `summary`: the trimmed intention;
 - `startMinutes`: the current Calendar-local time snapped to settings;
 - `durationMinutes`: `settings.slackDefaultDurationMinutes`, bounded at
   midnight;
@@ -76,7 +76,7 @@ stack:
 2. Attempt `window.open("slack://open", "_self")`.
 3. Close and clear the popover.
 
-Logging happens before launch, so the audit record remains even if Slack is
+Logging happens before launch, so the Slack Actual remains even if Slack is
 missing or the protocol attempt fails.
 
 If the launch call throws synchronously, the app shows a dismissible warning:
@@ -119,8 +119,8 @@ transient local `DayGrid` state and is never persisted.
 
 ## Component Responsibilities
 
-- `src/app/components/SlackAuditPopover.tsx` owns the controlled Radix
-  popover, reason draft, validation, accessible labels, and Slack icon.
+- `src/app/components/SlackIntentionPopover.tsx` owns the controlled Radix
+  popover, intention draft, validation, accessible labels, and Slack icon.
 - `src/app/components/ui/popover.tsx` owns the small shared Radix wrapper and
   base popover styling.
 - `src/app/components/DayGrid.tsx` owns the header controls and transient
@@ -154,7 +154,7 @@ Deterministic Playwright coverage proves:
 - synchronous launch failure keeps the logged Actual and shows a warning.
 
 An opt-in real smoke test attempts the actual Slack protocol using a dedicated
-Chrome profile and verifies that the local audit block remains. It restores
+Chrome profile and verifies that the local Slack Actual remains. It restores
 the profile's original day-record storage afterward.
 
 ## Working Agreement

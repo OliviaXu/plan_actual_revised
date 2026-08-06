@@ -16,7 +16,7 @@
     "test:e2e": "npm run build && playwright test",
     "test:e2e:headed": "PW_HEADED=1 npm run test:e2e",
     "test:real:actual": "npm run build && playwright test --config=playwright.real.config.ts tests/real/actual-calendar-smoke.spec.ts",
-    "test:real:slack": "npm run build && playwright test --config=playwright.real.config.ts tests/real/slack-audit-smoke.spec.ts",
+    "test:real:slack": "npm run build && playwright test --config=playwright.real.config.ts tests/real/slack-intention-smoke.spec.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

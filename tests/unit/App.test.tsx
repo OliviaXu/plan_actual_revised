@@ -1389,7 +1389,7 @@ describe("App new Actual dialog", () => {
   });
 });
 
-describe("App Slack audit", () => {
+describe("App Slack intention", () => {
   function connectCalendar() {
     return mockRuntime(async (message) => {
       if (message.type === "calendar.listEvents") {
@@ -1425,7 +1425,7 @@ describe("App Slack audit", () => {
     expect(logSlack).toHaveClass("text-muted-foreground");
   });
 
-  it("disables Slack submission until a reason is entered", async () => {
+  it("disables Slack submission until an intention is entered", async () => {
     connectCalendar();
     const launchSlack = vi.fn();
 
@@ -1438,7 +1438,7 @@ describe("App Slack audit", () => {
     const popover = await screen.findByRole("dialog", {
       name: "Log Slack time",
     });
-    const reason = within(popover).getByPlaceholderText(
+    const intention = within(popover).getByPlaceholderText(
       "attention is devotion :)",
     );
     const submit = within(popover).getByRole("button", {
@@ -1447,11 +1447,11 @@ describe("App Slack audit", () => {
 
     expect(submit).toBeDisabled();
     expect(submit).toHaveClass("disabled:opacity-50");
-    fireEvent.change(reason, { target: { value: "   " } });
+    fireEvent.change(intention, { target: { value: "   " } });
     expect(submit).toBeDisabled();
-    fireEvent.change(reason, { target: { value: "Check release channel" } });
+    fireEvent.change(intention, { target: { value: "Check release channel" } });
     expect(submit).toBeEnabled();
-    expect(screen.queryByText("Reason is required.")).not.toBeInTheDocument();
+    expect(screen.queryByText("Intention is required.")).not.toBeInTheDocument();
     expect(launchSlack).not.toHaveBeenCalled();
     expect(chrome.storage.local.set).not.toHaveBeenCalled();
     expect(screen.queryByTestId("actual-block")).not.toBeInTheDocument();
@@ -1474,19 +1474,19 @@ describe("App Slack audit", () => {
     });
     expect(popover).toHaveClass("w-56", "p-3");
     expect(within(popover).getByText("What are you up to?")).toBeVisible();
-    const reason = within(popover).getByPlaceholderText(
+    const intention = within(popover).getByPlaceholderText(
       "attention is devotion :)",
     );
-    expect(reason).toHaveFocus();
-    expect(reason).toHaveClass("border-b", "bg-transparent");
-    expect(reason).not.toHaveClass("rounded-sm");
+    expect(intention).toHaveFocus();
+    expect(intention).toHaveClass("border-b", "bg-transparent");
+    expect(intention).not.toHaveClass("rounded-sm");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
     ).toHaveClass("h-8");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
     ).not.toHaveClass("w-full");
-    fireEvent.change(reason, {
+    fireEvent.change(intention, {
       target: { value: "  Check release channel  " },
     });
     fireEvent.click(within(popover).getByRole("button", {

@@ -8,7 +8,7 @@ Plan / Actual / Revised is a production-ready Chrome extension for personal time
 - Log what actually happened as the day unfolds.
 - Replan the rest of the day when reality diverges from the plan.
 - Set intentions: a daily "something hard" and a weekly learning goal.
-- Audit context-switching Slack usage with a lightweight launcher that also logs the visit.
+- Set an intention before each Slack visit with a lightweight launcher that also logs the visit.
 
 The extension reads from and writes to the user's Google Calendar through the Google Calendar REST API using Chrome extension OAuth. It stores unsaved working state locally with Chrome extension storage and syncs durable actuals back to the calendar with idempotent writes.
 
@@ -231,7 +231,7 @@ Each Actual/Revised block has:
 - `startMinutes`: minutes from local midnight.
 - `durationMinutes`: positive whole number.
 - `colorId`: empty string or Google Calendar color ID.
-- `isSlack`: true if created through the Slack audit flow.
+- `isSlack`: true if created through the Slack intention flow.
 - `saveDisposition`: `unsaved`, `calendarSaved`, or `planMatched`.
 - `calendarEventId`: created Google Calendar event ID, once known.
 - `lastSaveAttemptAt`: optional timestamp.
@@ -395,7 +395,7 @@ Actual:
 - Starts empty for a new day.
 - Add by dragging from Plan.
 - Add by clicking `+`.
-- Add through the Slack audit flow.
+- Add through the Slack intention flow.
 
 Revised:
 
@@ -594,11 +594,13 @@ Catch-up shows a toast if anything was saved or failed:
 
 Silent partial failure is forbidden.
 
-## 14. Slack Audit
+## 14. Slack Intention
 
 ### 14.1 Intent
 
-Frame every Slack visit as an intentional choice. The user names why they are opening Slack before launch, which deters ambient context switching and creates an audit trail.
+Frame every Slack visit as an intentional choice. Before launch, the user names
+what they intend to do in Slack, which deters ambient context switching and
+creates a corresponding Actual.
 
 ### 14.2 UI
 
@@ -606,7 +608,7 @@ A small Slack button sits next to the Actual `+` button. Clicking opens a popove
 
 Popover contents:
 
-- Label: `WHY SLACK?`
+- Label: `What are you up to?`
 - Text input with placeholder `attention is devotion :)`
 - Button: `Open Slack`
 
@@ -833,7 +835,7 @@ Networked Calendar tests should mock the Google API boundary by default. A small
 
 - Daily focus banner.
 - Weekly learning banner.
-- Slack audit popover.
+- Slack intention popover.
 - Calendar creation for intention events.
 
 ### Phase 5 - Save Reliability
@@ -877,6 +879,6 @@ The product works if a user:
 - Gets clear feedback for every save, failure, and retry.
 - Sees past Actuals flow into Google Calendar without duplicate events.
 - Gets behavior driven by centralized settings defaults for day range and color semantics.
-- Uses the Slack audit long enough for it to change their behavior around impulsive Slack opens.
+- Sets an intention before opening Slack often enough to change their behavior around impulsive Slack opens.
 
 The mechanical requirements above serve those experiential outcomes.

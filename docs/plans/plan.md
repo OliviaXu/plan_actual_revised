@@ -272,21 +272,21 @@ Exit criteria:
 
 - Weekly learning behavior is correct across the work-week boundary.
 
-## Phase 10 - Slack Audit Tracer
+## Phase 10 - Slack Intention Tracer
 
 Goal: add Slack logging as an isolated behavior-shaping feature with its own launch risk.
 
 Build:
 
 - Slack popover anchored in the Actual header.
-- Required reason input.
+- Required intention input.
 - Slack Actual block creation with default duration, color, and `isSlack`.
 - Direct user-gesture protocol launch via `slack://open`.
 - Warning toast if the launch is blocked, while keeping the logged block.
 
 Deterministic E2E tracer:
 
-- Open the Slack popover, enter a reason, submit, and verify an Actual block is created and persisted.
+- Open the Slack popover, enter an intention, submit, and verify an Actual block is created and persisted.
 - Verify empty input does not launch or create a block.
 - Mock/observe the protocol-launch attempt from a direct user gesture.
 - Save a Slack block and verify the Slack prefix/private metadata kind.
@@ -297,7 +297,7 @@ Real smoke:
 
 Exit criteria:
 
-- Slack audit creates durable Actual data even when external protocol launch fails.
+- The Slack intention flow creates durable Actual data even when external protocol launch fails.
 
 ## Phase 11 - Production Hardening and Visual QA
 

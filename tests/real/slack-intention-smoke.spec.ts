@@ -1,7 +1,7 @@
 import { chromium, expect, test } from "@playwright/test";
 import path from "node:path";
 
-test("real Slack launch keeps its audit block in local Actual storage", async () => {
+test("real Slack launch keeps its intention in local Actual storage", async () => {
   const profileDirectory = process.env.REAL_CALENDAR_PROFILE_DIR;
   if (!profileDirectory) {
     throw new Error(
@@ -21,7 +21,7 @@ test("real Slack launch keeps its audit block in local Actual storage", async ()
   const extensionId = worker.url().split("/")[2];
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/index.html`);
-  const reason = `[PAR real Slack smoke ${Date.now()}]`;
+  const intention = `[PAR real Slack smoke ${Date.now()}]`;
   const originalRecords = await page.evaluate(async () => {
     const stored = await chrome.storage.local.get(null);
     return Object.fromEntries(
@@ -39,12 +39,12 @@ test("real Slack launch keeps its audit block in local Actual storage", async ()
     await page.getByRole("button", { name: "Log Slack time" }).click();
     await page
       .getByPlaceholder("attention is devotion :)")
-      .fill(reason);
+      .fill(intention);
     await page.getByRole("button", { name: "Open Slack" }).click();
 
     await expect
       .poll(() =>
-        page.evaluate(async (expectedReason) => {
+        page.evaluate(async (expectedIntention) => {
           const stored = await chrome.storage.local.get(null);
           return Object.values(stored)
             .filter(
@@ -62,9 +62,9 @@ test("real Slack launch keeps its audit block in local Actual storage", async ()
             .flatMap((record) => record.actual ?? [])
             .some(
               (actual) =>
-                actual.summary === expectedReason && actual.isSlack === true,
+                actual.summary === expectedIntention && actual.isSlack === true,
             );
-        }, reason),
+        }, intention),
       )
       .toBe(true);
   } finally {

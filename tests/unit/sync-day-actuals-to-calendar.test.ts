@@ -189,12 +189,12 @@ describe("syncDayActualsToCalendar", () => {
 
   it("uses the Slack prefix while keeping the standard Actual metadata", async () => {
     const slackActual = {
-      ...actual("slack-audit", "Check release channel", 720),
+      ...actual("slack-intention", "Check release channel", 720),
       isSlack: true as const,
     };
     const insertCalendarEvent = vi.fn().mockResolvedValue({
       ok: true,
-      value: { eventId: "calendar-slack-audit" },
+      value: { eventId: "calendar-slack-intention" },
     });
 
     await syncDayActualsToCalendar({

@@ -25,7 +25,7 @@ import {
 import { PlanEventBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableEventColumn } from "./EditableEventColumn";
-import { SlackAuditPopover } from "./SlackAuditPopover";
+import { SlackIntentionPopover } from "./SlackIntentionPopover";
 import type { DayGridDropOperation } from "./day-grid-drag";
 import type { DayGridLayoutMode } from "../hooks/use-responsive-day-grid-layout-mode";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
@@ -43,7 +43,7 @@ type DayGridProps = {
   layoutMode?: DayGridLayoutMode;
   mutationsDisabled?: boolean;
   onNewActual?: () => void;
-  onStartSlack?: (reason: string) => void;
+  onStartSlack?: (intention: string) => void;
   onEditEvent?: (column: EditableColumn, event: EditableEvent) => void;
   onResizeEvent?: (
     column: EditableColumn,
@@ -179,9 +179,9 @@ export function DayGrid({
               >
                 <Plus aria-hidden="true" className="h-4 w-4" />
               </button>
-              <SlackAuditPopover
+              <SlackIntentionPopover
                 disabled={mutationsDisabled}
-                onSubmit={(reason) => onStartSlack?.(reason)}
+                onSubmit={(intention) => onStartSlack?.(intention)}
               />
             </div>
           </div>
