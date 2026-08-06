@@ -131,6 +131,27 @@ registerServiceWorker(createServiceWorkerOperations({
   );
   const { context, extensionId } = await loadExtension(extensionPath);
   const page = await context.newPage();
+  await page.addInitScript(() => {
+    const state = window as typeof window & {
+      __slackAttempts?: Array<{
+        active: boolean;
+        target: string;
+        url: string;
+      }>;
+    };
+    state.__slackAttempts = [];
+    Object.defineProperty(window, "open", {
+      configurable: true,
+      value: (url: string | URL, windowTarget: string) => {
+        state.__slackAttempts?.push({
+          active: navigator.userActivation?.isActive ?? false,
+          target: windowTarget,
+          url: String(url),
+        });
+        return window;
+      },
+    });
+  });
   await page.clock.setFixedTime(new Date("2026-07-15T12:00:00-07:00"));
 
   try {
@@ -152,10 +173,26 @@ registerServiceWorker(createServiceWorkerOperations({
     await expect(page.getByRole("button", { name: "Add Actual" })).toBeEnabled();
     await expect(page.getByRole("button", { name: "Log Slack time" })).toBeEnabled();
 
+    await page.getByRole("button", { name: "Log Slack time" }).click();
+    await page
+      .getByPlaceholder("attention is devotion :)")
+      .fill("Panel Slack check");
+    await page.getByRole("button", { name: "Open Slack" }).click();
+    expect(await page.evaluate(() =>
+      (window as typeof window & { __slackAttempts?: unknown[] })
+        .__slackAttempts,
+    )).toEqual([{
+      active: true,
+      target: "_blank",
+      url: "slack://open",
+    }]);
+
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("textbox", { name: "Title" }).fill("Panel Actual");
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await expect(page.getByTestId("actual-block")).toContainText("Panel Actual");
+    await expect(
+      page.getByTestId("actual-block").filter({ hasText: "Panel Actual" }),
+    ).toContainText("Panel Actual");
 
     const viewport = page.getByTestId("plan-scroll-viewport");
     await viewport.evaluate((element) => {

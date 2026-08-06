@@ -7,22 +7,21 @@ import { useCalendarPlan } from "./hooks/use-calendar-plan";
 import type { AppSurface } from "./hooks/use-responsive-day-grid-layout-mode";
 
 const readSystemTime = () => new Date();
-const openSlackProtocol = () => {
-  window.open("slack://open", "_self");
-};
 const reloadAppPage = () => window.location.reload();
+
+export type AppProps = {
+  now?: () => Date;
+  launchSlack: () => void;
+  reloadPage?: () => void;
+  appSurface?: AppSurface;
+};
 
 export function App({
   now = readSystemTime,
-  launchSlack = openSlackProtocol,
+  launchSlack,
   reloadPage = reloadAppPage,
   appSurface = "standalone",
-}: {
-  now?: () => Date;
-  launchSlack?: () => void;
-  reloadPage?: () => void;
-  appSurface?: AppSurface;
-}) {
+}: AppProps) {
   const sidePanel = appSurface === "side-panel";
   const { calendarState, calendarDay, connectCalendar } =
     useCalendarPlan(now);

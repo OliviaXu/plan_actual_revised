@@ -51,14 +51,19 @@ async function openExtension(
   const page = await context.newPage();
   await page.addInitScript((behavior) => {
     const target = window as typeof window & {
-      __slackAttempts?: Array<{ active: boolean; url: string }>;
+      __slackAttempts?: Array<{
+        active: boolean;
+        target: string;
+        url: string;
+      }>;
     };
     target.__slackAttempts = [];
     Object.defineProperty(window, "open", {
       configurable: true,
-      value: (url: string | URL) => {
+      value: (url: string | URL, windowTarget: string) => {
         target.__slackAttempts?.push({
           active: navigator.userActivation?.isActive ?? false,
+          target: windowTarget,
           url: String(url),
         });
         if (behavior === "throw") {
@@ -136,10 +141,18 @@ test("Slack audit validates, launches from the click, persists, and saves as an 
       await page.evaluate(
         () =>
           (window as typeof window & {
-            __slackAttempts?: Array<{ active: boolean; url: string }>;
+            __slackAttempts?: Array<{
+              active: boolean;
+              target: string;
+              url: string;
+            }>;
           }).__slackAttempts,
       ),
-    ).toEqual([{ active: true, url: "slack://open" }]);
+    ).toEqual([{
+      active: true,
+      target: "_self",
+      url: "slack://open",
+    }]);
 
     await page.reload();
     await expect(page.getByTestId("actual-block")).toContainText(

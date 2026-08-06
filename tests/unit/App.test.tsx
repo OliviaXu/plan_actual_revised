@@ -9,8 +9,19 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { App } from "../../src/app/App";
+import {
+  App as ProductionApp,
+  type AppProps,
+} from "../../src/app/App";
 import type { ActualEvent } from "../../src/domain/day-event";
+
+type TestAppProps = Omit<AppProps, "launchSlack"> & {
+  launchSlack?: () => void;
+};
+
+function App({ launchSlack = vi.fn(), ...props }: TestAppProps) {
+  return <ProductionApp {...props} launchSlack={launchSlack} />;
+}
 
 type RuntimeMessage = {
   type: string;

@@ -6,6 +6,9 @@ import "./styles.css";
 
 ReactDOM.createRoot(document.getElementById("root")!).render(
   <React.StrictMode>
-    <App appSurface="side-panel" />
+    <App
+      appSurface="side-panel"
+      launchSlack={() => window.open("slack://open", "_blank")}
+    />
   </React.StrictMode>,
 );
