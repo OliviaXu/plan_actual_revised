@@ -5,7 +5,7 @@ import {
   getCalendarSaveToastContent,
   getCatchUpToastContent,
   useDayPlannerToast,
-} from "../../src/app/day-planner-toast";
+} from "../../src/app/hooks/use-day-planner-toast";
 
 describe("Day Planner operation feedback", () => {
   it("summarizes a mixed Calendar save result", () => {

@@ -1,8 +1,8 @@
 import { useCallback, useRef, useState } from "react";
 
-import type { CatchUpRunResult } from "../shared/catch-up-run-result";
-import type { Result } from "../shared/result";
-import type { SyncDayActualsResult } from "../workflows/sync-day-actuals-to-calendar";
+import type { CatchUpRunResult } from "../../shared/catch-up-run-result";
+import type { Result } from "../../shared/result";
+import type { SyncDayActualsResult } from "../../workflows/sync-day-actuals-to-calendar";
 
 export type DayPlannerToastContent = {
   source: "calendar-save" | "catch-up" | "slack-launch";

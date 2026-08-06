@@ -1,7 +1,7 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { DayPlanner } from "../../src/app/DayPlanner";
+import { DayPlanner } from "../../src/app/components/DayPlanner";
 
 afterEach(() => {
   cleanup();

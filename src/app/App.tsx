@@ -2,9 +2,9 @@ import { CalendarDays, CircleAlert } from "lucide-react";
 
 import { CalendarSurfaceTransition } from "./components/CalendarSurfaceTransition";
 import { Button } from "./components/ui/button";
-import { DayPlanner } from "./DayPlanner";
+import { DayPlanner } from "./components/DayPlanner";
 import { useCalendarPlan } from "./hooks/use-calendar-plan";
-import type { AppSurface } from "./side-panel-layout";
+import type { AppSurface } from "./hooks/use-responsive-day-grid-layout-mode";
 
 const readSystemTime = () => new Date();
 const openSlackProtocol = () => {

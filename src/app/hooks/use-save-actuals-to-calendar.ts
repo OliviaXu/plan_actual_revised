@@ -9,16 +9,16 @@ import {
   getCalendarSaveToastContent,
   getCatchUpToastContent,
   type DayPlannerToastContent,
-} from "../day-planner-toast";
+} from "./use-day-planner-toast";
 import { runtimeCalendarEventClient } from "../runtime-calendar-event-client";
 import type { DayRecordLoadStatus } from "./use-day-record";
 
-export type ActualCalendarSyncResult = {
+export type ActualsToCalendarSaveResult = {
   isSavingActualsToCalendar: boolean;
   saveActualsToCalendar: () => Promise<void>;
 };
 
-export function useActualCalendarSync({
+export function useSaveActualsToCalendar({
   calendarDate,
   dayRecord,
   persistDayRecord,
@@ -32,7 +32,7 @@ export function useActualCalendarSync({
   dayRecordLoadStatus: DayRecordLoadStatus;
   now: () => Date;
   onFeedback: (feedback: DayPlannerToastContent) => void;
-}): ActualCalendarSyncResult {
+}): ActualsToCalendarSaveResult {
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
 

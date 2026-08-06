@@ -1,21 +1,21 @@
-import { Button } from "./components/ui/button";
-import { Toast, type ToastAction } from "./components/ui/toast";
-import { DayGrid } from "./components/DayGrid";
-import { EventEditor } from "./components/EventEditor";
+import { Button } from "./ui/button";
+import { Toast, type ToastAction } from "./ui/toast";
+import { DayGrid } from "./DayGrid";
+import { EventEditor } from "./EventEditor";
 import {
   slackLaunchFailureToastContent,
   useDayPlannerToast,
-} from "./day-planner-toast";
-import { useActualCalendarSync } from "./hooks/use-actual-calendar-sync";
-import type { CalendarDay } from "./hooks/use-calendar-plan";
-import { useDayRecord } from "./hooks/use-day-record";
-import { useEditableEvents } from "./hooks/use-editable-events";
-import type { PlanEvent } from "../domain/day-event";
-import { defaultSettings } from "../domain/settings";
+} from "../hooks/use-day-planner-toast";
+import { useSaveActualsToCalendar } from "../hooks/use-save-actuals-to-calendar";
+import type { CalendarDay } from "../hooks/use-calendar-plan";
+import { useDayRecord } from "../hooks/use-day-record";
+import { useEditableEvents } from "../hooks/use-editable-events";
+import type { PlanEvent } from "../../domain/day-event";
+import { defaultSettings } from "../../domain/settings";
 import {
-  useDayGridLayoutMode,
+  useResponsiveDayGridLayoutMode,
   type AppSurface,
-} from "./side-panel-layout";
+} from "../hooks/use-responsive-day-grid-layout-mode";
 
 export function DayPlanner({
   appSurface = "standalone",
@@ -31,14 +31,14 @@ export function DayPlanner({
   planEvents: PlanEvent[];
 }) {
   const sidePanel = appSurface === "side-panel";
-  const dayGridLayoutMode = useDayGridLayoutMode(appSurface);
+  const dayGridLayoutMode = useResponsiveDayGridLayoutMode(appSurface);
   const {
     dayRecord,
     loadStatus: dayRecordLoadStatus,
     persistDayRecord,
   } = useDayRecord(calendarDay);
   const toast = useDayPlannerToast();
-  const calendarSync = useActualCalendarSync({
+  const calendarSave = useSaveActualsToCalendar({
     calendarDate: calendarDay.date,
     dayRecord,
     persistDayRecord,
@@ -48,7 +48,7 @@ export function DayPlanner({
   });
   const editableMutationsDisabled =
     dayRecordLoadStatus === "loading" ||
-    calendarSync.isSavingActualsToCalendar;
+    calendarSave.isSavingActualsToCalendar;
   const editableEvents = useEditableEvents({
     calendarDay,
     dayRecord,
@@ -65,9 +65,9 @@ export function DayPlanner({
       toast.current.tone === "warning"
       ? {
           label: "Retry save",
-          pending: calendarSync.isSavingActualsToCalendar,
+          pending: calendarSave.isSavingActualsToCalendar,
           pendingLabel: "Retrying…",
-          onClick: () => void calendarSync.saveActualsToCalendar(),
+          onClick: () => void calendarSave.saveActualsToCalendar(),
         }
       : undefined;
 
@@ -94,11 +94,11 @@ export function DayPlanner({
       {dayRecord?.actual.length ? (
         <footer className="flex items-center">
           <Button
-            disabled={calendarSync.isSavingActualsToCalendar}
-            onClick={() => void calendarSync.saveActualsToCalendar()}
+            disabled={calendarSave.isSavingActualsToCalendar}
+            onClick={() => void calendarSave.saveActualsToCalendar()}
             type="button"
           >
-            {calendarSync.isSavingActualsToCalendar
+            {calendarSave.isSavingActualsToCalendar
               ? "Saving Actual"
               : "Save Actual to calendar"}
           </Button>

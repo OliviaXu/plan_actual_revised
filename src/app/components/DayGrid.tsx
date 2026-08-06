@@ -27,7 +27,7 @@ import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableEventColumn } from "./EditableEventColumn";
 import { SlackAuditPopover } from "./SlackAuditPopover";
 import type { DayGridDropOperation } from "./day-grid-drag";
-import type { DayGridLayoutMode } from "../side-panel-layout";
+import type { DayGridLayoutMode } from "../hooks/use-responsive-day-grid-layout-mode";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
 import { useDayGridDragDrop } from "../hooks/use-day-grid-drag-drop";
 

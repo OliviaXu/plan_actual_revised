@@ -1,7 +1,7 @@
 import { describe, expectTypeOf, it } from "vitest";
 
-import type { DayPlannerToastResult } from "../../src/app/day-planner-toast";
-import type { ActualCalendarSyncResult } from "../../src/app/hooks/use-actual-calendar-sync";
+import type { DayPlannerToastResult } from "../../src/app/hooks/use-day-planner-toast";
+import type { ActualsToCalendarSaveResult } from "../../src/app/hooks/use-save-actuals-to-calendar";
 import type { EditableEventsResult } from "../../src/app/hooks/use-editable-events";
 
 describe("extracted hook contracts", () => {
@@ -18,7 +18,7 @@ describe("extracted hook contracts", () => {
       "resizeEvent",
     );
     expectTypeOf<EditableEventsResult>().toHaveProperty("applyEventDrop");
-    expectTypeOf<ActualCalendarSyncResult>().toHaveProperty(
+    expectTypeOf<ActualsToCalendarSaveResult>().toHaveProperty(
       "isSavingActualsToCalendar",
     );
     expectTypeOf<DayPlannerToastResult>().toHaveProperty("current");

@@ -9,7 +9,7 @@ export function getSidePanelLayoutMode(width: number): DayGridLayoutMode {
   return "full";
 }
 
-export function useDayGridLayoutMode(
+export function useResponsiveDayGridLayoutMode(
   appSurface: AppSurface,
 ): DayGridLayoutMode {
   const [viewportWidth, setViewportWidth] = useState(window.innerWidth);
