@@ -99,6 +99,21 @@ afterEach(() => {
 });
 
 describe("DayGrid", () => {
+  it("reports the intent to create a new Actual", () => {
+    const onNewActual = vi.fn();
+    render(
+      <DayGrid
+        onNewActual={onNewActual}
+        planEvents={[]}
+        {...calendarDay}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole("button", { name: "Add Actual" }));
+
+    expect(onNewActual).toHaveBeenCalledOnce();
+  });
+
   it("shows only Actual with a non-interactive Revised reveal rail", () => {
     render(
       <DayGrid
@@ -260,14 +275,14 @@ describe("DayGrid", () => {
   });
 
   it("renders Revised as a fourth column with column-aware edit and resize interactions", () => {
-    const onEditEditable = vi.fn();
-    const onEditableResizeEnd = vi.fn();
+    const onEditEvent = vi.fn();
+    const onResizeEvent = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("actual", 540, 30)]}
         revised={[revisedEvent("revised", 600, 30)]}
-        onEditEditable={onEditEditable}
-        onEditableResizeEnd={onEditableResizeEnd}
+        onEditEvent={onEditEvent}
+        onResizeEvent={onResizeEvent}
         planEvents={[]}
         {...calendarDay}
       />,
@@ -282,7 +297,7 @@ describe("DayGrid", () => {
     fireEvent.click(
       screen.getByRole("button", { name: "Edit revised" }),
     );
-    expect(onEditEditable).toHaveBeenCalledWith(
+    expect(onEditEvent).toHaveBeenCalledWith(
       "revised",
       revisedEvent("revised", 600, 30),
     );
@@ -294,7 +309,7 @@ describe("DayGrid", () => {
     fireEvent.pointerMove(window, { clientY: 121, pointerId: 7 });
     fireEvent.pointerUp(window, { clientY: 121, pointerId: 7 });
 
-    expect(onEditableResizeEnd).toHaveBeenCalledWith(
+    expect(onResizeEvent).toHaveBeenCalledWith(
       "revised",
       "revised",
       45,
@@ -302,10 +317,10 @@ describe("DayGrid", () => {
   });
 
   it("previews and emits a snapped Plan copy over valid editable targets", () => {
-    const onDropEditable = vi.fn();
+    const onEventDrop = vi.fn();
     render(
       <DayGrid
-        onDropEditable={onDropEditable}
+        onEventDrop={onEventDrop}
         planEvents={[planEvent("plan-copy", 540, 60)]}
         {...calendarDay}
       />,
@@ -357,7 +372,7 @@ describe("DayGrid", () => {
 
     fireDragEvent(actualColumn, "drop", 399, transfer);
 
-    expect(onDropEditable).toHaveBeenCalledWith({
+    expect(onEventDrop).toHaveBeenCalledWith({
       sourceColumn: "plan",
       sourceEventId: "plan-copy",
       targetColumn: "actual",
@@ -369,12 +384,12 @@ describe("DayGrid", () => {
   });
 
   it("disables all day mutations from one policy", () => {
-    const onDropEditable = vi.fn();
+    const onEventDrop = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("disabled-actual", 600, 30)]}
         mutationsDisabled
-        onDropEditable={onDropEditable}
+        onEventDrop={onEventDrop}
         planEvents={[planEvent("disabled-plan", 540, 60)]}
         {...calendarDay}
       />,
@@ -403,17 +418,17 @@ describe("DayGrid", () => {
 
     expect(screen.queryByTestId("drop-time-indicator"))
       .not.toBeInTheDocument();
-    expect(onDropEditable).not.toHaveBeenCalled();
+    expect(onEventDrop).not.toHaveBeenCalled();
   });
 
   it("moves an editable block across columns and suppresses its drag click", () => {
-    const onDropEditable = vi.fn();
-    const onEditEditable = vi.fn();
+    const onEventDrop = vi.fn();
+    const onEditEvent = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("actual-source", 600, 30)]}
-        onDropEditable={onDropEditable}
-        onEditEditable={onEditEditable}
+        onEventDrop={onEventDrop}
+        onEditEvent={onEditEvent}
         planEvents={[]}
         {...calendarDay}
       />,
@@ -459,21 +474,21 @@ describe("DayGrid", () => {
     fireDragEvent(source, "dragend", 441, transfer);
     fireEvent.click(source);
 
-    expect(onDropEditable).toHaveBeenCalledWith({
+    expect(onEventDrop).toHaveBeenCalledWith({
       sourceColumn: "actual",
       sourceEventId: "actual-source",
       targetColumn: "revised",
       startMinutes: 720,
     });
-    expect(onEditEditable).not.toHaveBeenCalled();
+    expect(onEditEvent).not.toHaveBeenCalled();
   });
 
   it("emits same-column editable drops as reposition operations", () => {
-    const onDropEditable = vi.fn();
+    const onEventDrop = vi.fn();
     render(
       <DayGrid
         revised={[revisedEvent("revised-source", 600, 30)]}
-        onDropEditable={onDropEditable}
+        onEventDrop={onEventDrop}
         planEvents={[]}
         {...calendarDay}
       />,
@@ -510,7 +525,7 @@ describe("DayGrid", () => {
     fireDragEvent(source, "dragstart", 273, transfer);
     fireDragEvent(target, "drop", 357, transfer);
 
-    expect(onDropEditable).toHaveBeenCalledWith({
+    expect(onEventDrop).toHaveBeenCalledWith({
       sourceColumn: "revised",
       sourceEventId: "revised-source",
       targetColumn: "revised",
@@ -769,13 +784,13 @@ describe("DayGrid", () => {
   });
 
   it("previews a snapped Actual resize and commits once on pointer release", () => {
-    const onEditEditable = vi.fn();
-    const onEditableResizeEnd = vi.fn();
+    const onEditEvent = vi.fn();
+    const onResizeEvent = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("resized-actual", 540, 30)]}
-        onEditEditable={onEditEditable}
-        onEditableResizeEnd={onEditableResizeEnd}
+        onEditEvent={onEditEvent}
+        onResizeEvent={onResizeEvent}
         planEvents={[]}
         {...calendarDay}
       />,
@@ -791,26 +806,26 @@ describe("DayGrid", () => {
     expect(preview).toHaveStyle({ height: "63px" });
     expect(within(preview).getByText("45m")).toBeVisible();
     expect(within(preview).getByText("9:00 AM – 9:45 AM")).toBeVisible();
-    expect(onEditableResizeEnd).not.toHaveBeenCalled();
-    expect(onEditEditable).not.toHaveBeenCalled();
+    expect(onResizeEvent).not.toHaveBeenCalled();
+    expect(onEditEvent).not.toHaveBeenCalled();
 
     fireEvent.pointerUp(window, { clientY: 121, pointerId: 1 });
 
-    expect(onEditableResizeEnd).toHaveBeenCalledOnce();
-    expect(onEditableResizeEnd).toHaveBeenCalledWith(
+    expect(onResizeEvent).toHaveBeenCalledOnce();
+    expect(onResizeEvent).toHaveBeenCalledWith(
       "actual",
       "resized-actual",
       45,
     );
-    expect(onEditEditable).not.toHaveBeenCalled();
+    expect(onEditEvent).not.toHaveBeenCalled();
   });
 
   it("enforces the minimum resize duration and restores on cancellation", () => {
-    const onEditableResizeEnd = vi.fn();
+    const onResizeEvent = vi.fn();
     render(
       <DayGrid
         actuals={[actualEvent("cancelled-actual", 540, 30)]}
-        onEditableResizeEnd={onEditableResizeEnd}
+        onResizeEvent={onResizeEvent}
         planEvents={[]}
         {...calendarDay}
       />,
@@ -831,7 +846,7 @@ describe("DayGrid", () => {
     expect(screen.getByTestId("actual-block")).toHaveStyle({ height: "42px" });
     expect(within(screen.getByTestId("actual-block")).getByText("30m"))
       .toBeVisible();
-    expect(onEditableResizeEnd).not.toHaveBeenCalled();
+    expect(onResizeEvent).not.toHaveBeenCalled();
   });
 
   it("clips minimum-height Plan and Actual blocks at midnight", () => {

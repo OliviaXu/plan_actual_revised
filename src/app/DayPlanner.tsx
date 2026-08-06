@@ -1,7 +1,7 @@
 import { Button } from "./components/ui/button";
 import { Toast, type ToastAction } from "./components/ui/toast";
 import { DayGrid } from "./components/DayGrid";
-import { EditableEventDialog } from "./components/EditableEventDialog";
+import { EventEditor } from "./components/EventEditor";
 import {
   slackLaunchFailureToastContent,
   useDayPlannerToast,
@@ -9,7 +9,7 @@ import {
 import { useActualCalendarSync } from "./hooks/use-actual-calendar-sync";
 import type { CalendarDay } from "./hooks/use-calendar-plan";
 import { useDayRecord } from "./hooks/use-day-record";
-import { useEditableDayEvents } from "./hooks/use-editable-day-events";
+import { useEditableEvents } from "./hooks/use-editable-events";
 import type { PlanEvent } from "../domain/day-event";
 import { defaultSettings } from "../domain/settings";
 import {
@@ -49,7 +49,7 @@ export function DayPlanner({
   const editableMutationsDisabled =
     dayRecordLoadStatus === "loading" ||
     calendarSync.isSavingActualsToCalendar;
-  const editableDay = useEditableDayEvents({
+  const editableEvents = useEditableEvents({
     calendarDay,
     dayRecord,
     persistDayRecord,
@@ -85,11 +85,11 @@ export function DayPlanner({
         revised={dayRecord?.revised ?? []}
         layoutMode={dayGridLayoutMode}
         mutationsDisabled={editableMutationsDisabled}
-        onAddActual={editableDay.openNewActualEditor}
-        onStartSlack={editableDay.startSlack}
-        onEditEditable={editableDay.openEventEditor}
-        onEditableResizeEnd={editableDay.resizeEditableEvent}
-        onDropEditable={editableDay.applyEventDrop}
+        onNewActual={editableEvents.openNewActualEditor}
+        onStartSlack={editableEvents.startSlack}
+        onEditEvent={editableEvents.openEventEditor}
+        onResizeEvent={editableEvents.resizeEvent}
+        onEventDrop={editableEvents.applyEventDrop}
       />
       {dayRecord?.actual.length ? (
         <footer className="flex items-center">
@@ -104,14 +104,14 @@ export function DayPlanner({
           </Button>
         </footer>
       ) : null}
-      {editableDay.editorState ? (
-        <EditableEventDialog
-          column={editableDay.editorState.column}
-          event={editableDay.editorState.event}
-          mode={editableDay.editorState.mode}
-          onDelete={editableDay.deleteEditorEvent}
-          onDismiss={editableDay.closeEditor}
-          onSave={editableDay.saveEditorDraft}
+      {editableEvents.editorState ? (
+        <EventEditor
+          column={editableEvents.editorState.column}
+          event={editableEvents.editorState.event}
+          mode={editableEvents.editorState.mode}
+          onDelete={editableEvents.deleteEditorEvent}
+          onDismiss={editableEvents.closeEditor}
+          onSave={editableEvents.saveEditorDraft}
           paletteColorIds={defaultSettings.actualPaletteColorIds}
         />
       ) : null}

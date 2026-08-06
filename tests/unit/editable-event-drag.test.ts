@@ -1,10 +1,10 @@
 import { describe, expect, it } from "vitest";
 
-import { buildPlanCopy } from "../../src/domain/editable-event-drag";
+import { copyPlanEvent } from "../../src/domain/editable-event-drag";
 
-describe("buildPlanCopy", () => {
+describe("copyPlanEvent", () => {
   it("copies editable fields and records Plan provenance under a fresh ID", () => {
-    expect(buildPlanCopy(
+    expect(copyPlanEvent(
       {
         id: "calendar-source",
         summary: "Design review",

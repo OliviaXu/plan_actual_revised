@@ -1,7 +1,7 @@
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EditableDayGridColumn } from "../../src/app/components/EditableDayGridColumn";
+import { EditableEventColumn } from "../../src/app/components/EditableEventColumn";
 import type { DayGridDragDropController } from "../../src/app/hooks/use-day-grid-drag-drop";
 import type { ActualEvent } from "../../src/domain/day-event";
 
@@ -27,25 +27,25 @@ function dragDropController(): DayGridDragDropController {
   };
 }
 
-describe("EditableDayGridColumn", () => {
-  it("renders and selects events for its editable column", () => {
-    const onSelectEvent = vi.fn();
+describe("EditableEventColumn", () => {
+  it("renders and reports edits for its editable column", () => {
+    const onEditEvent = vi.fn();
 
     render(
-      <EditableDayGridColumn
+      <EditableEventColumn
         column="actual"
         gridStartHour={8}
         gridEndHour={17}
         events={[actual]}
         dragDrop={dragDropController()}
-        onSelectEvent={onSelectEvent}
-        onResizeEnd={vi.fn()}
+        onEditEvent={onEditEvent}
+        onResizeEvent={vi.fn()}
       />,
     );
 
     fireEvent.click(screen.getByRole("button", { name: "Edit Focused work" }));
 
     expect(screen.getByTestId("actual-column")).toBeVisible();
-    expect(onSelectEvent).toHaveBeenCalledWith("actual", actual);
+    expect(onEditEvent).toHaveBeenCalledWith("actual", actual);
   });
 });

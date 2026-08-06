@@ -1,6 +1,6 @@
 import type { EditableEvent, PlanEvent } from "./day-event";
 
-export function buildPlanCopy(
+export function copyPlanEvent(
   planEvent: PlanEvent,
   startMinutes: number,
   id: string,

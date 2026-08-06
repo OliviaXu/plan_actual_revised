@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import type { EditableEvent } from "../../domain/day-event";
 import type { AppSettings } from "../../domain/settings";
 
-type EditableEventResizePreview = {
+type EventResizePreview = {
   eventId: string;
   durationMinutes: number;
 };
@@ -13,7 +13,7 @@ type ResizeSettings = Pick<
   "minimumBlockDurationMinutes" | "pixelsPerMinute" | "snapMinutes"
 >;
 
-export function useEditableEventResize({
+export function useEventResize({
   events,
   disabled,
   onResizeEnd,
@@ -24,8 +24,8 @@ export function useEditableEventResize({
   onResizeEnd?: (eventId: string, durationMinutes: number) => void;
   settings: ResizeSettings;
 }) {
-  const [preview, setPreview] = useState<EditableEventResizePreview>();
-  const previewRef = useRef<EditableEventResizePreview | undefined>(undefined);
+  const [preview, setPreview] = useState<EventResizePreview>();
+  const previewRef = useRef<EventResizePreview | undefined>(undefined);
   const removePointerListenersRef = useRef<(() => void) | undefined>(
     undefined,
   );
@@ -93,13 +93,13 @@ export function useEditableEventResize({
     );
   }
 
-  const displayedEvents = events.map((event) =>
+  const eventsWithResizePreview = events.map((event) =>
     event.id === preview?.eventId
       ? { ...event, durationMinutes: preview.durationMinutes }
       : event,
   );
 
-  return { displayedEvents, startResize };
+  return { eventsWithResizePreview, startResize };
 }
 
 function calculateResizeDuration(

@@ -7,47 +7,47 @@ import type {
 } from "../../domain/day-event";
 import { defaultSettings } from "../../domain/settings";
 import type { DayGridDragDropController } from "../hooks/use-day-grid-drag-drop";
-import { useEditableEventResize } from "../hooks/use-editable-event-resize";
-import { EditableGridBlock } from "./DayGridEventBlock";
+import { useEventResize } from "../hooks/use-event-resize";
+import { EditableEventBlock } from "./DayGridEventBlock";
 import { calculateDayGridBlocks } from "./day-grid-layout";
 
 const DAY_GRID_DROP_TARGET_CLASS_NAME = "bg-accent/15";
 
-type EditableDayGridColumnProps = {
+type EditableEventColumnProps = {
   column: EditableColumn;
   gridStartHour: number;
   gridEndHour: number;
   events: EditableEvent[];
   dragDrop: DayGridDragDropController;
   mutationsDisabled?: boolean;
-  onSelectEvent?: (column: EditableColumn, event: EditableEvent) => void;
-  onResizeEnd?: (
+  onEditEvent?: (column: EditableColumn, event: EditableEvent) => void;
+  onResizeEvent?: (
     column: EditableColumn,
     eventId: string,
     durationMinutes: number,
   ) => void;
 };
 
-export function EditableDayGridColumn({
+export function EditableEventColumn({
   column,
   gridStartHour,
   gridEndHour,
   events,
   dragDrop,
   mutationsDisabled,
-  onSelectEvent,
-  onResizeEnd,
-}: EditableDayGridColumnProps) {
+  onEditEvent,
+  onResizeEvent,
+}: EditableEventColumnProps) {
   const [frontEventId, setFrontEventId] = useState<string | null>(null);
-  const { displayedEvents, startResize } = useEditableEventResize({
+  const { eventsWithResizePreview, startResize } = useEventResize({
     events,
     disabled: mutationsDisabled,
     onResizeEnd: (eventId, durationMinutes) =>
-      onResizeEnd?.(column, eventId, durationMinutes),
+      onResizeEvent?.(column, eventId, durationMinutes),
     settings: defaultSettings,
   });
   const blocks = calculateDayGridBlocks(
-    displayedEvents,
+    eventsWithResizePreview,
     gridStartHour,
     gridEndHour,
     defaultSettings,
@@ -77,16 +77,16 @@ export function EditableDayGridColumn({
         />
       ) : null}
       {blocks.map((block) => (
-        <EditableGridBlock
+        <EditableEventBlock
           key={block.event.id}
           column={column}
           block={block}
           frontZIndex={blocks.length}
           isFront={frontEventId === block.event.id}
           disabled={mutationsDisabled}
-          onSelect={() => {
+          onEdit={() => {
             setFrontEventId(block.event.id);
-            onSelectEvent?.(column, block.event);
+            onEditEvent?.(column, block.event);
           }}
           onResizeStart={(event, pointer) => {
             setFrontEventId(event.id);

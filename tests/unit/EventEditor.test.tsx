@@ -1,14 +1,14 @@
 import { cleanup, render, screen } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { EditableEventDialog } from "../../src/app/components/EditableEventDialog";
+import { EventEditor } from "../../src/app/components/EventEditor";
 
 afterEach(cleanup);
 
-describe("EditableEventDialog", () => {
+describe("EventEditor", () => {
   it("uses create mode to hide deletion even when a delete operation is available", () => {
     render(
-      <EditableEventDialog
+      <EventEditor
         column="actual"
         event={{
           id: "proposed-actual",

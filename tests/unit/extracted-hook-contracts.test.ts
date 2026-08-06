@@ -2,22 +2,22 @@ import { describe, expectTypeOf, it } from "vitest";
 
 import type { DayPlannerToastResult } from "../../src/app/day-planner-toast";
 import type { ActualCalendarSyncResult } from "../../src/app/hooks/use-actual-calendar-sync";
-import type { EditableDayEventsResult } from "../../src/app/hooks/use-editable-day-events";
+import type { EditableEventsResult } from "../../src/app/hooks/use-editable-events";
 
 describe("extracted hook contracts", () => {
   it("publishes explicit result types", () => {
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty("editorState");
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty(
+    expectTypeOf<EditableEventsResult>().toHaveProperty("editorState");
+    expectTypeOf<EditableEventsResult>().toHaveProperty(
       "openNewActualEditor",
     );
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty("openEventEditor");
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty("saveEditorDraft");
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty("deleteEditorEvent");
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty("closeEditor");
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty(
-      "resizeEditableEvent",
+    expectTypeOf<EditableEventsResult>().toHaveProperty("openEventEditor");
+    expectTypeOf<EditableEventsResult>().toHaveProperty("saveEditorDraft");
+    expectTypeOf<EditableEventsResult>().toHaveProperty("deleteEditorEvent");
+    expectTypeOf<EditableEventsResult>().toHaveProperty("closeEditor");
+    expectTypeOf<EditableEventsResult>().toHaveProperty(
+      "resizeEvent",
     );
-    expectTypeOf<EditableDayEventsResult>().toHaveProperty("applyEventDrop");
+    expectTypeOf<EditableEventsResult>().toHaveProperty("applyEventDrop");
     expectTypeOf<ActualCalendarSyncResult>().toHaveProperty(
       "isSavingActualsToCalendar",
     );

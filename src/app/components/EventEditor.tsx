@@ -14,13 +14,13 @@ import {
   DialogTitle,
 } from "./ui/dialog";
 
-export type EditableEventDraft = {
+export type EventEditorDraft = {
   summary: string;
   durationMinutes: number;
   colorId: string;
 };
 
-export function EditableEventDialog({
+export function EventEditor({
   column,
   event,
   mode,
@@ -34,7 +34,7 @@ export function EditableEventDialog({
   mode: "create" | "edit";
   onDelete: () => void;
   onDismiss: () => void;
-  onSave: (draft: EditableEventDraft) => void;
+  onSave: (draft: EventEditorDraft) => void;
   paletteColorIds: string[];
 }) {
   const titleInputRef = useRef<HTMLInputElement>(null);
@@ -70,7 +70,7 @@ export function EditableEventDialog({
       open
     >
       <DialogContent
-        aria-describedby="editable-event-dialog-description"
+        aria-describedby="event-editor-description"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           const titleInput = titleInputRef.current;
@@ -87,7 +87,7 @@ export function EditableEventDialog({
         <DialogTitle className="sr-only">Edit {columnLabel}</DialogTitle>
         <DialogDescription
           className="sr-only"
-          id="editable-event-dialog-description"
+          id="event-editor-description"
         >
           Update this local {columnLabel} block.
         </DialogDescription>
@@ -97,7 +97,7 @@ export function EditableEventDialog({
             aria-label="Title"
             aria-invalid={titleError ? true : undefined}
             className="-mx-2 block w-[calc(100%+1rem)] cursor-text border-b border-border bg-transparent px-2 py-1 text-xl font-semibold tracking-tight caret-primary outline-none selection:bg-primary/20 placeholder:text-muted-foreground focus:border-primary focus:ring-0"
-            id="editable-event-title"
+            id="event-editor-title"
             onChange={(event) => setTitle(event.target.value)}
             ref={titleInputRef}
             type="text"
@@ -111,14 +111,14 @@ export function EditableEventDialog({
             <div>
               <label
                 className="block text-sm font-medium"
-                htmlFor="editable-event-duration"
+                htmlFor="event-editor-duration"
               >
                 Minutes
                 <input
                   aria-label="Duration"
                   aria-invalid={durationError ? true : undefined}
                   className="mt-1 block h-9 w-16 rounded-md border border-border px-2 font-normal outline-none focus:ring-2 focus:ring-primary"
-                  id="editable-event-duration"
+                  id="event-editor-duration"
                   min={1}
                   onChange={(event) => setDuration(event.target.value)}
                   step={1}

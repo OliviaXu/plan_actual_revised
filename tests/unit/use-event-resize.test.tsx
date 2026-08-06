@@ -6,7 +6,7 @@ import {
 } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useEditableEventResize } from "../../src/app/hooks/use-editable-event-resize";
+import { useEventResize } from "../../src/app/hooks/use-event-resize";
 import type { ActualEvent } from "../../src/domain/day-event";
 import { defaultSettings } from "../../src/domain/settings";
 
@@ -28,12 +28,12 @@ function pointerEvent(pointerId: number, clientY: number) {
   }) as PointerEvent;
 }
 
-describe("useEditableEventResize", () => {
+describe("useEventResize", () => {
   it("registers pointer listeners only for an active resize session", () => {
     const addEventListener = vi.spyOn(window, "addEventListener");
     const removeEventListener = vi.spyOn(window, "removeEventListener");
     const { result, unmount } = renderHook(() =>
-      useEditableEventResize({
+      useEventResize({
         events: [actual],
         settings: defaultSettings,
       }),
@@ -78,7 +78,7 @@ describe("useEditableEventResize", () => {
   it("previews a snapped duration and commits it on pointer release", () => {
     const onResizeEnd = vi.fn();
     const { result } = renderHook(() =>
-      useEditableEventResize({
+      useEventResize({
         events: [actual],
         disabled: false,
         onResizeEnd,
@@ -91,12 +91,12 @@ describe("useEditableEventResize", () => {
     });
     fireEvent.pointerMove(window, { pointerId: 1, clientY: 121 });
 
-    expect(result.current.displayedEvents[0].durationMinutes).toBe(45);
+    expect(result.current.eventsWithResizePreview[0].durationMinutes).toBe(45);
     expect(onResizeEnd).not.toHaveBeenCalled();
 
     fireEvent.pointerUp(window, { pointerId: 1, clientY: 121 });
 
-    expect(result.current.displayedEvents[0].durationMinutes).toBe(30);
+    expect(result.current.eventsWithResizePreview[0].durationMinutes).toBe(30);
     expect(onResizeEnd).toHaveBeenCalledOnce();
     expect(onResizeEnd).toHaveBeenCalledWith("actual-1", 45);
   });
@@ -105,7 +105,7 @@ describe("useEditableEventResize", () => {
     const onResizeEnd = vi.fn();
     const { result, rerender } = renderHook(
       ({ disabled }) =>
-        useEditableEventResize({
+        useEventResize({
           events: [actual],
           disabled,
           onResizeEnd,
@@ -118,10 +118,10 @@ describe("useEditableEventResize", () => {
       result.current.startResize(actual, pointerEvent(2, 100));
     });
     fireEvent.pointerMove(window, { pointerId: 2, clientY: 30 });
-    expect(result.current.displayedEvents[0].durationMinutes).toBe(5);
+    expect(result.current.eventsWithResizePreview[0].durationMinutes).toBe(5);
 
     fireEvent.pointerCancel(window, { pointerId: 2 });
-    expect(result.current.displayedEvents[0].durationMinutes).toBe(30);
+    expect(result.current.eventsWithResizePreview[0].durationMinutes).toBe(30);
     expect(onResizeEnd).not.toHaveBeenCalled();
 
     rerender({ disabled: true });
@@ -131,7 +131,7 @@ describe("useEditableEventResize", () => {
     fireEvent.pointerMove(window, { pointerId: 3, clientY: 121 });
     fireEvent.pointerUp(window, { pointerId: 3, clientY: 121 });
 
-    expect(result.current.displayedEvents[0].durationMinutes).toBe(30);
+    expect(result.current.eventsWithResizePreview[0].durationMinutes).toBe(30);
     expect(onResizeEnd).not.toHaveBeenCalled();
   });
 });

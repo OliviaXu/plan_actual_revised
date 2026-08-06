@@ -2,8 +2,8 @@ import { cleanup, fireEvent, render, screen, within } from "@testing-library/rea
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import {
-  EditableGridBlock,
-  PlanGridBlock,
+  EditableEventBlock,
+  PlanEventBlock,
 } from "../../src/app/components/DayGridEventBlock";
 import { DayGridTimeAxis } from "../../src/app/components/DayGridTimeAxis";
 import type { ActualEvent, PlanEvent } from "../../src/domain/day-event";
@@ -56,7 +56,7 @@ describe("DayGrid event blocks", () => {
 
     render(
       <>
-        <PlanGridBlock
+        <PlanEventBlock
           block={plan}
           dragDisabled
           frontZIndex={2}
@@ -65,13 +65,13 @@ describe("DayGrid event blocks", () => {
           onDragStart={onPlanDragStart}
           onGrabOffsetCapture={onGrabOffsetCapture}
         />
-        <EditableGridBlock
+        <EditableEventBlock
           column="actual"
           block={actual}
           frontZIndex={2}
           isFront
           disabled
-          onSelect={vi.fn()}
+          onEdit={vi.fn()}
           onResizeStart={vi.fn()}
           onGrabOffsetCapture={onGrabOffsetCapture}
           onDragStart={onActualDragStart}
@@ -118,22 +118,22 @@ describe("DayGrid event blocks", () => {
     const actual = dayGridBlock(actualEvent);
     const onBringToFront = vi.fn();
     const onResizeStart = vi.fn();
-    const onSelect = vi.fn();
+    const onEdit = vi.fn();
 
     render(
       <>
-        <PlanGridBlock
+        <PlanEventBlock
           block={plan}
           frontZIndex={2}
           isFront={false}
           onBringToFront={onBringToFront}
         />
-        <EditableGridBlock
+        <EditableEventBlock
           column="actual"
           block={actual}
           frontZIndex={2}
           isFront
-          onSelect={onSelect}
+          onEdit={onEdit}
           onResizeStart={onResizeStart}
         />
       </>,
@@ -147,7 +147,7 @@ describe("DayGrid event blocks", () => {
     );
 
     expect(onBringToFront).toHaveBeenCalledOnce();
-    expect(onSelect).toHaveBeenCalledOnce();
+    expect(onEdit).toHaveBeenCalledOnce();
     expect(onResizeStart).toHaveBeenCalledWith(
       actualEvent,
       expect.objectContaining({ clientY: 100 }),

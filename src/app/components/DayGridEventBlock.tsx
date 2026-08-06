@@ -17,13 +17,13 @@ import {
   type DayGridBlock,
 } from "./day-grid-layout";
 
-export function EditableGridBlock({
+export function EditableEventBlock({
   column,
   block,
   frontZIndex,
   isFront,
   disabled,
-  onSelect,
+  onEdit,
   onResizeStart,
   onGrabOffsetCapture,
   onDragStart,
@@ -34,7 +34,7 @@ export function EditableGridBlock({
   frontZIndex: number;
   isFront: boolean;
   disabled?: boolean;
-  onSelect: () => void;
+  onEdit: () => void;
   onResizeStart: (event: EditableEvent, pointer: PointerEvent) => void;
   onGrabOffsetCapture?: (
     event: ReactMouseEvent<HTMLButtonElement>,
@@ -42,7 +42,7 @@ export function EditableGridBlock({
   onDragStart?: (event: ReactDragEvent<HTMLButtonElement>) => void;
   onDragEnd?: (event: ReactDragEvent<HTMLButtonElement>) => void;
 }) {
-  const suppressSelectRef = useRef(false);
+  const suppressEditRef = useRef(false);
   const appearance = getDayGridBlockAppearance(
     block,
     isFront,
@@ -65,20 +65,20 @@ export function EditableGridBlock({
         disabled={disabled}
         draggable={!disabled}
         onClick={() => {
-          if (suppressSelectRef.current) {
-            suppressSelectRef.current = false;
+          if (suppressEditRef.current) {
+            suppressEditRef.current = false;
             return;
           }
-          onSelect();
+          onEdit();
         }}
         onDragEnd={(event) => {
           onDragEnd?.(event);
           window.setTimeout(() => {
-            suppressSelectRef.current = false;
+            suppressEditRef.current = false;
           }, 0);
         }}
         onDragStart={(event) => {
-          suppressSelectRef.current = true;
+          suppressEditRef.current = true;
           onDragStart?.(event);
         }}
         onMouseDown={disabled ? undefined : onGrabOffsetCapture}
@@ -111,7 +111,7 @@ export function EditableGridBlock({
   );
 }
 
-export function PlanGridBlock({
+export function PlanEventBlock({
   block,
   dragDisabled,
   frontZIndex,

@@ -15,28 +15,28 @@ import {
   moveEditableEvent,
   type EditableEventAddition,
 } from "../../domain/day-record-edit";
-import { buildPlanCopy } from "../../domain/editable-event-drag";
+import { copyPlanEvent } from "../../domain/editable-event-drag";
 import { defaultSettings } from "../../domain/settings";
 import type { DayGridDropOperation } from "../components/day-grid-drag";
-import type { EditableEventDraft } from "../components/EditableEventDialog";
+import type { EventEditorDraft } from "../components/EventEditor";
 import type { CalendarDay } from "./use-calendar-plan";
 
-export type EditableEventEditorState =
+export type EventEditorState =
   | { mode: "create"; column: "actual"; event: ActualEvent }
   | { mode: "edit"; column: EditableColumn; event: EditableEvent };
 
-export type EditableDayEventsResult = {
-  editorState: EditableEventEditorState | undefined;
+export type EditableEventsResult = {
+  editorState: EventEditorState | undefined;
   openNewActualEditor: () => void;
   openEventEditor: (
     column: EditableColumn,
     event: EditableEvent,
   ) => void;
-  saveEditorDraft: (draft: EditableEventDraft) => void;
+  saveEditorDraft: (draft: EventEditorDraft) => void;
   deleteEditorEvent: () => void;
   closeEditor: () => void;
   startSlack: (reason: string) => void;
-  resizeEditableEvent: (
+  resizeEvent: (
     column: EditableColumn,
     eventId: string,
     durationMinutes: number,
@@ -46,7 +46,7 @@ export type EditableDayEventsResult = {
 
 const defaultActualDurationMinutes = 30;
 
-export function useEditableDayEvents({
+export function useEditableEvents({
   calendarDay,
   dayRecord,
   persistDayRecord,
@@ -64,9 +64,9 @@ export function useEditableDayEvents({
   planEvents: PlanEvent[];
   launchSlack: () => void;
   onSlackLaunchFailure: () => void;
-}): EditableDayEventsResult {
+}): EditableEventsResult {
   const [editorState, setEditorState] =
-    useState<EditableEventEditorState>();
+    useState<EventEditorState>();
 
   function buildNewActual({
     summary,
@@ -95,7 +95,7 @@ export function useEditableDayEvents({
     };
   }
 
-  function addEditableEvent(addition: EditableEventAddition) {
+  function addEvent(addition: EditableEventAddition) {
     void persistDayRecord(
       appendEditableEvent({
         record: dayRecord,
@@ -132,7 +132,7 @@ export function useEditableDayEvents({
       isSlack: true,
       createdAt: now(),
     });
-    addEditableEvent({ column: "actual", event: newActual });
+    addEvent({ column: "actual", event: newActual });
     try {
       launchSlack();
     } catch {
@@ -151,14 +151,14 @@ export function useEditableDayEvents({
     setEditorState(undefined);
   }
 
-  function saveEditorDraft(draft: EditableEventDraft) {
+  function saveEditorDraft(draft: EventEditorDraft) {
     if (!editorState) {
       closeEditor();
       return;
     }
     const editorEvent = editorState.event;
     if (editorState.mode === "create") {
-      addEditableEvent({
+      addEvent({
         column: "actual",
         event: { ...editorState.event, ...draft },
       });
@@ -225,7 +225,7 @@ export function useEditableDayEvents({
     closeEditor();
   }
 
-  function resizeEditableEvent(
+  function resizeEvent(
     column: EditableColumn,
     eventId: string,
     durationMinutes: number,
@@ -279,7 +279,7 @@ export function useEditableDayEvents({
       );
       if (!planEvent) return;
 
-      const copiedEvent = buildPlanCopy(
+      const copiedEvent = copyPlanEvent(
         planEvent,
         operation.startMinutes,
         crypto.randomUUID(),
@@ -291,12 +291,12 @@ export function useEditableDayEvents({
               event: { ...copiedEvent, saveDisposition: "unsaved" },
             }
           : { column: "revised", event: copiedEvent };
-      addEditableEvent(addition);
+      addEvent(addition);
       return;
     }
 
     if (!dayRecord) return;
-    const movedRecord = moveEditableEvent({
+    const nextDayRecord = moveEditableEvent({
       record: dayRecord,
       sourceColumn: operation.sourceColumn,
       sourceEventId: operation.sourceEventId,
@@ -305,8 +305,8 @@ export function useEditableDayEvents({
       updatedAt: now().toISOString(),
       createId: () => crypto.randomUUID(),
     });
-    if (movedRecord) {
-      void persistDayRecord(movedRecord);
+    if (nextDayRecord) {
+      void persistDayRecord(nextDayRecord);
     }
   }
 
@@ -318,7 +318,7 @@ export function useEditableDayEvents({
     deleteEditorEvent,
     closeEditor,
     startSlack,
-    resizeEditableEvent,
+    resizeEvent,
     applyEventDrop,
   };
 }

@@ -22,9 +22,9 @@ import {
   formatMinuteOfDay,
   getCalendarTime,
 } from "../../calendar/calendar-time";
-import { PlanGridBlock } from "./DayGridEventBlock";
+import { PlanEventBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
-import { EditableDayGridColumn } from "./EditableDayGridColumn";
+import { EditableEventColumn } from "./EditableEventColumn";
 import { SlackAuditPopover } from "./SlackAuditPopover";
 import type { DayGridDropOperation } from "./day-grid-drag";
 import type { DayGridLayoutMode } from "../side-panel-layout";
@@ -42,15 +42,15 @@ type DayGridProps = {
   revised?: RevisedEvent[];
   layoutMode?: DayGridLayoutMode;
   mutationsDisabled?: boolean;
-  onAddActual?: () => void;
+  onNewActual?: () => void;
   onStartSlack?: (reason: string) => void;
-  onEditEditable?: (column: EditableColumn, event: EditableEvent) => void;
-  onEditableResizeEnd?: (
+  onEditEvent?: (column: EditableColumn, event: EditableEvent) => void;
+  onResizeEvent?: (
     column: EditableColumn,
     eventId: string,
     durationMinutes: number,
   ) => void;
-  onDropEditable?: (operation: DayGridDropOperation) => void;
+  onEventDrop?: (operation: DayGridDropOperation) => void;
 };
 
 export function DayGrid({
@@ -61,11 +61,11 @@ export function DayGrid({
   revised,
   layoutMode = "full",
   mutationsDisabled,
-  onAddActual,
+  onNewActual,
   onStartSlack,
-  onEditEditable,
-  onEditableResizeEnd,
-  onDropEditable,
+  onEditEvent,
+  onResizeEvent,
+  onEventDrop,
 }: DayGridProps) {
   const [frontPlanId, setFrontPlanId] = useState<string | null>(null);
   const [currentTime, setCurrentTime] = useState(now);
@@ -97,7 +97,7 @@ export function DayGrid({
     gridStartMinutes,
     gridEndMinutes,
     disabled: mutationsDisabled,
-    onDrop: onDropEditable,
+    onDrop: onEventDrop,
     settings: defaultSettings,
   });
   const showPlan = layoutMode === "full";
@@ -174,7 +174,7 @@ export function DayGrid({
                 aria-label="Add Actual"
                 className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-white text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
                 disabled={mutationsDisabled}
-                onClick={onAddActual}
+                onClick={onNewActual}
                 type="button"
               >
                 <Plus aria-hidden="true" className="h-4 w-4" />
@@ -253,7 +253,7 @@ export function DayGrid({
                   </p>
                 ) : null}
                 {planBlocks.map((block) => (
-                  <PlanGridBlock
+                  <PlanEventBlock
                     block={block}
                     dragDisabled={mutationsDisabled}
                     frontZIndex={planBlocks.length}
@@ -278,29 +278,29 @@ export function DayGrid({
             {revealColumn === "plan" ? (
               <RevealRailBody column="plan" hourHeightPx={hourHeightPx} />
             ) : null}
-            <EditableDayGridColumn
+            <EditableEventColumn
               column="actual"
               gridStartHour={gridRange.startHour}
               gridEndHour={gridRange.endHour}
               events={actuals ?? []}
               dragDrop={dragDrop}
               mutationsDisabled={mutationsDisabled}
-              onSelectEvent={onEditEditable}
-              onResizeEnd={onEditableResizeEnd}
+              onEditEvent={onEditEvent}
+              onResizeEvent={onResizeEvent}
             />
             {revealColumn === "revised" ? (
               <RevealRailBody column="revised" hourHeightPx={hourHeightPx} />
             ) : null}
             {showRevised ? (
-              <EditableDayGridColumn
+              <EditableEventColumn
                 column="revised"
                 gridStartHour={gridRange.startHour}
                 gridEndHour={gridRange.endHour}
                 events={revised ?? []}
                 dragDrop={dragDrop}
                 mutationsDisabled={mutationsDisabled}
-                onSelectEvent={onEditEditable}
-                onResizeEnd={onEditableResizeEnd}
+                onEditEvent={onEditEvent}
+                onResizeEvent={onResizeEvent}
               />
             ) : null}
           </div>
