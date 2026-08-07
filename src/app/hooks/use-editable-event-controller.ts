@@ -24,7 +24,7 @@ export type EventEditorState =
   | { mode: "create"; column: "actual"; event: ActualEvent }
   | { mode: "edit"; column: EditableColumn; event: EditableEvent };
 
-export type EditableEventsResult = {
+export type EditableEventController = {
   editorState: EventEditorState | undefined;
   openNewActualEditor: () => void;
   openEventEditor: (
@@ -45,7 +45,7 @@ export type EditableEventsResult = {
 
 const defaultActualDurationMinutes = 30;
 
-export function useEditableEvents({
+export function useEditableEventController({
   calendarDay,
   dayRecord,
   persistDayRecord,
@@ -63,7 +63,7 @@ export function useEditableEvents({
   planEvents: PlanEvent[];
   launchSlack: () => void;
   onSlackLaunchFailure: () => void;
-}): EditableEventsResult {
+}): EditableEventController {
   const [editorState, setEditorState] =
     useState<EventEditorState>();
 

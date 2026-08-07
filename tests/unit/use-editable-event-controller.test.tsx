@@ -1,17 +1,19 @@
 import { act, renderHook } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { useEditableEvents } from "../../src/app/hooks/use-editable-events";
+import {
+  useEditableEventController,
+} from "../../src/app/hooks/use-editable-event-controller";
 
 afterEach(() => {
   vi.unstubAllGlobals();
 });
 
-describe("useEditableEvents", () => {
+describe("useEditableEventController", () => {
   it("opens a new Actual at the current snapped Calendar time", () => {
     vi.stubGlobal("crypto", { randomUUID: () => "new-actual" });
     const { result } = renderHook(() =>
-      useEditableEvents({
+      useEditableEventController({
         calendarDay: {
           date: "2026-07-15",
           timeZone: "America/Los_Angeles",

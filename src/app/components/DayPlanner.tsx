@@ -9,7 +9,7 @@ import {
 import { useSaveActualsToCalendar } from "../hooks/use-save-actuals-to-calendar";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
 import { useDayRecord } from "../hooks/use-day-record";
-import { useEditableEvents } from "../hooks/use-editable-events";
+import { useEditableEventController } from "../hooks/use-editable-event-controller";
 import type { PlanEvent } from "../../domain/day-event";
 import { defaultSettings } from "../../domain/settings";
 import {
@@ -49,7 +49,7 @@ export function DayPlanner({
   const editableMutationsDisabled =
     dayRecordLoadStatus === "loading" ||
     calendarSave.isSavingActualsToCalendar;
-  const editableEvents = useEditableEvents({
+  const eventController = useEditableEventController({
     calendarDay,
     dayRecord,
     persistDayRecord,
@@ -85,11 +85,11 @@ export function DayPlanner({
         revised={dayRecord?.revised ?? []}
         layoutMode={dayGridLayoutMode}
         mutationsDisabled={editableMutationsDisabled}
-        onNewActual={editableEvents.openNewActualEditor}
-        onStartSlack={editableEvents.startSlack}
-        onEditEvent={editableEvents.openEventEditor}
-        onResizeEvent={editableEvents.resizeEvent}
-        onEventDrop={editableEvents.applyEventDrop}
+        onNewActual={eventController.openNewActualEditor}
+        onStartSlack={eventController.startSlack}
+        onEditEvent={eventController.openEventEditor}
+        onResizeEvent={eventController.resizeEvent}
+        onEventDrop={eventController.applyEventDrop}
       />
       {dayRecord?.actual.length ? (
         <footer className="flex items-center">
@@ -104,14 +104,14 @@ export function DayPlanner({
           </Button>
         </footer>
       ) : null}
-      {editableEvents.editorState ? (
+      {eventController.editorState ? (
         <EventEditor
-          column={editableEvents.editorState.column}
-          event={editableEvents.editorState.event}
-          mode={editableEvents.editorState.mode}
-          onDelete={editableEvents.deleteEditorEvent}
-          onDismiss={editableEvents.closeEditor}
-          onSave={editableEvents.saveEditorDraft}
+          column={eventController.editorState.column}
+          event={eventController.editorState.event}
+          mode={eventController.editorState.mode}
+          onDelete={eventController.deleteEditorEvent}
+          onDismiss={eventController.closeEditor}
+          onSave={eventController.saveEditorDraft}
           paletteColorIds={defaultSettings.actualPaletteColorIds}
         />
       ) : null}
