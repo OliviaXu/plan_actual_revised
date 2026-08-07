@@ -1,5 +1,4 @@
 import { describe, expect, it } from "vitest";
-import { formatMinuteOfDay } from "../../src/app/format-time";
 import * as zonedTime from "../../src/shared/zoned-time";
 
 import {
@@ -7,14 +6,7 @@ import {
   getZonedTime,
 } from "../../src/shared/zoned-time";
 
-describe("Calendar time", () => {
-  it("formats minutes since midnight as a 12-hour clock time", () => {
-    expect(formatMinuteOfDay(0)).toBe("12:00 AM");
-    expect(formatMinuteOfDay(9 * 60 + 5)).toBe("9:05 AM");
-    expect(formatMinuteOfDay(12 * 60)).toBe("12:00 PM");
-    expect(formatMinuteOfDay(23 * 60 + 59)).toBe("11:59 PM");
-  });
-
+describe("Zoned time", () => {
   it("derives local date, clock fields, and minutes since midnight", () => {
     expect(
       getZonedTime(

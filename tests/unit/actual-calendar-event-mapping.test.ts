@@ -21,7 +21,7 @@ const input = {
   defaultColorId: "8",
 };
 
-describe("Calendar Actual insertion", () => {
+describe("Actual to Calendar event mapping", () => {
   it("derives a stable Calendar-compatible event ID", () => {
     expect(calendarEventIdForActual(input.actual.id)).toBe(
       "par123e4567e89b12d3a456426614174000",

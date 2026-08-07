@@ -28,7 +28,7 @@ function timedEvent(
   };
 }
 
-describe("mapCalendarEventsToPlanEvents", () => {
+describe("Calendar to Plan event mapping", () => {
   it("normalizes Calendar fields into the selected day's event shape", () => {
     expect(
       mapCalendarEventsToPlanEvents(

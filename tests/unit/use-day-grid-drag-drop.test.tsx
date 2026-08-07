@@ -5,7 +5,10 @@ import type {
 } from "react";
 import { describe, expect, it, vi } from "vitest";
 
-import { useDayGridDragDrop } from "../../src/app/hooks/use-day-grid-drag-drop";
+import {
+  calculateDroppedStartMinutes,
+  useDayGridDragDrop,
+} from "../../src/app/hooks/use-day-grid-drag-drop";
 
 function blockMouseEvent(
   element: HTMLButtonElement,
@@ -37,6 +40,31 @@ function dataTransfer() {
 }
 
 describe("useDayGridDragDrop", () => {
+  const dropCalculationInput = {
+    pointerClientY: 399,
+    columnViewportTopPx: 0,
+    grabOffsetYPx: 42,
+    gridStartMinutes: 420,
+    gridEndMinutes: 1_260,
+    pixelsPerMinute: 1.4,
+    snapMinutes: 5,
+  };
+
+  it("preserves the grab offset and snaps the block top to the nearest interval", () => {
+    expect(calculateDroppedStartMinutes(dropCalculationInput)).toBe(675);
+  });
+
+  it("clamps drops to the first and final visible snap slots", () => {
+    expect(calculateDroppedStartMinutes({
+      ...dropCalculationInput,
+      pointerClientY: -200,
+    })).toBe(420);
+    expect(calculateDroppedStartMinutes({
+      ...dropCalculationInput,
+      pointerClientY: 2_000,
+    })).toBe(1_255);
+  });
+
   it("previews and finishes a snapped drop using the recorded grab offset", () => {
     const onDrop = vi.fn();
     const { result } = renderHook(() =>
