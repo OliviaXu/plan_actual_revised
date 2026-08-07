@@ -1,4 +1,4 @@
-import { formatMinuteOfDay } from "../../calendar/calendar-time";
+import { formatMinuteOfDay } from "../format-time";
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import type {
   DragEvent as ReactDragEvent,

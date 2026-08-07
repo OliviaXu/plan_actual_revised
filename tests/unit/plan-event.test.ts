@@ -5,7 +5,7 @@ import type {
   CalendarEvent,
   TimedCalendarEvent,
 } from "../../src/calendar/calendar-event";
-import { toPlanEvents } from "../../src/domain/plan-event";
+import { mapCalendarEventsToPlanEvents } from "../../src/calendar/calendar-event-mapping";
 
 const date = "2026-07-15";
 const timeZone = "America/Los_Angeles";
@@ -28,10 +28,10 @@ function timedEvent(
   };
 }
 
-describe("toPlanEvents", () => {
+describe("mapCalendarEventsToPlanEvents", () => {
   it("normalizes Calendar fields into the selected day's event shape", () => {
     expect(
-      toPlanEvents(
+      mapCalendarEventsToPlanEvents(
         [
           timedEvent(
             "design-review",
@@ -97,7 +97,7 @@ describe("toPlanEvents", () => {
       ),
     ];
 
-    expect(toPlanEvents(events, date, timeZone, ["2"])).toEqual([
+    expect(mapCalendarEventsToPlanEvents(events, date, timeZone, ["2"])).toEqual([
       {
         id: "visible",
         summary: "visible",
@@ -110,7 +110,7 @@ describe("toPlanEvents", () => {
 
   it("preserves full crossing-midnight intervals and rejects invalid ones", () => {
     expect(
-      toPlanEvents(
+      mapCalendarEventsToPlanEvents(
         [
           timedEvent(
             "from-yesterday",
@@ -163,7 +163,7 @@ describe("toPlanEvents", () => {
 
   it("drops Calendar timestamp seconds at the normalization boundary", () => {
     expect(
-      toPlanEvents(
+      mapCalendarEventsToPlanEvents(
         [
           timedEvent(
             "seconds",

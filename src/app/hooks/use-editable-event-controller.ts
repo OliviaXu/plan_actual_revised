@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { getCalendarTime } from "../../calendar/calendar-time";
+import { getZonedTime } from "../../shared/zoned-time";
 import { buildEditedActual } from "../../domain/actual-edit";
 import type {
   ActualEvent,
@@ -330,7 +330,7 @@ function getNewActualTiming(
   timeZone: string,
   requestedDurationMinutes: number,
 ) {
-  const minutes = getCalendarTime(createdAt, timeZone).minutesSinceMidnight;
+  const minutes = getZonedTime(createdAt, timeZone).minutesSinceMidnight;
   const startMinutes =
     Math.floor(minutes / defaultSettings.snapMinutes) *
     defaultSettings.snapMinutes;

@@ -1,11 +1,11 @@
 import { describe, expect, it } from "vitest";
-import * as calendarTime from "../../src/calendar/calendar-time";
+import { formatMinuteOfDay } from "../../src/app/format-time";
+import * as zonedTime from "../../src/shared/zoned-time";
 
 import {
-  formatMinuteOfDay,
-  getCalendarDayRange,
-  getCalendarTime,
-} from "../../src/calendar/calendar-time";
+  getZonedDayRange,
+  getZonedTime,
+} from "../../src/shared/zoned-time";
 
 describe("Calendar time", () => {
   it("formats minutes since midnight as a 12-hour clock time", () => {
@@ -17,7 +17,7 @@ describe("Calendar time", () => {
 
   it("derives local date, clock fields, and minutes since midnight", () => {
     expect(
-      getCalendarTime(
+      getZonedTime(
         new Date("2026-07-15T01:00:00.000Z"),
         "Asia/Tokyo",
       ),
@@ -30,7 +30,7 @@ describe("Calendar time", () => {
   });
 
   it("does not hide the instant-to-local-date conversion behind a day-range wrapper", () => {
-    expect(calendarTime).not.toHaveProperty("getCalendarDay");
+    expect(zonedTime).not.toHaveProperty("getCalendarTime");
   });
 
   it("builds a Calendar-local day range from an instant's local date", () => {
@@ -38,29 +38,26 @@ describe("Calendar time", () => {
     const timeZone = "Asia/Tokyo";
 
     expect(
-      getCalendarDayRange(getCalendarTime(instant, timeZone).date, timeZone),
+      getZonedDayRange(getZonedTime(instant, timeZone).date, timeZone),
     ).toEqual({
-      date: "2026-07-15",
-      timeMin: "2026-07-14T15:00:00.000Z",
-      timeMax: "2026-07-15T15:00:00.000Z",
+      start: new Date("2026-07-14T15:00:00.000Z"),
+      end: new Date("2026-07-15T15:00:00.000Z"),
     });
   });
 
-  it("preserves a known Calendar date in UTC+14", () => {
-    expect(getCalendarDayRange("2026-07-15", "Pacific/Kiritimati")).toEqual({
-      date: "2026-07-15",
-      timeMin: "2026-07-14T10:00:00.000Z",
-      timeMax: "2026-07-15T10:00:00.000Z",
+  it("preserves a known local date in UTC+14", () => {
+    expect(getZonedDayRange("2026-07-15", "Pacific/Kiritimati")).toEqual({
+      start: new Date("2026-07-14T10:00:00.000Z"),
+      end: new Date("2026-07-15T10:00:00.000Z"),
     });
   });
 
   it("uses DST-aware day boundaries", () => {
     expect(
-      getCalendarDayRange("2026-03-08", "America/Los_Angeles"),
+      getZonedDayRange("2026-03-08", "America/Los_Angeles"),
     ).toEqual({
-      date: "2026-03-08",
-      timeMin: "2026-03-08T08:00:00.000Z",
-      timeMax: "2026-03-09T07:00:00.000Z",
+      start: new Date("2026-03-08T08:00:00.000Z"),
+      end: new Date("2026-03-09T07:00:00.000Z"),
     });
   });
 });

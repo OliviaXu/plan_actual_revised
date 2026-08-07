@@ -18,10 +18,8 @@ import type {
   PlanEvent,
   RevisedEvent,
 } from "../../domain/day-event";
-import {
-  formatMinuteOfDay,
-  getCalendarTime,
-} from "../../calendar/calendar-time";
+import { formatMinuteOfDay } from "../format-time";
+import { getZonedTime } from "../../shared/zoned-time";
 import { PlanEventBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableEventColumn } from "./EditableEventColumn";
@@ -368,6 +366,6 @@ function RevealRailBody({
 
 function formatTime(date: Date, timeZone: string) {
   return formatMinuteOfDay(
-    getCalendarTime(date, timeZone).minutesSinceMidnight,
+    getZonedTime(date, timeZone).minutesSinceMidnight,
   );
 }

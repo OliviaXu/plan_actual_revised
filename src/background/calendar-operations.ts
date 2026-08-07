@@ -4,12 +4,9 @@ import type {
   CalendarInsertEvent,
 } from "../calendar/calendar-event";
 import type { CalendarLoadStats } from "../calendar/google-calendar-client";
-import {
-  getCalendarDayRange,
-  getCalendarTime,
-} from "../calendar/calendar-time";
 import type { DayRecord } from "../domain/day-record";
 import type { Result } from "../shared/result";
+import { getZonedDayRange, getZonedTime } from "../shared/zoned-time";
 
 type CalendarOperationsDependencies = {
   requestCachedToken: () => Promise<Result<string>>;
@@ -85,10 +82,13 @@ export function createCalendarOperations(
       };
     }
 
-    const range = getCalendarDayRange(record.date, record.timezone);
+    const range = getZonedDayRange(record.date, record.timezone);
     const result = await dependencies.listPrimaryCalendarEvents(
       authResult.value,
-      { timeMin: range.timeMin, timeMax: range.timeMax },
+      {
+        timeMin: range.start.toISOString(),
+        timeMax: range.end.toISOString(),
+      },
     );
     return result.ok
       ? { ok: true, value: { events: result.value.events } }
@@ -134,13 +134,11 @@ async function loadCurrentCalendarDayEvents(
     return result;
   }
 
-  const assumedDay = getCalendarDayRange(
-    getCalendarTime(requestedAt, assumedTimezone).date,
-    assumedTimezone,
-  );
+  const assumedDate = getZonedTime(requestedAt, assumedTimezone).date;
+  const assumedDay = getZonedDayRange(assumedDate, assumedTimezone);
   const assumedRange: CalendarEventRange = {
-    timeMin: assumedDay.timeMin,
-    timeMax: assumedDay.timeMax,
+    timeMin: assumedDay.start.toISOString(),
+    timeMax: assumedDay.end.toISOString(),
   };
   let result = await dependencies.listPrimaryCalendarEvents(
     authResult.value,
@@ -155,17 +153,18 @@ async function loadCurrentCalendarDayEvents(
     return result;
   }
 
-  const calendarDay = getCalendarDayRange(
-    getCalendarTime(requestedAt, result.value.timeZone).date,
+  const calendarDate = getZonedTime(
+    requestedAt,
     result.value.timeZone,
-  );
+  ).date;
+  const calendarDay = getZonedDayRange(calendarDate, result.value.timeZone);
   if (
-    calendarDay.timeMin !== assumedDay.timeMin ||
-    calendarDay.timeMax !== assumedDay.timeMax
+    calendarDay.start.getTime() !== assumedDay.start.getTime() ||
+    calendarDay.end.getTime() !== assumedDay.end.getTime()
   ) {
     result = await dependencies.listPrimaryCalendarEvents(authResult.value, {
-      timeMin: calendarDay.timeMin,
-      timeMax: calendarDay.timeMax,
+      timeMin: calendarDay.start.toISOString(),
+      timeMax: calendarDay.end.toISOString(),
     });
     if (!result.ok) return result;
   }
@@ -183,7 +182,7 @@ async function loadCurrentCalendarDayEvents(
     ok: true,
     value: {
       events: result.value.events,
-      date: calendarDay.date,
+      date: calendarDate,
       timeZone: result.value.timeZone,
     },
   };

@@ -1,6 +1,6 @@
 import type { DayEvent, PlanEvent } from "../../domain/day-event";
 import type { AppSettings } from "../../domain/settings";
-import { getCalendarTime } from "../../calendar/calendar-time";
+import { getZonedTime } from "../../shared/zoned-time";
 
 const MINUTES_PER_HOUR = 60;
 
@@ -149,7 +149,7 @@ export function calculateDayGridNowIndicatorTopPx(
   endHour: number,
   pixelsPerMinute: number,
 ) {
-  const current = getCalendarTime(currentTime, timeZone);
+  const current = getZonedTime(currentTime, timeZone);
   if (current.date !== date) return null;
 
   const currentMinuteOfDay = current.minutesSinceMidnight;

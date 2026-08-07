@@ -1,7 +1,8 @@
 import {
   mapActualToCalendarEvent,
   type ActualCalendarEventInput,
-} from "../calendar/actual-calendar-event";
+  mapCalendarEventsToPlanEvents,
+} from "../calendar/calendar-event-mapping";
 import type {
   CalendarEvent,
   CalendarInsertEvent,
@@ -9,7 +10,6 @@ import type {
 import { isExactPlanMatch } from "../domain/actual-save";
 import type { SaveError } from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
-import { toPlanEvents } from "../domain/plan-event";
 import { defaultSettings } from "../domain/settings";
 import type { Result } from "../shared/result";
 
@@ -79,7 +79,7 @@ export async function syncDayActualsToCalendar({
     };
   }
 
-  const planEvents = toPlanEvents(
+  const planEvents = mapCalendarEventsToPlanEvents(
     planResponse.value.events,
     record.date,
     record.timezone,

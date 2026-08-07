@@ -1,9 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { getCalendarTime } from "../../calendar/calendar-time";
+import { mapCalendarEventsToPlanEvents } from "../../calendar/calendar-event-mapping";
 import type { PlanEvent } from "../../domain/day-event";
-import { toPlanEvents } from "../../domain/plan-event";
 import { defaultSettings } from "../../domain/settings";
+import { getZonedTime } from "../../shared/zoned-time";
 import { sendRuntimeMessage } from "../../shared/runtime-messages";
 
 export type CalendarState =
@@ -30,7 +30,7 @@ export function useCalendarPlan(now: () => Date) {
   const [calendarDay, setCalendarDay] = useState<CalendarDay>(() => {
     const timeZone = Intl.DateTimeFormat().resolvedOptions().timeZone;
     return {
-      date: getCalendarTime(now(), timeZone).date,
+      date: getZonedTime(now(), timeZone).date,
       timeZone,
     };
   });
@@ -90,7 +90,7 @@ async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
         },
         calendarState: {
           status: "connected",
-          planEvents: toPlanEvents(
+          planEvents: mapCalendarEventsToPlanEvents(
             response.value.events,
             response.value.date,
             response.value.timeZone,

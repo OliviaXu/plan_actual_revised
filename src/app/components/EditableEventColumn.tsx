@@ -1,6 +1,6 @@
 import { useState } from "react";
 
-import { formatMinuteOfDay } from "../../calendar/calendar-time";
+import { formatMinuteOfDay } from "../format-time";
 import type {
   EditableColumn,
   EditableEvent,

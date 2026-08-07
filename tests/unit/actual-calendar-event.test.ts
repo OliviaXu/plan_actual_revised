@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import {
   calendarEventIdForActual,
   mapActualToCalendarEvent,
-} from "../../src/calendar/actual-calendar-event";
+} from "../../src/calendar/calendar-event-mapping";
 import { insertPrimaryCalendarEvent } from "../../src/calendar/google-calendar-client";
 
 const input = {
