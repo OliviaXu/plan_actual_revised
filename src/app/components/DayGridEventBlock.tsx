@@ -84,7 +84,7 @@ export function EditableEventBlock({
         onMouseDown={disabled ? undefined : onGrabOffsetCapture}
         type="button"
       >
-        <DayGridBlockContent
+        <DayGridEventBlockBody
           block={block}
           timeRangeTestId={`${column}-event-time-range`}
         />
@@ -153,7 +153,7 @@ export function PlanEventBlock({
       style={appearance.style}
       type="button"
     >
-      <DayGridBlockContent
+      <DayGridEventBlockBody
         block={block}
         timeRangeTestId="plan-event-time-range"
         titleTestId="plan-event-title"
@@ -162,7 +162,7 @@ export function PlanEventBlock({
   );
 }
 
-function DayGridBlockContent({
+function DayGridEventBlockBody({
   block,
   timeRangeTestId,
   titleTestId,
