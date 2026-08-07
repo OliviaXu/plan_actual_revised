@@ -18,8 +18,7 @@ import type {
   PlanEvent,
   RevisedEvent,
 } from "../../domain/day-event";
-import { formatMinuteOfDay } from "../format-time";
-import { getZonedTime } from "../../shared/zoned-time";
+import { formatZonedTime } from "../format-time";
 import { PlanEventBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableEventColumn } from "./EditableEventColumn";
@@ -227,7 +226,7 @@ export function DayGrid({
                   nowIndicatorTopPx === 0 ? "" : "-translate-y-full"
                 }`}
               >
-                {formatTime(currentTime, calendarDay.timeZone)}
+                {formatZonedTime(currentTime, calendarDay.timeZone)}
               </span>
             </div>
           ) : null}
@@ -361,11 +360,5 @@ function RevealRailBody({
         •••
       </span>
     </div>
-  );
-}
-
-function formatTime(date: Date, timeZone: string) {
-  return formatMinuteOfDay(
-    getZonedTime(date, timeZone).minutesSinceMidnight,
   );
 }

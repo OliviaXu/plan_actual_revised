@@ -1,4 +1,5 @@
 import type { DayGridRange } from "./day-grid-layout";
+import { formatHourOfDay } from "../format-time";
 
 export function DayGridTimeAxis({
   hourHeightPx,
@@ -38,18 +39,11 @@ export function DayGridTimeAxis({
             <span
               className={`absolute right-3 text-xs text-muted-foreground ${labelPosition}`}
             >
-              {formatHour(hour)}
+              {formatHourOfDay(hour)}
             </span>
           </div>
         );
       })}
     </div>
   );
-}
-
-function formatHour(hour: number) {
-  const normalizedHour = hour % 24;
-  const suffix = normalizedHour >= 12 ? "PM" : "AM";
-  const clockHour = normalizedHour % 12 || 12;
-  return `${clockHour} ${suffix}`;
 }

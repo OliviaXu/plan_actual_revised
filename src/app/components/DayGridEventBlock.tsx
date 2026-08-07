@@ -1,4 +1,7 @@
-import { formatMinuteOfDay } from "../format-time";
+import {
+  formatDurationMinutes,
+  formatMinuteOfDay,
+} from "../format-time";
 import { resolveGoogleCalendarEventColor } from "../../calendar/google-calendar-colors";
 import type {
   DragEvent as ReactDragEvent,
@@ -181,7 +184,7 @@ function DayGridEventBlockBody({
           {block.event.summary || "Untitled event"}
         </span>
         <span className="shrink-0 text-muted-foreground">
-          {formatDuration(block.durationMinutes)}
+          {formatDurationMinutes(block.durationMinutes)}
         </span>
       </span>
       {block.showTimeRange ? (
@@ -221,18 +224,4 @@ function getDayGridBlockAppearance(
         : {}),
     },
   };
-}
-
-function formatDuration(durationMinutes: number) {
-  const roundedMinutes = Math.round(durationMinutes);
-  const hours = Math.floor(roundedMinutes / 60);
-  const minutes = roundedMinutes % 60;
-
-  if (hours === 0) {
-    return `${minutes}m`;
-  }
-  if (minutes === 0) {
-    return `${hours}h`;
-  }
-  return `${hours}h ${minutes}m`;
 }
