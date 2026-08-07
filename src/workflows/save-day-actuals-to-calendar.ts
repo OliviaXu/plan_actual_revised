@@ -12,16 +12,16 @@ import type { ActualEvent, PlanEvent, SaveError } from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
 import type { Result } from "../shared/result";
 
-export type SyncDayActualsResult = {
+export type SaveDayActualsResult = {
   record: DayRecord;
-  status: "nothingToSync" | "planLookupFailed" | "completed";
+  status: "nothingToSave" | "planLookupFailed" | "completed";
   saved: number;
   matched: number;
   failed: number;
   error?: SaveError;
 };
 
-type SyncDayActualsInput = {
+type SaveDayActualsInput = {
   record: DayRecord;
   now: () => Date;
   persistDayRecord: (record: DayRecord) => Promise<void>;
@@ -31,20 +31,20 @@ type SyncDayActualsInput = {
   ) => Promise<Result<{ eventId: string }>>;
 };
 
-export async function syncDayActualsToCalendar({
+export async function saveDayActualsToCalendar({
   record,
   now,
   persistDayRecord,
   listCalendarEvents,
   insertCalendarEvent,
-}: SyncDayActualsInput): Promise<SyncDayActualsResult> {
+}: SaveDayActualsInput): Promise<SaveDayActualsResult> {
   const unsaved = record.actual.filter(
     (actual) => (actual.saveDisposition ?? "unsaved") === "unsaved",
   );
   if (unsaved.length === 0) {
     return {
       record,
-      status: "nothingToSync",
+      status: "nothingToSave",
       saved: 0,
       matched: 0,
       failed: 0,

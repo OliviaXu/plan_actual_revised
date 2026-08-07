@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { syncDayActualsToCalendar } from "../../src/workflows/sync-day-actuals-to-calendar";
+import { saveDayActualsToCalendar } from "../../src/workflows/save-day-actuals-to-calendar";
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import type { ActualEvent } from "../../src/domain/day-event";
 import type { DayRecord } from "../../src/domain/day-record";
@@ -46,7 +46,7 @@ function timedPlanEvent(): CalendarEvent {
   };
 }
 
-describe("syncDayActualsToCalendar", () => {
+describe("saveDayActualsToCalendar workflow", () => {
   it("owns filtering, matching, insertion, and ordered per-block persistence", async () => {
     const record = dayRecord([
       actual("matched", "Plan match", 540),
@@ -70,7 +70,7 @@ describe("syncDayActualsToCalendar", () => {
         error: { code: "INSERT_FAILED", message: "Response lost." },
       });
 
-    const result = await syncDayActualsToCalendar({
+    const result = await saveDayActualsToCalendar({
       record,
       now,
       listCalendarEvents,
@@ -108,7 +108,7 @@ describe("syncDayActualsToCalendar", () => {
       value: { eventId: "calendar-saved" },
     });
 
-    const result = await syncDayActualsToCalendar({
+    const result = await saveDayActualsToCalendar({
       record: dayRecord([actual("candidate", "Plan match", 540)]),
       now,
       listCalendarEvents: vi.fn().mockResolvedValue({
@@ -137,7 +137,7 @@ describe("syncDayActualsToCalendar", () => {
     };
     const persistDayRecord = vi.fn();
 
-    await syncDayActualsToCalendar({
+    await saveDayActualsToCalendar({
       record,
       now,
       listCalendarEvents: vi.fn().mockResolvedValue({
@@ -163,7 +163,7 @@ describe("syncDayActualsToCalendar", () => {
     ]);
     const persisted: DayRecord[] = [];
 
-    const result = await syncDayActualsToCalendar({
+    const result = await saveDayActualsToCalendar({
       record,
       now,
       listCalendarEvents: vi.fn().mockResolvedValue({
@@ -196,14 +196,14 @@ describe("syncDayActualsToCalendar", () => {
     const listCalendarEvents = vi.fn();
     const persistDayRecord = vi.fn();
 
-    await expect(syncDayActualsToCalendar({
+    await expect(saveDayActualsToCalendar({
       record,
       now,
       listCalendarEvents,
       insertCalendarEvent: vi.fn(),
       persistDayRecord,
     })).resolves.toMatchObject({
-      status: "nothingToSync",
+      status: "nothingToSave",
       record,
       saved: 0,
       matched: 0,
@@ -223,7 +223,7 @@ describe("syncDayActualsToCalendar", () => {
       value: { eventId: "calendar-slack-intention" },
     });
 
-    await syncDayActualsToCalendar({
+    await saveDayActualsToCalendar({
       record: dayRecord([slackActual]),
       now,
       listCalendarEvents: vi.fn().mockResolvedValue({

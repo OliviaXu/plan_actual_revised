@@ -56,7 +56,7 @@ without Calendar work when processed.
 ## Per-Day Synchronization
 
 Manual save and catch-up use the same
-`syncDayActualsToCalendar` workflow. The caller supplies the day, Calendar
+`saveDayActualsToCalendar` workflow. The caller supplies the day, Calendar
 operations, clock, and persistence boundary.
 
 For each selected historical day containing unsaved Actuals, the workflow:
@@ -130,7 +130,7 @@ The final implementation separates concerns as follows:
 
 - `src/domain/catch-up.ts` owns pure historical selection and retention-window
   classification.
-- `src/workflows/sync-day-actuals-to-calendar.ts` owns unsaved filtering, Plan
+- `src/workflows/save-day-actuals-to-calendar.ts` owns unsaved filtering, Plan
   matching, deterministic insertion, normalized outcomes, and ordered
   per-block persistence for one day.
 - `src/background/run-catch-up.ts` owns multi-day orchestration, retained versus

@@ -4,7 +4,7 @@ import type { DayRecord } from "../../domain/day-record";
 import type { CatchUpRunResult } from "../../shared/catch-up-run-result";
 import type { Result } from "../../shared/result";
 import { sendRuntimeMessage } from "../../shared/runtime-messages";
-import { syncDayActualsToCalendar } from "../../workflows/sync-day-actuals-to-calendar";
+import { saveDayActualsToCalendar } from "../../workflows/save-day-actuals-to-calendar";
 import {
   getCalendarSaveToastContent,
   getCatchUpToastContent,
@@ -56,7 +56,7 @@ export function useSaveActualsToCalendar({
 
     setIsSavingActualsToCalendar(true);
     try {
-      const result = await syncDayActualsToCalendar({
+      const result = await saveDayActualsToCalendar({
         record: dayRecord,
         now,
         persistDayRecord,

@@ -5,7 +5,7 @@ import type {
 import type { DayRecord } from "../domain/day-record";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import type { Result } from "../shared/result";
-import { syncDayActualsToCalendar } from "../workflows/sync-day-actuals-to-calendar";
+import { saveDayActualsToCalendar } from "../workflows/save-day-actuals-to-calendar";
 
 export type CatchUpDependencies = {
   listDayRecords: () => Promise<{
@@ -67,7 +67,7 @@ export async function runCatchUp(
 
     affectedDayCount += 1;
     let persistenceFailed = false;
-    const result = await syncDayActualsToCalendar({
+    const result = await saveDayActualsToCalendar({
       record,
       now: dependencies.now,
       listCalendarEvents: () => dependencies.listCalendarEvents(record),

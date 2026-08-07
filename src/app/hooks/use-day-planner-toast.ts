@@ -2,7 +2,7 @@ import { useCallback, useRef, useState } from "react";
 
 import type { CatchUpRunResult } from "../../shared/catch-up-run-result";
 import type { Result } from "../../shared/result";
-import type { SyncDayActualsResult } from "../../workflows/sync-day-actuals-to-calendar";
+import type { SaveDayActualsResult } from "../../workflows/save-day-actuals-to-calendar";
 
 export type DayPlannerToastContent = {
   source: "calendar-save" | "catch-up" | "slack-launch";
@@ -41,9 +41,9 @@ export function useDayPlannerToast(): DayPlannerToastResult {
 }
 
 export function getCalendarSaveToastContent(
-  result: SyncDayActualsResult,
+  result: SaveDayActualsResult,
 ): DayPlannerToastContent {
-  if (result.status === "nothingToSync") {
+  if (result.status === "nothingToSave") {
     return {
       source: "calendar-save",
       message: "Nothing new to save.",

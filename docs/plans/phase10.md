@@ -129,7 +129,7 @@ transient local `DayGrid` state and is never persisted.
   launch, and launch-failure feedback.
 - `src/domain/day-event.ts` and `src/domain/day-record.ts` own the canonical
   Slack marker and persisted-boundary validation.
-- `src/workflows/sync-day-actuals-to-calendar.ts` selects the Slack Calendar
+- `src/workflows/save-day-actuals-to-calendar.ts` selects the Slack Calendar
   summary prefix at the Calendar edge.
 
 ## Test Coverage
