@@ -10,7 +10,7 @@ import {
   calculateDayGridNowIndicatorTopPx,
   calculateDayGridRange,
 } from "./day-grid-layout";
-import { defaultSettings } from "../../domain/settings";
+import { defaultSettings } from "../../config/settings";
 import type {
   ActualEvent,
   EditableColumn,

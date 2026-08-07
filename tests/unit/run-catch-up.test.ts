@@ -79,7 +79,8 @@ describe("runCatchUp", () => {
     const empty = record("2026-07-13", []);
     const terminal = record("2026-07-14", [actual("saved", "calendarSaved")]);
     const current = record(today, [actual("today")]);
-    const deps = dependencies([empty, terminal, current]);
+    const future = record("2026-07-16", [actual("future")]);
+    const deps = dependencies([empty, terminal, current, future]);
 
     await expect(runCatchUp(today, deps)).resolves.toEqual({
       saved: 0,

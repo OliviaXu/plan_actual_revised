@@ -7,10 +7,9 @@ import type {
   CalendarEvent,
   CalendarInsertEvent,
 } from "../calendar/calendar-event";
-import { isExactPlanMatch } from "../domain/actual-save";
-import type { SaveError } from "../domain/day-event";
+import { defaultSettings } from "../config/settings";
+import type { ActualEvent, PlanEvent, SaveError } from "../domain/day-event";
 import type { DayRecord } from "../domain/day-record";
-import { defaultSettings } from "../domain/settings";
 import type { Result } from "../shared/result";
 
 export type SyncDayActualsResult = {
@@ -92,7 +91,7 @@ export async function syncDayActualsToCalendar({
 
   for (const actual of unsaved) {
     const attemptedAt = now().toISOString();
-    if (planEvents.some((plan) => isExactPlanMatch(actual, plan))) {
+    if (planEvents.some((plan) => hasMatchingPlanFields(actual, plan))) {
       workingRecord = updateActual(
         workingRecord,
         actual.id,
@@ -154,6 +153,15 @@ export async function syncDayActualsToCalendar({
     matched,
     failed,
   };
+}
+
+function hasMatchingPlanFields(actual: ActualEvent, plan: PlanEvent) {
+  return (
+    plan.summary === actual.summary &&
+    plan.startMinutes === actual.startMinutes &&
+    plan.durationMinutes === actual.durationMinutes &&
+    plan.colorId === actual.colorId
+  );
 }
 
 function updateActual(

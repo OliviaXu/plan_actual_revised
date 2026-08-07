@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 
 import type { EditableEvent } from "../../domain/day-event";
-import type { AppSettings } from "../../domain/settings";
+import type { AppSettings } from "../../config/settings";
 
 type EventResizePreview = {
   eventId: string;

@@ -33,6 +33,11 @@ Calendar-local date is earlier than today.
 
 ## Historical Record Selection
 
+> **Later cleanup:** `selectCatchUpRecords` moved from
+> `src/domain/catch-up.ts` into `src/background/run-catch-up.ts` as a private
+> function after the selection policy remained specific to that workflow. The
+> ownership descriptions below record the original Phase 7 design.
+
 `selectCatchUpRecords` is a pure domain operation. It classifies the current
 inventory before any record is processed:
 

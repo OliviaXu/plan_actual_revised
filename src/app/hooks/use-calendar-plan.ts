@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 
 import { mapCalendarEventsToPlanEvents } from "../../calendar/calendar-event-mapping";
 import type { PlanEvent } from "../../domain/day-event";
-import { defaultSettings } from "../../domain/settings";
+import { defaultSettings } from "../../config/settings";
 import { getZonedTime } from "../../shared/zoned-time";
 import { sendRuntimeMessage } from "../../shared/runtime-messages";
 

@@ -5,7 +5,7 @@ import type {
   EditableColumn,
   EditableEvent,
 } from "../../domain/day-event";
-import { defaultSettings } from "../../domain/settings";
+import { defaultSettings } from "../../config/settings";
 import type { DayGridDragDropController } from "../hooks/use-day-grid-drag-drop";
 import { useEventResize } from "../hooks/use-event-resize";
 import { EditableEventBlock } from "./DayGridEventBlock";

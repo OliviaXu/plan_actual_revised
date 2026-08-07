@@ -97,6 +97,32 @@ describe("syncDayActualsToCalendar", () => {
     ]);
   });
 
+  it.each([
+    ["summary", { summary: "Different" }],
+    ["start", { start: "2026-07-15T09:05:00-07:00" }],
+    ["duration", { end: "2026-07-15T10:05:00-07:00" }],
+    ["color", { colorId: "8" }],
+  ])("inserts an Actual when the Plan %s differs", async (_field, change) => {
+    const insertCalendarEvent = vi.fn().mockResolvedValue({
+      ok: true,
+      value: { eventId: "calendar-saved" },
+    });
+
+    const result = await syncDayActualsToCalendar({
+      record: dayRecord([actual("candidate", "Plan match", 540)]),
+      now,
+      listCalendarEvents: vi.fn().mockResolvedValue({
+        ok: true,
+        value: { events: [{ ...timedPlanEvent(), ...change }] },
+      }),
+      insertCalendarEvent,
+      persistDayRecord: vi.fn(),
+    });
+
+    expect(result).toMatchObject({ saved: 1, matched: 0 });
+    expect(insertCalendarEvent).toHaveBeenCalledOnce();
+  });
+
   it("preserves Revised blocks in every Calendar disposition snapshot", async () => {
     const record: DayRecord = {
       ...dayRecord([actual("saved", "Calendar insert", 660)]),

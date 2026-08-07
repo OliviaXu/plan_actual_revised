@@ -1,5 +1,5 @@
 import type { DayEvent, PlanEvent } from "../../domain/day-event";
-import type { AppSettings } from "../../domain/settings";
+import type { AppSettings } from "../../config/settings";
 import { getZonedTime } from "../../shared/zoned-time";
 
 const MINUTES_PER_HOUR = 60;

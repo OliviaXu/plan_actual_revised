@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { defaultSettings } from "../../src/domain/settings";
+import { defaultSettings } from "../../src/config/settings";
 
 describe("defaultSettings", () => {
   it("provides the MVP day-grid defaults from the PRD", () => {

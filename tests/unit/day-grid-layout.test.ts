@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { ActualEvent, PlanEvent } from "../../src/domain/day-event";
-import { defaultSettings } from "../../src/domain/settings";
+import { defaultSettings } from "../../src/config/settings";
 import {
   calculateDayGridBlocks,
   calculateDayGridNowIndicatorTopPx,

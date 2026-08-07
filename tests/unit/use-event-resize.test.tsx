@@ -8,7 +8,7 @@ import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { useEventResize } from "../../src/app/hooks/use-event-resize";
 import type { ActualEvent } from "../../src/domain/day-event";
-import { defaultSettings } from "../../src/domain/settings";
+import { defaultSettings } from "../../src/config/settings";
 
 const actual: ActualEvent = {
   id: "actual-1",

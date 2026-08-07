@@ -1,7 +1,7 @@
 import { useState } from "react";
 
 import { getZonedTime } from "../../shared/zoned-time";
-import { buildEditedActual } from "../../domain/actual-edit";
+import { buildEditedActual } from "../../domain/actual-event-edit";
 import type {
   ActualEvent,
   EditableColumn,
@@ -15,7 +15,7 @@ import {
   moveEditableEvent,
   type EditableEventAddition,
 } from "../../domain/day-record-edit";
-import { defaultSettings } from "../../domain/settings";
+import { defaultSettings } from "../../config/settings";
 import type { DayGridDropOperation } from "./use-day-grid-drag-drop";
 import type { EventEditorDraft } from "../components/EventEditor";
 import type { CalendarDay } from "./use-calendar-plan";

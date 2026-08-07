@@ -11,7 +11,7 @@ import type { CalendarDay } from "../hooks/use-calendar-plan";
 import { useDayRecord } from "../hooks/use-day-record";
 import { useEditableEventController } from "../hooks/use-editable-event-controller";
 import type { PlanEvent } from "../../domain/day-event";
-import { defaultSettings } from "../../domain/settings";
+import { defaultSettings } from "../../config/settings";
 import {
   useResponsiveDayGridLayoutMode,
   type AppSurface,

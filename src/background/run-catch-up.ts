@@ -2,7 +2,6 @@ import type {
   CalendarEvent,
   CalendarInsertEvent,
 } from "../calendar/calendar-event";
-import { selectCatchUpRecords } from "../domain/catch-up";
 import type { DayRecord } from "../domain/day-record";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import type { Result } from "../shared/result";
@@ -126,6 +125,19 @@ export async function runCatchUp(
     });
   }
   return summary;
+}
+
+function selectCatchUpRecords(records: DayRecord[], today: string) {
+  const historical = records.filter((record) => record.date < today);
+  const nonempty = historical
+    .filter((record) => record.actual.length > 0)
+    .sort((left, right) => right.date.localeCompare(left.date));
+
+  return {
+    retained: nonempty.slice(0, 2),
+    expired: nonempty.slice(2),
+    deletable: historical.filter((record) => record.actual.length === 0),
+  };
 }
 
 async function tryDeleteDayRecord(

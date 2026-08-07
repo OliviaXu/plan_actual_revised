@@ -4,7 +4,7 @@ import {
   actualChangeNeedsFreshId,
   buildEditedActual,
   buildMovedActual,
-} from "../../src/domain/actual-edit";
+} from "../../src/domain/actual-event-edit";
 import type { ActualEvent } from "../../src/domain/day-event";
 
 function actualEvent(overrides: Partial<ActualEvent> = {}): ActualEvent {
