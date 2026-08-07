@@ -15,7 +15,6 @@ import {
   moveEditableEvent,
   type EditableEventAddition,
 } from "../../domain/day-record-edit";
-import { copyPlanEvent } from "../../domain/editable-event-drag";
 import { defaultSettings } from "../../domain/settings";
 import type { DayGridDropOperation } from "./use-day-grid-drag-drop";
 import type { EventEditorDraft } from "../components/EventEditor";
@@ -279,11 +278,14 @@ export function useEditableEvents({
       );
       if (!planEvent) return;
 
-      const copiedEvent = copyPlanEvent(
-        planEvent,
-        operation.startMinutes,
-        crypto.randomUUID(),
-      );
+      const copiedEvent: EditableEvent = {
+        id: crypto.randomUUID(),
+        summary: planEvent.summary,
+        startMinutes: operation.startMinutes,
+        durationMinutes: planEvent.durationMinutes,
+        colorId: planEvent.colorId,
+        sourceCalendarEventId: planEvent.id,
+      };
       const addition: EditableEventAddition =
         operation.targetColumn === "actual"
           ? {
