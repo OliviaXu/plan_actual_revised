@@ -17,7 +17,7 @@ import {
 } from "../../domain/day-record-edit";
 import { copyPlanEvent } from "../../domain/editable-event-drag";
 import { defaultSettings } from "../../domain/settings";
-import type { DayGridDropOperation } from "../components/day-grid-drag";
+import type { DayGridDropOperation } from "./use-day-grid-drag-drop";
 import type { EventEditorDraft } from "../components/EventEditor";
 import type { CalendarDay } from "./use-calendar-plan";
 

@@ -26,10 +26,12 @@ import { PlanEventBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableEventColumn } from "./EditableEventColumn";
 import { SlackIntentionPopover } from "./SlackIntentionPopover";
-import type { DayGridDropOperation } from "./day-grid-drag";
 import type { DayGridLayoutMode } from "../hooks/use-responsive-day-grid-layout-mode";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
-import { useDayGridDragDrop } from "../hooks/use-day-grid-drag-drop";
+import {
+  useDayGridDragDrop,
+  type DayGridDropOperation,
+} from "../hooks/use-day-grid-drag-drop";
 
 const DAY_TIME_AXIS_WIDTH = "4.5rem";
 const REVEAL_RAIL_WIDTH = "23px";

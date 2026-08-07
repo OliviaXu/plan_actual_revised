@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 
-import { calculateDroppedStartMinutes } from "../../src/app/components/day-grid-drag";
+import { calculateDroppedStartMinutes } from "../../src/app/hooks/use-day-grid-drag-drop";
 
 describe("calculateDroppedStartMinutes", () => {
   const input = {
