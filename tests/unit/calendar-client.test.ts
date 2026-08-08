@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createCalendarOperations } from "../../src/background/calendar-operations";
+import { createCalendarClient } from "../../src/background/calendar-client";
 
 const fixedNow = new Date(2026, 6, 15, 12);
 const range = {
@@ -34,7 +34,7 @@ function installCalendarOperations(
     })),
     ...overrides,
   };
-  const operations = createCalendarOperations(
+  const operations = createCalendarClient(
     dependencies,
     clock,
     () => "America/Los_Angeles",
@@ -42,7 +42,7 @@ function installCalendarOperations(
   return { dependencies, operations };
 }
 
-describe("createCalendarOperations", () => {
+describe("createCalendarClient", () => {
   it("coalesces overlapping current-day reads", async () => {
     let finishList:
       | ((result: {
@@ -59,7 +59,7 @@ describe("createCalendarOperations", () => {
           finishList = resolve;
         }),
     );
-    const operations = createCalendarOperations(
+    const operations = createCalendarClient(
       {
         requestCachedToken: vi.fn(async () => ({
           ok: true as const,
@@ -96,7 +96,7 @@ describe("createCalendarOperations", () => {
         timeZone: "America/Los_Angeles",
       },
     }));
-    const operations = createCalendarOperations({
+    const operations = createCalendarClient({
       requestCachedToken: vi.fn(async () => ({
         ok: true as const,
         value: "token-123",

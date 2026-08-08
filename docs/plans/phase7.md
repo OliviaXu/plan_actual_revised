@@ -37,6 +37,9 @@ Calendar-local date is earlier than today.
 > `src/domain/catch-up.ts` into `src/background/run-catch-up.ts` as a private
 > function after the selection policy remained specific to that workflow. The
 > ownership descriptions below record the original Phase 7 design.
+> A later background cleanup also folded `catch-up-request.ts` into
+> `runtime-message-handlers.ts`, where its request coalescing and logging now
+> sit beside the other runtime-message adapters.
 
 `selectCatchUpRecords` is a pure domain operation. It classifies the current
 inventory before any record is processed:
@@ -136,7 +139,7 @@ The final implementation separates concerns as follows:
 - `src/background/run-catch-up.ts` owns multi-day orchestration, retained versus
   expired cleanup, storage-failure policy, public counts, and private
   diagnostics.
-- `src/background/calendar-operations.ts` owns cached authentication plus
+- `src/background/calendar-client.ts` owns cached authentication plus
   current-day and historical Calendar access.
 - `src/background/catch-up-request.ts` owns in-flight coalescing, request-level
   error translation, and total timing.

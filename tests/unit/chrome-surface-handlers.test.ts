@@ -1,8 +1,8 @@
 import { describe, expect, it, vi } from "vitest";
 
-import { createChromeSurfaceOperations } from "../../src/background/chrome-surface-operations";
+import { createChromeSurfaceHandlers } from "../../src/background/chrome-surface-handlers";
 
-describe("createChromeSurfaceOperations", () => {
+describe("createChromeSurfaceHandlers", () => {
   it("gives every Calendar action a fresh panel path before opening it", async () => {
     const calls: string[] = [];
     const setSidePanelOptions = vi.fn(async (options: unknown) => {
@@ -12,7 +12,7 @@ describe("createChromeSurfaceOperations", () => {
       calls.push(`open:${JSON.stringify(options)}`);
     });
     const refreshKeys = ["first", "second"];
-    const operations = createChromeSurfaceOperations({
+    const operations = createChromeSurfaceHandlers({
       disableSidePanel: vi.fn(async () => undefined),
       openAppPage: vi.fn(async () => undefined),
       openSidePanel,
@@ -32,7 +32,7 @@ describe("createChromeSurfaceOperations", () => {
 
   it("disables only the requested tab", async () => {
     const disableSidePanel = vi.fn(async () => undefined);
-    const operations = createChromeSurfaceOperations({
+    const operations = createChromeSurfaceHandlers({
       disableSidePanel,
       openAppPage: vi.fn(async () => undefined),
       openSidePanel: vi.fn(async () => undefined),

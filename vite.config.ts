@@ -19,9 +19,9 @@ export default defineConfig({
           __dirname,
           "src/background/register-service-worker.ts",
         ),
-        "background/compose-service-worker": path.resolve(
+        "background/runtime-message-handlers": path.resolve(
           __dirname,
-          "src/background/compose-service-worker.ts",
+          "src/background/runtime-message-handlers.ts",
         ),
       },
       output: {

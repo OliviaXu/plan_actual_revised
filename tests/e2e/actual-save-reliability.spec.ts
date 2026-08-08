@@ -14,13 +14,12 @@ async function createExtension(scenario: Scenario) {
     path.join(extensionPath, "background/service-worker.js"),
     `
 import registerServiceWorker from "./register-service-worker.js";
-import { createServiceWorkerOperations } from "./compose-service-worker.js";
+import { createRuntimeMessageHandlers } from "./runtime-message-handlers.js";
 
 const createdBlockIds = new Set();
 let ambiguousReturned = false;
 
-registerServiceWorker(createServiceWorkerOperations({
-  openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+registerServiceWorker(createRuntimeMessageHandlers({
   requestCachedToken: async () => ({ ok: true, value: "test-token" }),
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
   listPrimaryCalendarEvents: async () => ({
@@ -48,7 +47,7 @@ registerServiceWorker(createServiceWorkerOperations({
     }
     return { ok: true, value: { eventId: event.id } };
   },
-}, () => new Date("2026-07-15T19:00:00.000Z")));
+}, { now: () => new Date("2026-07-15T19:00:00.000Z") }));
 `,
   );
   return extensionPath;

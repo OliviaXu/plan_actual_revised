@@ -49,7 +49,7 @@ async function createExtension(scenario: Scenario) {
     path.join(extensionPath, "background/service-worker.js"),
     `
 import registerServiceWorker from "./register-service-worker.js";
-import { createServiceWorkerOperations } from "./compose-service-worker.js";
+import { createRuntimeMessageHandlers } from "./runtime-message-handlers.js";
 
 const listDayRecords = async () => {
   const stored = await chrome.storage.local.get(null);
@@ -65,8 +65,7 @@ const saveDayRecord = async (record) =>
 const deleteDayRecord = async (date) =>
   chrome.storage.local.remove("dayRecord:" + date);
 
-registerServiceWorker(createServiceWorkerOperations({
-  openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+registerServiceWorker(createRuntimeMessageHandlers({
   requestCachedToken: async () => ({ ok: true, value: "test-token" }),
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
   listPrimaryCalendarEvents: async () => ({
@@ -91,7 +90,7 @@ registerServiceWorker(createServiceWorkerOperations({
   listDayRecords,
   saveDayRecord,
   deleteDayRecord,
-}, () => new Date("2026-07-15T19:00:00.000Z")));
+}, { now: () => new Date("2026-07-15T19:00:00.000Z") }));
 `,
   );
   return extensionPath;

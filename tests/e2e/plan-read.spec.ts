@@ -22,13 +22,12 @@ async function createSeededExtension(
     path.join(extensionPath, "background/service-worker.js"),
     `
 import registerServiceWorker from "./register-service-worker.js";
-import { createServiceWorkerOperations } from "./compose-service-worker.js";
+import { createRuntimeMessageHandlers } from "./runtime-message-handlers.js";
 
 let connected = ${scenario === "disconnected" || scenario === "slowDisconnected" || scenario === "authRetry" ? "false" : "true"};
 let authAttempts = 0;
 
-registerServiceWorker(createServiceWorkerOperations({
-  openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+registerServiceWorker(createRuntimeMessageHandlers({
   requestCachedToken: async () => {
     ${scenario === "slowDisconnected" ? "await new Promise((resolve) => setTimeout(resolve, 700));" : ""}
     return connected
@@ -62,7 +61,7 @@ registerServiceWorker(createServiceWorkerOperations({
         }],
       },
     })`},
-}, () => new Date("2026-07-15T19:00:00.000Z")));
+}, { now: () => new Date("2026-07-15T19:00:00.000Z") }));
 `,
   );
   return extensionPath;

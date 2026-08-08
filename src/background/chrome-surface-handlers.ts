@@ -11,7 +11,7 @@ type ChromeSurfaceDependencies = {
   disableSidePanel: (options: SidePanelOptions) => Promise<void>;
 };
 
-export function createChromeSurfaceOperations(
+export function createChromeSurfaceHandlers(
   dependencies: ChromeSurfaceDependencies,
   createRefreshKey: () => string = () => `${Date.now()}`,
 ) {

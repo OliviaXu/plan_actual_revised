@@ -8,7 +8,7 @@ import type { DayRecord } from "../domain/day-record";
 import type { Result } from "../shared/result";
 import { getZonedDayRange, getZonedTime } from "../shared/zoned-time";
 
-type CalendarOperationsDependencies = {
+type CalendarClientDependencies = {
   requestCachedToken: () => Promise<Result<string>>;
   listPrimaryCalendarEvents: (
     token: string,
@@ -26,19 +26,19 @@ type CalendarOperationsDependencies = {
   ) => Promise<Result<{ eventId: string }>>;
 };
 
-export type CalendarResult = Result<{
+export type CurrentCalendarDayResult = Result<{
   events: CalendarEvent[];
   date: string;
   timeZone: string;
 }>;
 
-export function createCalendarOperations(
-  dependencies: CalendarOperationsDependencies,
+export function createCalendarClient(
+  dependencies: CalendarClientDependencies,
   now: () => Date = () => new Date(),
   readBrowserTimezone: () => string = () =>
     Intl.DateTimeFormat().resolvedOptions().timeZone,
 ) {
-  let inFlightRead: Promise<CalendarResult> | undefined;
+  let inFlightRead: Promise<CurrentCalendarDayResult> | undefined;
   let primaryCalendarTimezone: string | undefined;
 
   return {
@@ -111,10 +111,10 @@ export function createCalendarOperations(
 }
 
 async function loadCurrentCalendarDayEvents(
-  dependencies: CalendarOperationsDependencies,
+  dependencies: CalendarClientDependencies,
   requestedAt: Date,
   assumedTimezone: string,
-): Promise<CalendarResult> {
+): Promise<CurrentCalendarDayResult> {
   const startedAt = performance.now();
   const authResult = await dependencies.requestCachedToken();
   const cachedAuthDurationMs = performance.now() - startedAt;

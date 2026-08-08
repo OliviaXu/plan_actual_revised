@@ -52,10 +52,9 @@ test("Plan copies and editable moves survive reload", async () => {
     path.join(extensionPath, "background/service-worker.js"),
     `
 import registerServiceWorker from "./register-service-worker.js";
-import { createServiceWorkerOperations } from "./compose-service-worker.js";
+import { createRuntimeMessageHandlers } from "./runtime-message-handlers.js";
 
-registerServiceWorker(createServiceWorkerOperations({
-  openAppPage: () => chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+registerServiceWorker(createRuntimeMessageHandlers({
   requestCachedToken: async () => ({ ok: true, value: "test-token" }),
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
   listPrimaryCalendarEvents: async () => ({
@@ -73,7 +72,7 @@ registerServiceWorker(createServiceWorkerOperations({
       }],
     },
   }),
-}, () => new Date("2026-07-15T19:00:00.000Z")));
+}, { now: () => new Date("2026-07-15T19:00:00.000Z") }));
 `,
   );
   const context = await chromium.launchPersistentContext("", {

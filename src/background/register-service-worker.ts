@@ -2,14 +2,14 @@ import type { CalendarInsertEvent } from "../calendar/calendar-event";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import type { Result } from "../shared/result";
 import type { RuntimeMessage } from "../shared/runtime-messages";
-import type { CalendarResult } from "./calendar-operations";
+import type { CurrentCalendarDayResult } from "./calendar-client";
 
-type ServiceWorkerOperations = {
+type ServiceWorkerHandlers = {
   openAppPage: () => Promise<unknown>;
   openCalendarSidePanel: (tabId: number) => Promise<unknown>;
   disableSidePanel: (tabId: number) => Promise<unknown>;
   connectCalendar: () => Promise<Result<{ status: "connected" }>>;
-  listCurrentCalendarEvents: () => Promise<CalendarResult>;
+  listCurrentCalendarEvents: () => Promise<CurrentCalendarDayResult>;
   insertCalendarEvent: (
     event: CalendarInsertEvent,
   ) => Promise<Result<{ eventId: string }>>;
@@ -19,23 +19,23 @@ type ServiceWorkerOperations = {
 };
 
 export default function registerServiceWorker(
-  operations: ServiceWorkerOperations,
+  handlers: ServiceWorkerHandlers,
 ) {
   chrome.action.onClicked.addListener((tab) => {
     if (tab.id !== undefined && isGoogleCalendarUrl(tab.url)) {
-      void operations.openCalendarSidePanel?.(tab.id);
+      void handlers.openCalendarSidePanel(tab.id);
       return;
     }
 
     if (tab.id !== undefined) {
-      void operations.disableSidePanel?.(tab.id);
+      void handlers.disableSidePanel(tab.id);
     }
-    void operations.openAppPage();
+    void handlers.openAppPage();
   });
 
   chrome.tabs.onUpdated.addListener((tabId, _changeInfo, tab) => {
     if (tab.url && !isGoogleCalendarUrl(tab.url)) {
-      void operations.disableSidePanel?.(tabId);
+      void handlers.disableSidePanel(tabId);
     }
   });
 
@@ -44,7 +44,7 @@ export default function registerServiceWorker(
       if (message?.type === "auth.requestInteractiveToken") {
         forwardRuntimeResponse(
           message.type,
-          operations.connectCalendar,
+          handlers.connectCalendar,
           sendResponse,
         );
         return true;
@@ -53,7 +53,7 @@ export default function registerServiceWorker(
       if (message?.type === "calendar.listEvents") {
         forwardRuntimeResponse(
           message.type,
-          operations.listCurrentCalendarEvents,
+          handlers.listCurrentCalendarEvents,
           sendResponse,
         );
         return true;
@@ -62,7 +62,7 @@ export default function registerServiceWorker(
       if (message?.type === "calendar.insertEvent") {
         forwardRuntimeResponse(
           message.type,
-          () => operations.insertCalendarEvent(message.event),
+          () => handlers.insertCalendarEvent(message.event),
           sendResponse,
         );
         return true;
@@ -71,7 +71,7 @@ export default function registerServiceWorker(
       if (message?.type === "catchUp.run") {
         forwardRuntimeResponse(
           message.type,
-          () => operations.runCatchUp(message.todayDate),
+          () => handlers.runCatchUp(message.todayDate),
           sendResponse,
         );
         return true;

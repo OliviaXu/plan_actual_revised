@@ -1,6 +1,6 @@
 import { requestCachedToken, requestInteractiveToken } from "./auth";
 import registerServiceWorker from "./register-service-worker";
-import { createServiceWorkerOperations } from "./compose-service-worker";
+import { createRuntimeMessageHandlers } from "./runtime-message-handlers";
 import {
   insertPrimaryCalendarEvent,
   listPrimaryCalendarEvents,
@@ -10,9 +10,9 @@ import {
   listDayRecords,
   saveDayRecord,
 } from "../storage/day-record-storage";
-import { createChromeSurfaceOperations } from "./chrome-surface-operations";
+import { createChromeSurfaceHandlers } from "./chrome-surface-handlers";
 
-const chromeSurfaceOperations = createChromeSurfaceOperations({
+const chromeSurfaceHandlers = createChromeSurfaceHandlers({
   openAppPage: () =>
     chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
   setSidePanelOptions: (options) => chrome.sidePanel.setOptions(options),
@@ -21,9 +21,7 @@ const chromeSurfaceOperations = createChromeSurfaceOperations({
 });
 
 registerServiceWorker({
-  ...createServiceWorkerOperations({
-    openAppPage: () =>
-      chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+  ...createRuntimeMessageHandlers({
     requestCachedToken,
     requestInteractiveToken,
     listPrimaryCalendarEvents,
@@ -32,5 +30,5 @@ registerServiceWorker({
     saveDayRecord,
     deleteDayRecord,
   }),
-  ...chromeSurfaceOperations,
+  ...chromeSurfaceHandlers,
 });
