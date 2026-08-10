@@ -31,7 +31,8 @@ export type CalendarInsertEvent = {
   start: { dateTime: string; timeZone: string } | { date: string };
   end: { dateTime: string; timeZone: string } | { date: string };
   colorId?: string;
-  attendees?: [];
   reminders?: { useDefault: boolean };
+  visibility?: "default" | "public" | "private" | "confidential";
+  transparency?: "opaque" | "transparent";
   extendedProperties?: { private: Record<string, string> };
 };

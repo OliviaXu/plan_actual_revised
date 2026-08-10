@@ -294,12 +294,14 @@ Behavior:
 
 - On extension page load, fetch all-day events for today's date.
 - Find all-day events with `settings.dailyFocusColorId`.
-- If one exists, show a warm amber-tinted banner with label `SOMETHING HARD TODAY`, title, and plain-text description.
+- If one exists, show a warm amber-tinted banner with label `SOMETHING HARD TODAY` and its title.
 - If none exists, show the same banner style with an inline text input placeholder `struggling is how learning happens` and a small check button.
 - Clicking the check button or pressing Enter creates an all-day private event for today.
-- On save success, switch to read-only display and show toast: `Committed - saved to calendar`.
+- On save success, switch to read-only display and show toast: `Daily focus saved to calendar`.
 - On save failure, keep the input editable and show a red toast with the error.
-- Multiple matching all-day events stack as separate banners.
+- Show one canonical focus: prefer the extension event whose ID is derived from
+  today, otherwise show the first matching all-day event in Calendar order.
+- A confirmed focus is read-only in the extension; edit it in Google Calendar.
 
 ### 8.2 This Week's Learning on Work
 
@@ -516,16 +518,16 @@ Each saved block becomes a new event on the user's primary calendar:
 
 ### 12.4 Idempotency
 
-The Calendar adapter derives a valid deterministic Google Calendar event ID from the stable local block ID and inserts directly without a pre-insert lookup.
+The Calendar adapter derives a valid deterministic Google Calendar event ID from the stable local block ID. The required Calendar refresh reconciles existing extension Actual IDs before inserting remaining blocks.
 
 Rules:
 
 - If insert succeeds, mark the block `calendarSaved` and store the returned event ID.
-- If insert returns duplicate/409, the deterministic ID proves an earlier attempt created the event, so mark it `calendarSaved` without another request.
+- If the Calendar refresh already contains an extension Actual with the deterministic ID, mark the block `calendarSaved` without another insert.
 - If insert fails or is ambiguous, keep the block local as `unsaved` with normalized failure details.
 - Phase 4 retains `calendarSaved` and `planMatched` blocks locally so the active Actual column has one source.
 
-This prevents duplicate events when a network response is lost after Google Calendar successfully created the event.
+This prevents duplicate events when a network response is lost after Google Calendar successfully created the event: the next save reconciles it during the normal Calendar refresh.
 
 ### 12.5 Manual Save UX
 

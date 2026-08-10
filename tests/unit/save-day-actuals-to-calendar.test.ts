@@ -2,6 +2,7 @@ import { describe, expect, it, vi } from "vitest";
 
 import { saveDayActualsToCalendar } from "../../src/workflows/save-day-actuals-to-calendar";
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
+import { calendarEventIdForActual } from "../../src/calendar/calendar-event-mapping";
 import type { ActualEvent } from "../../src/domain/day-event";
 import type { DayRecord } from "../../src/domain/day-record";
 
@@ -47,6 +48,41 @@ function timedPlanEvent(): CalendarEvent {
 }
 
 describe("saveDayActualsToCalendar workflow", () => {
+  it("reconciles an existing deterministic Actual ID without another insert", async () => {
+    const candidate = actual("candidate", "Calendar insert", 660);
+    const calendarEventId = calendarEventIdForActual(candidate.id);
+    const insertCalendarEvent = vi.fn();
+
+    const result = await saveDayActualsToCalendar({
+      record: dayRecord([candidate]),
+      now,
+      listCalendarEvents: vi.fn().mockResolvedValue({
+        ok: true,
+        value: {
+          events: [{
+            kind: "timed",
+            id: calendarEventId,
+            summary: "[Actual] Calendar insert",
+            colorId: "9",
+            start: "2026-07-15T11:00:00-07:00",
+            end: "2026-07-15T12:00:00-07:00",
+            timeZone: "America/Los_Angeles",
+            isExtensionActual: true,
+          }],
+        },
+      }),
+      insertCalendarEvent,
+      persistDayRecord: vi.fn(),
+    });
+
+    expect(result).toMatchObject({ saved: 1, matched: 0, failed: 0 });
+    expect(result.record.actual[0]).toMatchObject({
+      saveDisposition: "calendarSaved",
+      calendarEventId,
+    });
+    expect(insertCalendarEvent).not.toHaveBeenCalled();
+  });
+
   it("owns filtering, matching, insertion, and ordered per-block persistence", async () => {
     const record = dayRecord([
       actual("matched", "Plan match", 540),

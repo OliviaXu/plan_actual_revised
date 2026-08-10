@@ -102,12 +102,13 @@ export function createCalendarClient(
         ok: false as const,
         error: {
           code: "AUTH_NOT_CONNECTED",
-          message: "Connect Calendar before saving Actuals.",
+          message: "Connect Calendar before creating events.",
         },
       };
     }
     return dependencies.insertPrimaryCalendarEvent(authResult.value, event);
   }
+
 }
 
 async function loadCurrentCalendarDayEvents(

@@ -5,7 +5,7 @@ import type { Result } from "../../shared/result";
 import type { SaveDayActualsResult } from "../../workflows/save-day-actuals-to-calendar";
 
 export type DayPlannerToastContent = {
-  source: "calendar-save" | "catch-up" | "slack-launch";
+  source: "calendar-save" | "catch-up" | "slack-launch" | "daily-focus";
   message: string;
   tone: "plain" | "warning";
   durationMs?: number;

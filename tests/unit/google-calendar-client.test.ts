@@ -74,6 +74,7 @@ describe("listPrimaryCalendarEvents", () => {
             {
               id: "all-day",
               summary: "Focus",
+              description: "Practice the difficult part",
               start: { date: "2026-07-15" },
               end: { date: "2026-07-16" },
             },
@@ -81,13 +82,13 @@ describe("listPrimaryCalendarEvents", () => {
         }),
     );
 
-    await expect(
-      listPrimaryCalendarEvents(
-        "token-123",
-        range,
-        fetchCalendar,
-      ),
-    ).resolves.toMatchObject({
+    const result = await listPrimaryCalendarEvents(
+      "token-123",
+      range,
+      fetchCalendar,
+    );
+
+    expect(result).toMatchObject({
       ok: true,
       value: {
         events: [
@@ -112,6 +113,9 @@ describe("listPrimaryCalendarEvents", () => {
         ],
       },
     });
+
+    if (!result.ok) throw new Error("Expected Calendar events to load.");
+    expect(result.value.events[1]).not.toHaveProperty("description");
 
     expect(fetchCalendar).toHaveBeenCalledWith(
       expect.stringMatching(

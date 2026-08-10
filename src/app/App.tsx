@@ -143,6 +143,7 @@ export function App({
               launchSlack={launchSlack}
               now={now}
               planEvents={calendarState.planEvents}
+              dailyFocusSummary={calendarState.dailyFocusSummary}
               appSurface={appSurface}
             />
           )}

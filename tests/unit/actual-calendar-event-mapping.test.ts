@@ -59,7 +59,6 @@ describe("Actual to Calendar event mapping", () => {
       start: { dateTime: "2026-07-15T09:00:00", timeZone: "America/Los_Angeles" },
       end: { dateTime: "2026-07-15T10:00:00", timeZone: "America/Los_Angeles" },
       colorId: "9",
-      attendees: [],
       reminders: { useDefault: false },
       extendedProperties: {
         private: {
@@ -102,7 +101,7 @@ describe("Actual to Calendar event mapping", () => {
     });
   });
 
-  it("treats a duplicate response as proof of the deterministic event", async () => {
+  it("normalizes a duplicate response as an insert failure", async () => {
     const fetchCalendar = vi.fn(async () =>
       Response.json({ error: {} }, { status: 409 }),
     );
@@ -110,8 +109,11 @@ describe("Actual to Calendar event mapping", () => {
     await expect(
       insertPrimaryCalendarEvent("token", mapActualToCalendarEvent(input), fetchCalendar),
     ).resolves.toEqual({
-      ok: true,
-      value: { eventId: "par123e4567e89b12d3a456426614174000" },
+      ok: false,
+      error: {
+        code: "CALENDAR_EVENT_INSERT_FAILED",
+        message: "Unable to insert Calendar event.",
+      },
     });
     expect(fetchCalendar).toHaveBeenCalledOnce();
   });

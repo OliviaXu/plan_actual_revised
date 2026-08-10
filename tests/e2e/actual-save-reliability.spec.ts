@@ -18,13 +18,14 @@ import { createRuntimeMessageHandlers } from "./runtime-message-handlers.js";
 
 const createdBlockIds = new Set();
 let ambiguousReturned = false;
+const insertedEvents = [];
 
 registerServiceWorker(createRuntimeMessageHandlers({
   requestCachedToken: async () => ({ ok: true, value: "test-token" }),
   requestInteractiveToken: async () => ({ ok: true, value: "test-token" }),
   listPrimaryCalendarEvents: async () => ({
     ok: true,
-    value: { timeZone: "America/Los_Angeles", events: ${scenario === "planMatch" ? `[{
+    value: { timeZone: "America/Los_Angeles", events: [...${scenario === "planMatch" ? `[{
       kind: "timed",
       id: "matching-plan",
       summary: "Untitled",
@@ -32,10 +33,20 @@ registerServiceWorker(createRuntimeMessageHandlers({
       start: "2026-07-15T12:00:00-07:00",
       end: "2026-07-15T12:30:00-07:00",
       timeZone: "America/Los_Angeles",
-    }]` : "[]"} },
+    }]` : "[]"}, ...insertedEvents] },
   }),
   insertPrimaryCalendarEvent: async (_token, event) => {
     createdBlockIds.add(event.id);
+    insertedEvents.push({
+      kind: "timed",
+      id: event.id,
+      summary: event.summary,
+      colorId: event.colorId ?? null,
+      start: event.start.dateTime,
+      end: event.end.dateTime,
+      timeZone: event.start.timeZone,
+      isExtensionActual: true,
+    });
     await chrome.storage.local.set({
       "test:lastInsert": event,
       "test:uniqueInsertCount": createdBlockIds.size,
@@ -160,7 +171,7 @@ test("a Calendar-saved Actual becomes a new insert after a meaningful edit", asy
   }
 });
 
-test("an ambiguous insert remains unsaved and retries without a duplicate", async () => {
+test("an ambiguous insert reconciles on retry without another insert", async () => {
   const extensionPath = await createExtension("ambiguous");
   const { context, page } = await openExtension(extensionPath);
   try {
@@ -170,7 +181,7 @@ test("an ambiguous insert remains unsaved and retries without a duplicate", asyn
     await expect(page.getByTestId("calendar-save-toast")).toContainText("1 Actual couldn’t be saved");
     await page.getByRole("button", { name: "Retry save" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
-    expect(await readStorage(page, "test:insertAttemptCount")).toBe(2);
+    expect(await readStorage(page, "test:insertAttemptCount")).toBe(1);
     expect(await readStorage(page, "test:uniqueInsertCount")).toBe(1);
   } finally {
     await context.close();

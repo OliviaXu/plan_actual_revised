@@ -1,6 +1,7 @@
 import { Button } from "./ui/button";
 import { Toast, type ToastAction } from "./ui/toast";
 import { DayGrid } from "./DayGrid";
+import { DailyFocusBanner } from "./DailyFocusBanner";
 import { EventEditor } from "./EventEditor";
 import {
   slackLaunchFailureToastContent,
@@ -16,16 +17,19 @@ import {
   useResponsiveDayGridLayoutMode,
   type AppSurface,
 } from "../hooks/use-responsive-day-grid-layout-mode";
+import { useDailyFocus } from "../hooks/use-daily-focus";
 
 export function DayPlanner({
   appSurface = "standalone",
   calendarDay,
+  dailyFocusSummary,
   launchSlack,
   now,
   planEvents,
 }: {
   appSurface?: AppSurface;
   calendarDay: CalendarDay;
+  dailyFocusSummary?: string | null;
   launchSlack: () => void;
   now: () => Date;
   planEvents: PlanEvent[];
@@ -38,6 +42,11 @@ export function DayPlanner({
     persistDayRecord,
   } = useDayRecord(calendarDay);
   const toast = useDayPlannerToast();
+  const dailyFocus = useDailyFocus({
+    calendarDate: calendarDay.date,
+    initialSummary: dailyFocusSummary,
+    onFeedback: toast.show,
+  });
   const calendarSave = useSaveActualsToCalendar({
     calendarDate: calendarDay.date,
     dayRecord,
@@ -77,6 +86,13 @@ export function DayPlanner({
         ? "flex min-w-0 flex-col gap-3"
         : "flex min-w-0 flex-col gap-6"}
     >
+      <DailyFocusBanner
+        draft={dailyFocus.draft}
+        summary={dailyFocus.dailyFocusSummary}
+        isSaving={dailyFocus.isSaving}
+        onDraftChange={dailyFocus.setDraft}
+        onSubmit={() => void dailyFocus.submitDailyFocus()}
+      />
       <DayGrid
         calendarDay={calendarDay}
         now={now}

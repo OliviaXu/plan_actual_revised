@@ -1,5 +1,6 @@
 import { DateTime } from "luxon";
 
+import { defaultSettings } from "../config/settings";
 import type { ActualEvent, PlanEvent } from "../domain/day-event";
 import { getZonedDayRange, getZonedTime } from "../shared/zoned-time";
 import type { CalendarEvent, CalendarInsertEvent } from "./calendar-event";
@@ -16,6 +17,54 @@ export type ActualCalendarEventInput = {
 
 export function calendarEventIdForActual(blockId: string) {
   return `par${blockId.toLowerCase().replace(/-/g, "")}`;
+}
+
+export function calendarEventIdForDailyFocus(date: string) {
+  return `parfocus${date.replaceAll("-", "")}`;
+}
+
+export function mapDailyFocusToCalendarEvent({
+  date,
+  summary,
+  dailyFocusColorId = defaultSettings.dailyFocusColorId,
+}: {
+  date: string;
+  summary: string;
+  dailyFocusColorId?: string;
+}): CalendarInsertEvent & {
+  colorId: string;
+  start: { date: string };
+  end: { date: string };
+} {
+  return {
+    id: calendarEventIdForDailyFocus(date),
+    summary,
+    start: { date },
+    end: {
+      date: DateTime.fromISO(date, { zone: "utc" })
+        .plus({ days: 1 })
+        .toISODate()!,
+    },
+    colorId: dailyFocusColorId,
+    visibility: "private",
+    transparency: "transparent",
+    reminders: { useDefault: false },
+  };
+}
+
+export function findDailyFocusCalendarEvent(
+  events: CalendarEvent[],
+  date: string,
+  dailyFocusColorId = defaultSettings.dailyFocusColorId,
+) {
+  const allDayEvents = events.filter(
+    (event) => event.kind === "allDay",
+  );
+  return allDayEvents.find(
+    (event) => event.id === calendarEventIdForDailyFocus(date),
+  ) ?? allDayEvents.find(
+    (event) => event.colorId === dailyFocusColorId,
+  );
 }
 
 export function mapActualToCalendarEvent(
@@ -41,7 +90,6 @@ export function mapActualToCalendarEvent(
       timeZone: input.timezone,
     },
     colorId: input.actual.colorId || input.defaultColorId,
-    attendees: [],
     reminders: { useDefault: false },
     extendedProperties: {
       private: { planActualRevisedActual: "true" },

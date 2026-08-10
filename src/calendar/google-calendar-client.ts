@@ -34,7 +34,7 @@ export async function insertPrimaryCalendarEvent(
       },
     );
 
-    if (response.ok || response.status === 409) {
+    if (response.ok) {
       return { ok: true, value: { eventId: event.id } };
     }
 

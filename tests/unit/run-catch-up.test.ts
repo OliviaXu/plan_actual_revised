@@ -211,7 +211,10 @@ describe("runCatchUp", () => {
             ok: false as const,
             error: { code: "CALENDAR_INSERT_FAILED", message: "No response." },
           }
-        : { ok: true as const, value: { eventId: event.id } },
+        : {
+            ok: true as const,
+            value: { eventId: event.id },
+          },
     );
 
     const result = await runCatchUp(today, deps);

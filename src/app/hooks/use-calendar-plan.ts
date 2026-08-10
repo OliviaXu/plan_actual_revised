@@ -1,6 +1,9 @@
 import { useEffect, useState } from "react";
 
-import { mapCalendarEventsToPlanEvents } from "../../calendar/calendar-event-mapping";
+import {
+  findDailyFocusCalendarEvent,
+  mapCalendarEventsToPlanEvents,
+} from "../../calendar/calendar-event-mapping";
 import type { PlanEvent } from "../../domain/day-event";
 import { defaultSettings } from "../../config/settings";
 import { getZonedTime } from "../../shared/zoned-time";
@@ -10,7 +13,11 @@ export type CalendarState =
   | { status: "loading" }
   | { status: "disconnected"; errorMessage?: string }
   | { status: "connecting" }
-  | { status: "connected"; planEvents: PlanEvent[] }
+  | {
+      status: "connected";
+      planEvents: PlanEvent[];
+      dailyFocusSummary: string | null | undefined;
+    }
   | { status: "error"; message: string };
 
 export type CalendarDay = {
@@ -90,6 +97,10 @@ async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
         },
         calendarState: {
           status: "connected",
+          dailyFocusSummary: findDailyFocusCalendarEvent(
+            response.value.events,
+            response.value.date,
+          )?.summary,
           planEvents: mapCalendarEventsToPlanEvents(
             response.value.events,
             response.value.date,

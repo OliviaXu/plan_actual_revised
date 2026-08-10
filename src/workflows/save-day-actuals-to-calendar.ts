@@ -1,4 +1,5 @@
 import {
+  calendarEventIdForActual,
   mapActualToCalendarEvent,
   type ActualCalendarEventInput,
   mapCalendarEventsToPlanEvents,
@@ -91,7 +92,26 @@ export async function saveDayActualsToCalendar({
 
   for (const actual of unsaved) {
     const attemptedAt = now().toISOString();
-    if (planEvents.some((plan) => hasMatchingPlanFields(actual, plan))) {
+    const existingCalendarActual = planResponse.value.events.find(
+      (event) =>
+        event.kind === "timed" &&
+        event.isExtensionActual &&
+        event.id === calendarEventIdForActual(actual.id),
+    );
+    if (existingCalendarActual) {
+      workingRecord = updateActual(
+        workingRecord,
+        actual.id,
+        {
+          saveDisposition: "calendarSaved",
+          calendarEventId: existingCalendarActual.id,
+          lastSaveAttemptAt: attemptedAt,
+          lastSaveError: undefined,
+        },
+        attemptedAt,
+      );
+      saved += 1;
+    } else if (planEvents.some((plan) => hasMatchingPlanFields(actual, plan))) {
       workingRecord = updateActual(
         workingRecord,
         actual.id,

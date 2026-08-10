@@ -1,4 +1,6 @@
-import type { CalendarInsertEvent } from "../calendar/calendar-event";
+import type {
+  CalendarInsertEvent,
+} from "../calendar/calendar-event";
 import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import type { Result } from "../shared/result";
 import type { RuntimeMessage } from "../shared/runtime-messages";
