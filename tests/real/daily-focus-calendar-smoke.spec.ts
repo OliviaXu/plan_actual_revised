@@ -1,35 +1,18 @@
-import { expect, chromium, test } from "@playwright/test";
-import path from "node:path";
+import { expect, test } from "@playwright/test";
+
+import {
+  connectToRealExtension,
+  requireConnectedCalendar,
+} from "./real-browser";
 
 test("real Calendar daily focus persists across an extension reload", async () => {
-  const profileDirectory = process.env.REAL_CALENDAR_PROFILE_DIR;
-  if (!profileDirectory) {
-    throw new Error(
-      "Set REAL_CALENDAR_PROFILE_DIR to a dedicated Chrome profile directory.",
-    );
-  }
-
-  const context = await chromium.launchPersistentContext(profileDirectory, {
-    headless: false,
-    args: [
-      `--disable-extensions-except=${path.resolve("dist")}`,
-      `--load-extension=${path.resolve("dist")}`,
-    ],
-  });
-  const worker =
-    context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  const extensionId = worker.url().split("/")[2];
+  const { context, extensionId } = await connectToRealExtension();
   const page = await context.newPage();
   const summary = `[PAR real focus smoke ${Date.now()}]`;
   await page.goto(`chrome-extension://${extensionId}/index.html`);
+  await requireConnectedCalendar(page);
 
   try {
-    const connect = page.getByRole("button", { name: "Connect Calendar" });
-    if (await connect.isVisible()) {
-      await connect.click();
-      await expect(connect).toHaveCount(0, { timeout: 90_000 });
-    }
-
     const input = page.getByPlaceholder("struggling is how learning happens");
     if (await input.count() === 0) {
       throw new Error(
@@ -72,6 +55,6 @@ test("real Calendar daily focus persists across an extension reload", async () =
         );
       }
     }, summary);
-    await context.close();
+    await page.close();
   }
 });

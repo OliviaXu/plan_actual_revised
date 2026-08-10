@@ -35,3 +35,34 @@ and choose `dist`.
 Do not change the manifest’s public `key`; it keeps the extension ID stable
 across computers. No client secret is needed. While the app remains in Testing,
 Google may require test users to reconnect after seven days.
+
+## Live Google Calendar and Slack E2E Tests
+
+These opt-in tests attach Playwright to a dedicated Chrome profile and exercise
+the unpacked extension against Google Calendar. The Slack smoke verifies the
+`slack://` launch attempt and local Actual persistence; Slack need not be
+installed.
+
+One-time setup:
+
+1. Add the Google account under the OAuth app's **Audience → Test users**.
+2. Start the dedicated Chrome profile:
+
+   ```sh
+   npm run real:open
+   ```
+
+3. In that Chrome window, select **Connect Calendar**, complete Google sign-in,
+   and wait for the planner to load. Leave Chrome open; the tests do not perform
+   interactive sign-in.
+
+Then run the live E2E suite in another terminal:
+
+```sh
+npm run test:real
+```
+
+The isolated, Git-ignored profile lives at `.pw-profiles/calendar`; do not use a
+normal Chrome profile or open it in two Chrome processes. The default debugging
+endpoint is `127.0.0.1:9225`. Override it with `REAL_CHROME_PROFILE_DIR`,
+`REAL_CHROME_CDP_PORT`, or `REAL_CHROME_CDP_URL`.

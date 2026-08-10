@@ -1,26 +1,15 @@
-import { chromium, expect, test } from "@playwright/test";
-import path from "node:path";
+import { expect, test } from "@playwright/test";
+
+import {
+  connectToRealExtension,
+  requireConnectedCalendar,
+} from "./real-browser";
 
 test("real Slack launch keeps its intention in local Actual storage", async () => {
-  const profileDirectory = process.env.REAL_CALENDAR_PROFILE_DIR;
-  if (!profileDirectory) {
-    throw new Error(
-      "Set REAL_CALENDAR_PROFILE_DIR to a dedicated Chrome profile directory.",
-    );
-  }
-
-  const context = await chromium.launchPersistentContext(profileDirectory, {
-    headless: false,
-    args: [
-      `--disable-extensions-except=${path.resolve("dist")}`,
-      `--load-extension=${path.resolve("dist")}`,
-    ],
-  });
-  const worker =
-    context.serviceWorkers()[0] ?? (await context.waitForEvent("serviceworker"));
-  const extensionId = worker.url().split("/")[2];
+  const { context, extensionId } = await connectToRealExtension();
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/index.html`);
+  await requireConnectedCalendar(page);
   const intention = `[PAR real Slack smoke ${Date.now()}]`;
   const originalRecords = await page.evaluate(async () => {
     const stored = await chrome.storage.local.get(null);
@@ -30,12 +19,6 @@ test("real Slack launch keeps its intention in local Actual storage", async () =
   });
 
   try {
-    const connect = page.getByRole("button", { name: "Connect Calendar" });
-    if (await connect.isVisible()) {
-      await connect.click();
-      await expect(connect).toHaveCount(0, { timeout: 90_000 });
-    }
-
     await page.getByRole("button", { name: "Log Slack time" }).click();
     await page
       .getByPlaceholder("attention is devotion :)")
@@ -84,6 +67,6 @@ test("real Slack launch keeps its intention in local Actual storage", async () =
         await chrome.storage.local.set(records);
       }
     }, originalRecords);
-    await context.close();
+    await page.close();
   }
 });

@@ -10,10 +10,12 @@ Manual save refreshes the day's Plan once, permanently classifies exact matches 
 
 ## Real Calendar Write Smoke
 
-Use a dedicated Chrome profile that can authenticate the unpacked production extension:
+Start the dedicated Chrome profile, complete Connect Calendar manually, and
+leave that browser open:
 
 ```sh
-REAL_CALENDAR_PROFILE_DIR=/absolute/path/to/dedicated-profile npm run test:real:actual
+npm run real:open
+npm run test:real:actual
 ```
 
 The opt-in test temporarily replaces today's test-profile `DayRecord`, saves a clearly prefixed Actual twice with the same deterministic ID, verifies private metadata, deletes only that Calendar event, and restores the prior local record. Do not point it at a profile currently open in another Chrome process.

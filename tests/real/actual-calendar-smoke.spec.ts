@@ -1,26 +1,17 @@
-import { expect, chromium, test } from "@playwright/test";
-import path from "node:path";
+import { expect, test } from "@playwright/test";
 
-const BLOCK_ID = "0a1b2c3d-4e5f-6789-abcd-0123456789ab";
-const EVENT_ID = `par${BLOCK_ID.replaceAll("-", "")}`;
+import { createActualCalendarSmokeIds } from "./actual-calendar-smoke-data";
+import {
+  connectToRealExtension,
+  requireConnectedCalendar,
+} from "./real-browser";
 
 test("real Calendar Actual insert is duplicate-safe and carries private metadata", async () => {
-  const profileDirectory = process.env.REAL_CALENDAR_PROFILE_DIR;
-  if (!profileDirectory) {
-    throw new Error("Set REAL_CALENDAR_PROFILE_DIR to a dedicated Chrome profile directory.");
-  }
-
-  const context = await chromium.launchPersistentContext(profileDirectory, {
-    headless: false,
-    args: [
-      `--disable-extensions-except=${path.resolve("dist")}`,
-      `--load-extension=${path.resolve("dist")}`,
-    ],
-  });
-  const worker = context.serviceWorkers()[0] ?? await context.waitForEvent("serviceworker");
-  const extensionId = worker.url().split("/")[2];
+  const { blockId, eventId } = createActualCalendarSmokeIds();
+  const { context, extensionId } = await connectToRealExtension();
   const page = await context.newPage();
   await page.goto(`chrome-extension://${extensionId}/index.html`);
+  await requireConnectedCalendar(page);
 
   const testData = await page.evaluate(({ blockId }) => {
     const now = new Date();
@@ -44,15 +35,9 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
         updatedAt: now.toISOString(),
       },
     }));
-  }, { blockId: BLOCK_ID });
+  }, { blockId });
 
   try {
-    const connect = page.getByRole("button", { name: "Connect Calendar" });
-    if (await connect.isVisible()) {
-      await connect.click();
-      await expect(connect).toHaveCount(0, { timeout: 90_000 });
-    }
-
     await page.evaluate(({ key, record }) => chrome.storage.local.set({ [key]: record }), testData);
     await page.reload();
     await page.getByRole("button", { name: "Save Actual to calendar" }).click();
@@ -70,7 +55,7 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
         { headers: { Authorization: `Bearer ${token}` } },
       );
       return response.json();
-    }, EVENT_ID);
+    }, eventId);
     expect(event.extendedProperties?.private).toMatchObject({
       planActualRevisedActual: "true",
     });
@@ -85,7 +70,7 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
       }
       if (original === undefined) await chrome.storage.local.remove(key);
       else await chrome.storage.local.set({ [key]: original });
-    }, { ...testData, eventId: EVENT_ID });
-    await context.close();
+    }, { ...testData, eventId });
+    await page.close();
   }
 });

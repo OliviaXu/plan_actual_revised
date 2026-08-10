@@ -6,10 +6,16 @@ import tseslint from 'typescript-eslint';
 
 export default tseslint.config(
   {
-    ignores: ['dist', 'coverage'],
+    ignores: ['dist', 'coverage', '.pw-profiles'],
   },
   js.configs.recommended,
   tseslint.configs.recommended,
+  {
+    files: ['scripts/**/*.{js,mjs,cjs}'],
+    languageOptions: {
+      globals: globals.node,
+    },
+  },
   {
     files: ['**/*.{ts,tsx}'],
     languageOptions: {
