@@ -10,3 +10,9 @@
 - Do not add runtime validation for extension-internal data sent by our own statically typed code when the sender and receiver share the same message types.
 - Keep runtime validation at genuinely untrusted boundaries, including persisted storage, external messages or input, and data returned by external APIs.
 - If an internal channel later becomes externally reachable, add validation at that boundary rather than defensively rechecking every internal consumer.
+
+## Bug Fix Alignment
+
+- Diagnose bugs with empirical evidence before editing code, tests, or docs.
+- Present the evidence, likely cause, and fix alternatives with tradeoffs; wait for explicit direction.
+- After alignment, use TDD: failing test, minimal fix, refactor, then verify.
