@@ -246,31 +246,30 @@ Exit criteria:
 
 - Daily focus works without depending on weekly learning or Slack.
 
-## Phase 9 - Weekly Learning Tracer
+## Phase 9 - Weekly Practice Tracer
 
-Goal: add weekly learning separately because week-boundary date math is easy to get subtly wrong.
+Goal: add a longer-horizon work-week practice without widening today's Calendar query.
 
 Build:
 
-- Monday calculation for Monday-Saturday and Sunday behavior.
-- Weekly learning read path using the configured weekly-learning color default.
-- Weekly learning empty state input.
-- All-day Calendar insert on the computed Monday.
+- Monday calculation and Monday-Friday visibility.
+- Isolated Monday-only read using the configured weekly color default.
+- `MY PRACTICE THIS WEEK` empty state input and read-only confirmed state.
+- One-day all-day Calendar insert on Monday.
+- Independent Monday load failure that hides only the practice banner.
 
 Deterministic E2E tracer:
 
-- Freeze dates for Monday, Wednesday, Saturday, and Sunday.
-- Verify the computed Monday is correct in each case.
-- Seed existing weekly learning on Monday and verify it renders throughout the week.
-- Submit new weekly learning and verify the insert date is the computed Monday.
+- Verify Monday reuses today's events and midweek loads only Monday.
+- Seed an existing practice on Monday and verify it renders through Friday.
+- Submit a new practice and verify the one-day Monday insert payload.
+- Verify weekend absence and isolated Monday failure behavior.
 
-Real smoke:
-
-- Opt-in local test creates a clearly prefixed weekly learning all-day event on the computed Monday and verifies it renders from the current day.
+Real smoke is deferred until the shared authenticated smoke environment works.
 
 Exit criteria:
 
-- Weekly learning behavior is correct across the work-week boundary.
+- Weekly practice behavior is correct across the work-week boundary without degrading today's planner.
 
 ## Phase 10 - Slack Intention Tracer
 

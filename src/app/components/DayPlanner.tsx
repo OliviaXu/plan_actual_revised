@@ -6,6 +6,7 @@ import { EventEditor } from "./EventEditor";
 import {
   slackLaunchFailureToastContent,
   useDayPlannerToast,
+  type DayPlannerToastContent,
 } from "../hooks/use-day-planner-toast";
 import { useSaveActualsToCalendar } from "../hooks/use-save-actuals-to-calendar";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
@@ -18,6 +19,14 @@ import {
   type AppSurface,
 } from "../hooks/use-responsive-day-grid-layout-mode";
 import { useDailyFocus } from "../hooks/use-daily-focus";
+import {
+  useWeeklyPractice,
+  type WeeklyPracticeState,
+} from "../hooks/use-weekly-practice";
+import { WeeklyPracticeBanner } from "./WeeklyPracticeBanner";
+import {
+  isWeeklyPracticeVisible,
+} from "../../calendar/calendar-event-mapping";
 
 export function DayPlanner({
   appSurface = "standalone",
@@ -26,6 +35,7 @@ export function DayPlanner({
   launchSlack,
   now,
   planEvents,
+  weeklyPracticeState,
 }: {
   appSurface?: AppSurface;
   calendarDay: CalendarDay;
@@ -33,8 +43,8 @@ export function DayPlanner({
   launchSlack: () => void;
   now: () => Date;
   planEvents: PlanEvent[];
+  weeklyPracticeState?: WeeklyPracticeState;
 }) {
-  const sidePanel = appSurface === "side-panel";
   const dayGridLayoutMode = useResponsiveDayGridLayoutMode(appSurface);
   const {
     dayRecord,
@@ -82,17 +92,25 @@ export function DayPlanner({
 
   return (
     <div
-      className={sidePanel
-        ? "flex min-w-0 flex-col gap-3"
-        : "flex min-w-0 flex-col gap-6"}
+      className="flex min-w-0 flex-col gap-6"
     >
-      <DailyFocusBanner
-        draft={dailyFocus.draft}
-        summary={dailyFocus.dailyFocusSummary}
-        isSaving={dailyFocus.isSaving}
-        onDraftChange={dailyFocus.setDraft}
-        onSubmit={() => void dailyFocus.submitDailyFocus()}
-      />
+      <div className="flex min-w-0 flex-col gap-3">
+        <DailyFocusBanner
+          draft={dailyFocus.draft}
+          summary={dailyFocus.dailyFocusSummary}
+          isSaving={dailyFocus.isSaving}
+          onDraftChange={dailyFocus.setDraft}
+          onSubmit={() => void dailyFocus.submitDailyFocus()}
+        />
+        {isWeeklyPracticeVisible(calendarDay.date) &&
+        weeklyPracticeState?.status === "loaded" ? (
+          <WeeklyPracticeController
+            calendarDay={calendarDay}
+            initialSummary={weeklyPracticeState.summary}
+            onFeedback={toast.show}
+          />
+        ) : null}
+      </div>
       <DayGrid
         calendarDay={calendarDay}
         now={now}
@@ -144,5 +162,31 @@ export function DayPlanner({
         />
       ) : null}
     </div>
+  );
+}
+
+function WeeklyPracticeController({
+  calendarDay,
+  initialSummary,
+  onFeedback,
+}: {
+  calendarDay: CalendarDay;
+  initialSummary: string | null | undefined;
+  onFeedback: (feedback: DayPlannerToastContent) => void;
+}) {
+  const weeklyPractice = useWeeklyPractice({
+    calendarDay,
+    initialSummary,
+    onFeedback,
+  });
+
+  return (
+    <WeeklyPracticeBanner
+      draft={weeklyPractice.draft}
+      summary={weeklyPractice.summary}
+      isSaving={weeklyPractice.isSaving}
+      onDraftChange={weeklyPractice.setDraft}
+      onSubmit={() => void weeklyPractice.submitWeeklyPractice()}
+    />
   );
 }

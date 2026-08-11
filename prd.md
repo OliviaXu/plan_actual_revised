@@ -303,24 +303,24 @@ Behavior:
   today, otherwise show the first matching all-day event in Calendar order.
 - A confirmed focus is read-only in the extension; edit it in Google Calendar.
 
-### 8.2 This Week's Learning on Work
+### 8.2 Practice
 
-Intent: Encourage the user to name one skill or muscle to build during the current work week.
+Intent: Encourage the user to name one skill or muscle to practice during the current work week.
 
 Behavior:
 
-- Compute this week's Monday. If today is Monday-Saturday, use the most recent Monday on or before today. If today is Sunday, use the Monday six days ago.
-- Fetch all-day events for that Monday.
+- Show the banner Monday through Friday and hide it on weekends.
+- On Monday, reuse today's Calendar events. Tuesday through Friday, fetch only Monday's all-day events.
 - Find all-day events with `settings.weeklyLearningColorId`.
-- If one exists, show a salmon-tinted banner with label `THIS WEEK'S LEARNING ON WORK`, title, and plain-text description.
-- If none exists, show an inline input with placeholder `learning focus` and a check button.
+- If one exists, show a salmon-tinted banner with label `MY PRACTICE THIS WEEK` and its title.
+- If none exists, show an inline input with placeholder `practice` and a check button.
 - Clicking the check button or pressing Enter creates an all-day private event on that Monday.
-- Toast on save: `Committed for the week - saved to <Monday date>`.
+- Toast on save: `Weekly practice saved to calendar`.
 
 Critical behavior:
 
-- This banner displays Monday through Sunday.
-- Opening the extension on Wednesday or Friday must still fetch Monday's all-day events and show the current week's learning goal.
+- A failed Monday read hides the practice banner without hiding today's Plan or daily focus.
+- Opening the extension on Wednesday or Friday fetches Monday only and shows the current practice.
 
 ## 9. The Day Grid
 

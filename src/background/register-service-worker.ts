@@ -5,6 +5,7 @@ import type { CatchUpRunResult } from "../shared/catch-up-run-result";
 import type { Result } from "../shared/result";
 import type { RuntimeMessage } from "../shared/runtime-messages";
 import type { CurrentCalendarDayResult } from "./calendar-client";
+import type { CalendarEvent } from "../calendar/calendar-event";
 
 type ServiceWorkerHandlers = {
   openAppPage: () => Promise<unknown>;
@@ -12,6 +13,10 @@ type ServiceWorkerHandlers = {
   disableSidePanel: (tabId: number) => Promise<unknown>;
   connectCalendar: () => Promise<Result<{ status: "connected" }>>;
   listCurrentCalendarEvents: () => Promise<CurrentCalendarDayResult>;
+  listCalendarEventsForDate: (
+    date: string,
+    timeZone: string,
+  ) => Promise<Result<{ events: CalendarEvent[] }>>;
   insertCalendarEvent: (
     event: CalendarInsertEvent,
   ) => Promise<Result<{ eventId: string }>>;
@@ -56,6 +61,15 @@ export default function registerServiceWorker(
         forwardRuntimeResponse(
           message.type,
           handlers.listCurrentCalendarEvents,
+          sendResponse,
+        );
+        return true;
+      }
+
+      if (message?.type === "calendar.listEventsForDate") {
+        forwardRuntimeResponse(
+          message.type,
+          () => handlers.listCalendarEventsForDate(message.date, message.timeZone),
           sendResponse,
         );
         return true;

@@ -112,4 +112,17 @@ describe("Daily focus Calendar mapping", () => {
     expect(findDailyFocusCalendarEvent(events, "2026-07-15", "9"))
       .toMatchObject({ id: "configured-focus" });
   });
+
+  it("does not select a configured-color focus from another date", () => {
+    const events: CalendarEvent[] = [{
+      kind: "allDay",
+      id: "prior-focus",
+      summary: "Prior focus",
+      colorId: "5",
+      startDate: "2026-07-14",
+      endDate: "2026-07-15",
+    }];
+
+    expect(findDailyFocusCalendarEvent(events, "2026-07-15")).toBeUndefined();
+  });
 });

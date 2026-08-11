@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from "vitest";
 import registerServiceWorker from "../../src/background/register-service-worker";
 
 type MessageListener = (
-  message: { type?: string; event?: unknown; todayDate?: string },
+  message: { type?: string; event?: unknown; todayDate?: string; date?: string; timeZone?: string },
   sender: unknown,
   sendResponse: (response: unknown) => void,
 ) => boolean;
@@ -61,6 +61,10 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
         timeZone: "America/Los_Angeles",
       },
     })),
+    listCalendarEventsForDate: vi.fn(async () => ({
+      ok: true as const,
+      value: { events: [] },
+    })),
     insertCalendarEvent: vi.fn(async () => ({
       ok: true as const,
       value: { eventId: "calendar-actual-id" },
@@ -83,7 +87,7 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
 
 async function sendMessage(
   listener: MessageListener,
-  message: { type?: string; event?: unknown; todayDate?: string },
+  message: { type?: string; event?: unknown; todayDate?: string; date?: string; timeZone?: string },
 ) {
   const sendResponse = vi.fn();
   const keepsChannelOpen = listener(message, undefined, sendResponse);

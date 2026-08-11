@@ -63,7 +63,8 @@ export function createRuntimeMessageHandlers(
     saveDayRecord: dependencies.saveDayRecord,
     deleteDayRecord: dependencies.deleteDayRecord,
     now,
-    listCalendarEvents: calendar.listEventsForDayRecord,
+    listCalendarEvents: (record) =>
+      calendar.listEventsForDate(record.date, record.timezone),
     insertCalendarEvent: calendar.insertEvent,
   };
   let inFlightCatchUp: Promise<Result<CatchUpRunResult>> | undefined;
@@ -98,6 +99,7 @@ export function createRuntimeMessageHandlers(
           : result,
       ),
     listCurrentCalendarEvents: calendar.listCurrentDayEvents,
+    listCalendarEventsForDate: calendar.listEventsForDate,
     insertCalendarEvent: calendar.insertEvent,
     runCatchUp: handleCatchUpRequest,
   };

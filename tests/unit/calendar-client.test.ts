@@ -88,36 +88,21 @@ describe("createCalendarClient", () => {
     ]);
   });
 
-  it("lists historical events using the record date and timezone", async () => {
-    const listPrimaryCalendarEvents = vi.fn(async () => ({
-      ok: true as const,
-      value: {
-        events: [],
-        timeZone: "America/Los_Angeles",
+  it("lists one explicitly requested local date", async () => {
+    const { dependencies, operations } = installCalendarOperations();
+
+    await operations.listEventsForDate(
+      "2026-07-13",
+      "America/Los_Angeles",
+    );
+
+    expect(dependencies.listPrimaryCalendarEvents).toHaveBeenCalledWith(
+      "token-123",
+      {
+        timeMin: "2026-07-13T07:00:00.000Z",
+        timeMax: "2026-07-14T07:00:00.000Z",
       },
-    }));
-    const operations = createCalendarClient({
-      requestCachedToken: vi.fn(async () => ({
-        ok: true as const,
-        value: "token-123",
-      })),
-      listPrimaryCalendarEvents,
-      insertPrimaryCalendarEvent: vi.fn(),
-    });
-
-    await operations.listEventsForDayRecord({
-      schemaVersion: 1,
-      date: "2026-07-14",
-      timezone: "America/Los_Angeles",
-      actual: [],
-      revised: [],
-      updatedAt: "2026-07-14T18:00:00.000Z",
-    });
-
-    expect(listPrimaryCalendarEvents).toHaveBeenCalledWith("token-123", {
-      timeMin: "2026-07-14T07:00:00.000Z",
-      timeMax: "2026-07-15T07:00:00.000Z",
-    });
+    );
   });
 
   it("lists today's Calendar events with a silently cached token", async () => {

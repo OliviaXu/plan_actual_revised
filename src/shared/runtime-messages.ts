@@ -14,6 +14,10 @@ type RuntimeMessageMap = {
     request: { type: "calendar.listEvents" };
     response: Result<{ events: CalendarEvent[]; date: string; timeZone: string }>;
   };
+  "calendar.listEventsForDate": {
+    request: { type: "calendar.listEventsForDate"; date: string; timeZone: string };
+    response: Result<{ events: CalendarEvent[] }>;
+  };
   "calendar.insertEvent": {
     request: { type: "calendar.insertEvent"; event: CalendarInsertEvent };
     response: Result<{ eventId: string }>;
@@ -32,6 +36,9 @@ export function sendRuntimeMessage(
 export function sendRuntimeMessage(
   message: RuntimeMessageMap["calendar.listEvents"]["request"],
 ): Promise<RuntimeMessageMap["calendar.listEvents"]["response"]>;
+export function sendRuntimeMessage(
+  message: RuntimeMessageMap["calendar.listEventsForDate"]["request"],
+): Promise<RuntimeMessageMap["calendar.listEventsForDate"]["response"]>;
 export function sendRuntimeMessage(
   message: RuntimeMessageMap["calendar.insertEvent"]["request"],
 ): Promise<RuntimeMessageMap["calendar.insertEvent"]["response"]>;

@@ -130,11 +130,12 @@ test("commits one daily focus, trusts creation, and reloads it from Calendar", a
       transparency: "transparent",
       reminders: { useDefault: false },
     });
-    expect(await readStorage(page, "test:focusListCount")).toBe(1);
+    // One current-day read plus the isolated Monday practice read.
+    expect(await readStorage(page, "test:focusListCount")).toBe(2);
 
     await page.reload();
     await expect(page.getByText("Write the difficult proposal")).toBeVisible();
-    expect(await readStorage(page, "test:focusListCount")).toBe(2);
+    expect(await readStorage(page, "test:focusListCount")).toBe(4);
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });
@@ -177,13 +178,14 @@ test("reconciles a failed save and restores the ordinary form when absent", asyn
     await expect(input).toBeEnabled();
     await expect(input).toHaveValue("Ship the hard thing");
     await expect(page.getByRole("button", { name: /retry/i })).toHaveCount(0);
-    expect(await readStorage(page, "test:focusListCount")).toBe(2);
+    // Initial current-day + Monday reads, then daily-focus reconciliation.
+    expect(await readStorage(page, "test:focusListCount")).toBe(3);
 
     await input.press("Enter");
     await expect(page.getByText("Ship the hard thing")).toBeVisible();
     await expect(input).toHaveCount(0);
     expect(await readStorage(page, "test:focusInsertAttempts")).toBe(2);
-    expect(await readStorage(page, "test:focusListCount")).toBe(2);
+    expect(await readStorage(page, "test:focusListCount")).toBe(3);
   } finally {
     await context.close();
     await fs.rm(extensionPath, { recursive: true, force: true });

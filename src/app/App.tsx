@@ -144,6 +144,7 @@ export function App({
               now={now}
               planEvents={calendarState.planEvents}
               dailyFocusSummary={calendarState.dailyFocusSummary}
+              weeklyPracticeState={calendarState.weeklyPracticeState}
               appSurface={appSurface}
             />
           )}

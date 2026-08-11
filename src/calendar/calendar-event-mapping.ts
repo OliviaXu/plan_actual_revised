@@ -23,6 +23,59 @@ export function calendarEventIdForDailyFocus(date: string) {
   return `parfocus${date.replaceAll("-", "")}`;
 }
 
+export function calendarEventIdForWeeklyPractice(mondayDate: string) {
+  return `parpractice${mondayDate.replaceAll("-", "")}`;
+}
+
+export function isWeeklyPracticeVisible(date: string) {
+  return DateTime.fromISO(date, { zone: "utc" }).weekday <= 5;
+}
+
+export function getWeeklyPracticeMonday(date: string) {
+  const dateInCalendarTimeZone = DateTime.fromISO(date, { zone: "utc" });
+  return dateInCalendarTimeZone
+    .minus({ days: dateInCalendarTimeZone.weekday - 1 })
+    .toISODate()!;
+}
+
+export function mapWeeklyPracticeToCalendarEvent({
+  mondayDate,
+  summary,
+  weeklyLearningColorId = defaultSettings.weeklyLearningColorId,
+}: {
+  mondayDate: string;
+  summary: string;
+  weeklyLearningColorId?: string;
+}): CalendarInsertEvent {
+  return {
+    id: calendarEventIdForWeeklyPractice(mondayDate),
+    summary,
+    start: { date: mondayDate },
+    end: {
+      date: DateTime.fromISO(mondayDate, { zone: "utc" })
+        .plus({ days: 1 })
+        .toISODate()!,
+    },
+    colorId: weeklyLearningColorId,
+    visibility: "private",
+    transparency: "transparent",
+    reminders: { useDefault: false },
+  };
+}
+
+export function findWeeklyPracticeCalendarEvent(
+  events: CalendarEvent[],
+  mondayDate: string,
+  weeklyLearningColorId = defaultSettings.weeklyLearningColorId,
+) {
+  const mondayEvents = events.filter(
+    (event) => event.kind === "allDay" && event.startDate === mondayDate,
+  );
+  return mondayEvents.find(
+    (event) => event.id === calendarEventIdForWeeklyPractice(mondayDate),
+  ) ?? mondayEvents.find((event) => event.colorId === weeklyLearningColorId);
+}
+
 export function mapDailyFocusToCalendarEvent({
   date,
   summary,
@@ -58,7 +111,7 @@ export function findDailyFocusCalendarEvent(
   dailyFocusColorId = defaultSettings.dailyFocusColorId,
 ) {
   const allDayEvents = events.filter(
-    (event) => event.kind === "allDay",
+    (event) => event.kind === "allDay" && event.startDate === date,
   );
   return allDayEvents.find(
     (event) => event.id === calendarEventIdForDailyFocus(date),

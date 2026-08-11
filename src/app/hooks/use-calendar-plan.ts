@@ -1,13 +1,18 @@
 import { useEffect, useState } from "react";
+import { DateTime } from "luxon";
 
 import {
   findDailyFocusCalendarEvent,
+  findWeeklyPracticeCalendarEvent,
+  getWeeklyPracticeMonday,
+  isWeeklyPracticeVisible,
   mapCalendarEventsToPlanEvents,
 } from "../../calendar/calendar-event-mapping";
 import type { PlanEvent } from "../../domain/day-event";
 import { defaultSettings } from "../../config/settings";
 import { getZonedTime } from "../../shared/zoned-time";
 import { sendRuntimeMessage } from "../../shared/runtime-messages";
+import type { WeeklyPracticeState } from "./use-weekly-practice";
 
 export type CalendarState =
   | { status: "loading" }
@@ -17,6 +22,7 @@ export type CalendarState =
       status: "connected";
       planEvents: PlanEvent[];
       dailyFocusSummary: string | null | undefined;
+      weeklyPracticeState?: WeeklyPracticeState;
     }
   | { status: "error"; message: string };
 
@@ -42,12 +48,26 @@ export function useCalendarPlan(now: () => Date) {
     };
   });
 
+  function setWeeklyPracticeState(weeklyPracticeState: WeeklyPracticeState) {
+    setCalendarState((current) => current.status === "connected"
+      ? { ...current, weeklyPracticeState }
+      : current);
+  }
+
   useEffect(() => {
     let active = true;
     void requestCalendarPlan().then((result) => {
       if (!active) return;
       if (result.calendarDay) setCalendarDay(result.calendarDay);
       setCalendarState(result.calendarState);
+      if (
+        result.calendarDay &&
+        result.calendarState.status === "connected" &&
+        result.calendarState.weeklyPracticeState === undefined &&
+        isWeeklyPracticeVisible(result.calendarDay.date)
+      ) {
+        void loadWeeklyPractice(result.calendarDay).then(setWeeklyPracticeState);
+      }
     });
 
     return () => {
@@ -75,6 +95,14 @@ export function useCalendarPlan(now: () => Date) {
       const result = await requestCalendarPlan();
       if (result.calendarDay) setCalendarDay(result.calendarDay);
       setCalendarState(result.calendarState);
+      if (
+        result.calendarDay &&
+        result.calendarState.status === "connected" &&
+        result.calendarState.weeklyPracticeState === undefined &&
+        isWeeklyPracticeVisible(result.calendarDay.date)
+      ) {
+        void loadWeeklyPractice(result.calendarDay).then(setWeeklyPracticeState);
+      }
     } catch {
       setCalendarState({
         status: "disconnected",
@@ -90,6 +118,15 @@ async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
   try {
     const response = await sendRuntimeMessage({ type: "calendar.listEvents" });
     if (response.ok) {
+      const isMonday = DateTime.fromISO(response.value.date, {
+        zone: "utc",
+      }).weekday === 1;
+      const weeklyPracticeEvent = isMonday
+        ? findWeeklyPracticeCalendarEvent(
+            response.value.events,
+            response.value.date,
+          )
+        : undefined;
       return {
         calendarDay: {
           date: response.value.date,
@@ -101,6 +138,14 @@ async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
             response.value.events,
             response.value.date,
           )?.summary,
+          ...(isMonday
+            ? {
+                weeklyPracticeState: {
+                  status: "loaded" as const,
+                  summary: weeklyPracticeEvent?.summary,
+                },
+              }
+            : {}),
           planEvents: mapCalendarEventsToPlanEvents(
             response.value.events,
             response.value.date,
@@ -128,5 +173,25 @@ async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
         message: "Unable to reach the background Calendar boundary.",
       },
     };
+  }
+}
+
+async function loadWeeklyPractice(
+  calendarDay: CalendarDay,
+): Promise<WeeklyPracticeState> {
+  const mondayDate = getWeeklyPracticeMonday(calendarDay.date);
+  try {
+    const response = await sendRuntimeMessage({
+      type: "calendar.listEventsForDate",
+      date: mondayDate,
+      timeZone: calendarDay.timeZone,
+    });
+    if (!response.ok) return { status: "error" };
+    const event = findWeeklyPracticeCalendarEvent(response.value.events, mondayDate);
+    return event
+      ? { status: "loaded", summary: event.summary }
+      : { status: "loaded", summary: undefined };
+  } catch {
+    return { status: "error" };
   }
 }

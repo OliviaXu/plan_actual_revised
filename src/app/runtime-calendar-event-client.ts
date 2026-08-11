@@ -15,6 +15,20 @@ export const runtimeCalendarEventClient = {
       return calendarBoundaryUnavailable();
     }
   },
+  listCalendarEventsForDate: async (
+    date: string,
+    timeZone: string,
+  ): Promise<Result<{ events: CalendarEvent[] }>> => {
+    try {
+      return await sendRuntimeMessage({
+        type: "calendar.listEventsForDate",
+        date,
+        timeZone,
+      });
+    } catch {
+      return calendarBoundaryUnavailable();
+    }
+  },
   insertCalendarEvent: async (
     event: CalendarInsertEvent,
   ): Promise<Result<{ eventId: string }>> => {

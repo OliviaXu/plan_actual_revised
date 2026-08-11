@@ -4,7 +4,6 @@ import type {
   CalendarInsertEvent,
 } from "../calendar/calendar-event";
 import type { CalendarLoadStats } from "../calendar/google-calendar-client";
-import type { DayRecord } from "../domain/day-record";
 import type { Result } from "../shared/result";
 import { getZonedDayRange, getZonedTime } from "../shared/zoned-time";
 
@@ -43,9 +42,23 @@ export function createCalendarClient(
 
   return {
     listCurrentDayEvents,
-    listEventsForDayRecord,
+    listEventsForDate,
     insertEvent,
   };
+
+  async function listEventsForDate(date: string, timeZone: string) {
+    const authResult = await dependencies.requestCachedToken();
+    if (!authResult.ok) return authResult;
+    const result = await listEventsForZonedDate(
+      dependencies,
+      authResult.value,
+      date,
+      timeZone,
+    );
+    return result.ok
+      ? { ok: true as const, value: { events: result.value.events } }
+      : result;
+  }
 
   function listCurrentDayEvents() {
     if (!inFlightRead) {
@@ -68,33 +81,6 @@ export function createCalendarClient(
     return inFlightRead;
   }
 
-  async function listEventsForDayRecord(
-    record: DayRecord,
-  ): Promise<Result<{ events: CalendarEvent[] }>> {
-    const authResult = await dependencies.requestCachedToken();
-    if (!authResult.ok) {
-      return {
-        ok: false,
-        error: {
-          code: "AUTH_NOT_CONNECTED",
-          message: "Connect Calendar before catching up Actuals.",
-        },
-      };
-    }
-
-    const range = getZonedDayRange(record.date, record.timezone);
-    const result = await dependencies.listPrimaryCalendarEvents(
-      authResult.value,
-      {
-        timeMin: range.start.toISOString(),
-        timeMax: range.end.toISOString(),
-      },
-    );
-    return result.ok
-      ? { ok: true, value: { events: result.value.events } }
-      : result;
-  }
-
   async function insertEvent(event: CalendarInsertEvent) {
     const authResult = await dependencies.requestCachedToken();
     if (!authResult.ok) {
@@ -109,6 +95,19 @@ export function createCalendarClient(
     return dependencies.insertPrimaryCalendarEvent(authResult.value, event);
   }
 
+}
+
+function listEventsForZonedDate(
+  dependencies: CalendarClientDependencies,
+  token: string,
+  date: string,
+  timeZone: string,
+) {
+  const range = getZonedDayRange(date, timeZone);
+  return dependencies.listPrimaryCalendarEvents(token, {
+    timeMin: range.start.toISOString(),
+    timeMax: range.end.toISOString(),
+  });
 }
 
 async function loadCurrentCalendarDayEvents(
@@ -137,13 +136,11 @@ async function loadCurrentCalendarDayEvents(
 
   const assumedDate = getZonedTime(requestedAt, assumedTimezone).date;
   const assumedDay = getZonedDayRange(assumedDate, assumedTimezone);
-  const assumedRange: CalendarEventRange = {
-    timeMin: assumedDay.start.toISOString(),
-    timeMax: assumedDay.end.toISOString(),
-  };
-  let result = await dependencies.listPrimaryCalendarEvents(
+  let result = await listEventsForZonedDate(
+    dependencies,
     authResult.value,
-    assumedRange,
+    assumedDate,
+    assumedTimezone,
   );
   if (!result.ok) {
     console.info("calendar-plan-load", {
@@ -163,10 +160,12 @@ async function loadCurrentCalendarDayEvents(
     calendarDay.start.getTime() !== assumedDay.start.getTime() ||
     calendarDay.end.getTime() !== assumedDay.end.getTime()
   ) {
-    result = await dependencies.listPrimaryCalendarEvents(authResult.value, {
-      timeMin: calendarDay.start.toISOString(),
-      timeMax: calendarDay.end.toISOString(),
-    });
+    result = await listEventsForZonedDate(
+      dependencies,
+      authResult.value,
+      calendarDate,
+      result.value.timeZone,
+    );
     if (!result.ok) return result;
   }
 
