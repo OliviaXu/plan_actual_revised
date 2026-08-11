@@ -1,7 +1,7 @@
 import { Button } from "./ui/button";
 import { Toast, type ToastAction } from "./ui/toast";
 import { DayGrid } from "./DayGrid";
-import { DailyFocusBanner } from "./DailyFocusBanner";
+import { IntentionBanner } from "./IntentionBanner";
 import { EventEditor } from "./EventEditor";
 import {
   slackLaunchFailureToastContent,
@@ -23,7 +23,6 @@ import {
   useWeeklyPractice,
   type WeeklyPracticeState,
 } from "../hooks/use-weekly-practice";
-import { WeeklyPracticeBanner } from "./WeeklyPracticeBanner";
 import {
   isWeeklyPracticeVisible,
 } from "../../calendar/calendar-event-mapping";
@@ -95,7 +94,8 @@ export function DayPlanner({
       className="flex min-w-0 flex-col gap-6"
     >
       <div className="flex min-w-0 flex-col gap-3">
-        <DailyFocusBanner
+        <IntentionBanner
+          kind="daily-focus"
           draft={dailyFocus.draft}
           summary={dailyFocus.dailyFocusSummary}
           isSaving={dailyFocus.isSaving}
@@ -181,7 +181,8 @@ function WeeklyPracticeController({
   });
 
   return (
-    <WeeklyPracticeBanner
+    <IntentionBanner
+      kind="weekly-practice"
       draft={weeklyPractice.draft}
       summary={weeklyPractice.summary}
       isSaving={weeklyPractice.isSaving}
