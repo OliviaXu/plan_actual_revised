@@ -45,10 +45,10 @@ describe("extension manifest", () => {
       icons?: unknown;
     };
     const frogIcons = {
-      "16": "icons/frog-16.png",
-      "32": "icons/frog-32.png",
-      "48": "icons/frog-48.png",
-      "128": "icons/frog-128.png",
+      "16": "icons/frog-full-16.png",
+      "32": "icons/frog-full-32.png",
+      "48": "icons/frog-full-48.png",
+      "128": "icons/frog-full-128.png",
     };
 
     expect(manifest.icons).toEqual(frogIcons);
