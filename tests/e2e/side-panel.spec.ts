@@ -19,6 +19,83 @@ async function loadExtension(extensionPath: string) {
   return { context, extensionId, serviceWorker };
 }
 
+test("the extension action reuses the standalone app tab outside Calendar", async () => {
+  const extensionPath = await fs.mkdtemp(
+    path.join(os.tmpdir(), "standalone-action-extension-"),
+  );
+  await fs.cp(path.resolve("dist"), extensionPath, { recursive: true });
+  const { context, extensionId, serviceWorker } = await loadExtension(extensionPath);
+  const sourcePage = await context.newPage();
+
+  try {
+    await sourcePage.route("https://example.com/**", (route) =>
+      route.fulfill({ contentType: "text/html", body: "<title>Source</title>" }),
+    );
+    await sourcePage.goto("https://example.com/extension-action-source");
+
+    const browser = context.browser();
+    if (!browser) {
+      throw new Error("Persistent Chromium context has no browser connection");
+    }
+    const browserSession = await browser.newBrowserCDPSession();
+    const tabTargetFilter = [
+      { type: "tab", exclude: false },
+      { exclude: true },
+    ];
+    await browserSession.send("Target.setDiscoverTargets", {
+      discover: true,
+      filter: tabTargetFilter,
+    });
+    const { targetInfos } = await browserSession.send("Target.getTargets", {
+      filter: tabTargetFilter,
+    });
+    const sourceTarget = targetInfos.find(
+      (target) =>
+        target.type === "tab" &&
+        target.url === "https://example.com/extension-action-source",
+    );
+    if (!sourceTarget) {
+      throw new Error(
+        `Chrome did not expose the source tab target: ${JSON.stringify(targetInfos)}`,
+      );
+    }
+
+    await serviceWorker.evaluate(() => chrome.runtime.getManifest().name);
+
+    await browserSession.send("Extensions.triggerAction", {
+      id: extensionId,
+      targetId: sourceTarget.targetId,
+    });
+
+    await expect.poll(() => serviceWorker.evaluate(async (id) => {
+      const appUrl = `chrome-extension://${id}/index.html`;
+      return (await chrome.tabs.query({ url: appUrl })).length;
+    }, extensionId)).toBe(1);
+
+    await serviceWorker.evaluate(async (sourceUrl) => {
+      const [sourceTab] = await chrome.tabs.query({ url: sourceUrl });
+      await chrome.tabs.update(sourceTab.id!, { active: true });
+    }, "https://example.com/extension-action-source");
+
+    await browserSession.send("Extensions.triggerAction", {
+      id: extensionId,
+      targetId: sourceTarget.targetId,
+    });
+
+    await expect.poll(() => serviceWorker.evaluate(async (id) => {
+      const appUrl = `chrome-extension://${id}/index.html`;
+      const appTabs = await chrome.tabs.query({ url: appUrl });
+      return {
+        active: appTabs[0]?.active,
+        count: appTabs.length,
+      };
+    }, extensionId)).toEqual({ active: true, count: 1 });
+  } finally {
+    await context.close();
+    await fs.rm(extensionPath, { recursive: true, force: true });
+  }
+});
+
 test("the real extension action opens the panel from a Calendar tab", async () => {
   test.skip(
     getExtensionLaunchOptions().headless,

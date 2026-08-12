@@ -13,8 +13,16 @@ import {
 import { createChromeSurfaceHandlers } from "./chrome-surface-handlers";
 
 const chromeSurfaceHandlers = createChromeSurfaceHandlers({
-  openAppPage: () =>
+  findAppTabs: async () => {
+    const tabs = await chrome.tabs.query({
+      url: chrome.runtime.getURL("index.html"),
+    });
+    return tabs.map((tab) => ({ id: tab.id!, windowId: tab.windowId }));
+  },
+  createAppTab: () =>
     chrome.tabs.create({ url: chrome.runtime.getURL("index.html") }),
+  activateAppTab: (tabId) => chrome.tabs.update(tabId, { active: true }),
+  focusWindow: (windowId) => chrome.windows.update(windowId, { focused: true }),
   setSidePanelOptions: (options) => chrome.sidePanel.setOptions(options),
   openSidePanel: (options) => chrome.sidePanel.open(options),
   disableSidePanel: (options) => chrome.sidePanel.setOptions(options),

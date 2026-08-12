@@ -5,7 +5,10 @@ type SidePanelOptions = {
 };
 
 type ChromeSurfaceDependencies = {
-  openAppPage: () => Promise<unknown>;
+  findAppTabs: () => Promise<Array<{ id: number; windowId: number }>>;
+  createAppTab: () => Promise<unknown>;
+  activateAppTab: (tabId: number) => Promise<unknown>;
+  focusWindow: (windowId: number) => Promise<unknown>;
   setSidePanelOptions: (options: SidePanelOptions) => Promise<void>;
   openSidePanel: (options: { tabId: number }) => Promise<void>;
   disableSidePanel: (options: SidePanelOptions) => Promise<void>;
@@ -16,7 +19,18 @@ export function createChromeSurfaceHandlers(
   createRefreshKey: () => string = () => `${Date.now()}`,
 ) {
   return {
-    openAppPage: dependencies.openAppPage,
+    async openAppPage() {
+      const [appTab] = await dependencies.findAppTabs();
+      if (!appTab) {
+        await dependencies.createAppTab();
+        return;
+      }
+
+      await Promise.all([
+        dependencies.activateAppTab(appTab.id),
+        dependencies.focusWindow(appTab.windowId),
+      ]);
+    },
     async openCalendarSidePanel(tabId: number) {
       const refreshKey = encodeURIComponent(createRefreshKey());
       const configurePanel = dependencies.setSidePanelOptions({
