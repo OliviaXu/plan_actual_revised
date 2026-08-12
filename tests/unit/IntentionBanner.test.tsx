@@ -58,6 +58,20 @@ describe("IntentionBanner", () => {
     expect(screen.queryByRole("textbox")).not.toBeInTheDocument();
   });
 
+  it("aligns its content with the surrounding planner sections", () => {
+    render(<IntentionBanner
+      kind="daily-focus"
+      draft=""
+      summary="Deliberate practice"
+      isSaving={false}
+      onDraftChange={vi.fn()}
+      onSubmit={vi.fn()}
+    />);
+
+    expect(screen.getByTestId("daily-focus-banner"))
+      .toHaveClass("px-0", "py-2");
+  });
+
   it.each([
     {
       kind: "daily-focus" as const,

@@ -50,7 +50,7 @@ export function IntentionBanner({
   return (
     <section
       aria-label={config.sectionLabel}
-      className={`flex min-w-0 items-center gap-3 px-3 py-2 ${config.sectionClassName}`}
+      className={`flex min-w-0 items-center gap-3 px-0 py-2 ${config.sectionClassName}`}
       data-testid={config.testId}
     >
       <p className={`shrink-0 whitespace-nowrap text-[0.65rem] font-semibold tracking-[0.1em] ${config.labelClassName}`}>
