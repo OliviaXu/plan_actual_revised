@@ -147,26 +147,26 @@ export function DayGrid({
         ref={scrollViewportRef}
       >
         <div
-          className="sticky top-0 z-20 grid border-b border-border bg-muted"
+          className="sticky top-0 z-20 grid border-b border-border bg-white"
           data-testid="day-grid-header"
           ref={gridHeaderRef}
           style={{ gridTemplateColumns }}
         >
           <div
-            className="border-r border-border px-3 py-2 text-xs font-medium uppercase text-muted-foreground"
+            className="border-r border-border px-3 py-1.5 text-xs font-medium uppercase text-muted-foreground"
             data-testid="day-grid-header-axis"
           >
             Time
           </div>
           {showPlan ? (
-            <h2 className="day-grid-column-enter px-4 py-2 text-sm font-semibold">
+            <h2 className="day-grid-column-enter px-4 py-1.5 text-sm font-semibold">
               Plan
             </h2>
           ) : null}
           {revealColumn === "plan" ? (
             <RevealRailHeader column="plan" />
           ) : null}
-          <div className="flex items-center justify-between border-l border-border px-4 py-2">
+          <div className="flex items-center gap-2 border-l border-border bg-white px-4 py-1.5">
             <h2 className="text-sm font-semibold">Actual</h2>
             <div className="flex items-center gap-1.5">
               <button
@@ -185,7 +185,7 @@ export function DayGrid({
             </div>
           </div>
           {showRevised ? (
-            <h2 className="day-grid-column-enter border-l border-border px-4 py-2 text-sm font-semibold">
+            <h2 className="day-grid-column-enter border-l border-border px-4 py-1.5 text-sm font-semibold">
               Revised
             </h2>
           ) : null}

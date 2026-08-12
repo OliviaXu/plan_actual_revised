@@ -114,6 +114,16 @@ describe("DayGrid", () => {
     expect(onNewActual).toHaveBeenCalledOnce();
   });
 
+  it("keeps Actual header controls beside a flat column label", () => {
+    render(<DayGrid planEvents={[]} {...calendarDay} />);
+
+    const actualHeader = screen.getByRole("heading", { name: "Actual" })
+      .parentElement;
+
+    expect(actualHeader).toHaveClass("items-center", "gap-2", "bg-white");
+    expect(actualHeader).not.toHaveClass("justify-between");
+  });
+
   it("shows only Actual with a non-interactive Revised reveal rail", () => {
     render(
       <DayGrid
