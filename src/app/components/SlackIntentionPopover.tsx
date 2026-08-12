@@ -5,6 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "./ui/popover";
+import { Button } from "./ui/button";
 
 const iconButtonClassName =
   "inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-white/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50";
@@ -51,7 +52,7 @@ export function SlackIntentionPopover({
       <PopoverContent
         align="end"
         aria-label="Log Slack time"
-        className="w-56 p-3"
+        className="w-64 translate-x-2 -translate-y-2.5 p-4"
         onOpenAutoFocus={(event) => {
           event.preventDefault();
           inputRef.current?.focus();
@@ -75,13 +76,13 @@ export function SlackIntentionPopover({
             value={intention}
           />
           <div className="flex justify-end pt-0.5">
-            <button
-              className="inline-flex h-8 items-center justify-center rounded-sm bg-muted px-3 text-sm font-medium transition-colors hover:bg-accent focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
+            <Button
+              className="h-8 rounded-sm"
               disabled={!intention.trim()}
               type="submit"
             >
               Open Slack
-            </button>
+            </Button>
           </div>
         </form>
       </PopoverContent>

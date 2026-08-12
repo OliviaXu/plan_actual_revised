@@ -1501,7 +1501,12 @@ describe("App Slack intention", () => {
     const popover = await screen.findByRole("dialog", {
       name: "Log Slack time",
     });
-    expect(popover).toHaveClass("w-56", "p-3");
+    expect(popover).toHaveClass(
+      "w-64",
+      "p-4",
+      "translate-x-2",
+      "-translate-y-2.5",
+    );
     expect(within(popover).getByText("What are you up to?")).toBeVisible();
     const intention = within(popover).getByPlaceholderText(
       "attention is devotion :)",
@@ -1511,7 +1516,10 @@ describe("App Slack intention", () => {
     expect(intention).not.toHaveClass("rounded-sm");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
-    ).toHaveClass("h-8");
+    ).toHaveClass("h-8", "bg-primary", "text-primary-foreground");
+    expect(
+      within(popover).getByRole("button", { name: "Open Slack" }),
+    ).not.toHaveClass("bg-muted");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
     ).not.toHaveClass("w-full");
