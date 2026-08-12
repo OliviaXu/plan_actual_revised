@@ -43,7 +43,7 @@ describe("DayPlanner", () => {
     ).toBeVisible();
   });
 
-  it("keeps 24px between side-panel intentions and the day grid", async () => {
+  it("keeps Focus and Practice compact while preserving space before the day grid", async () => {
     vi.stubGlobal("chrome", {
       runtime: {
         sendMessage: vi.fn(async () => ({
@@ -76,6 +76,9 @@ describe("DayPlanner", () => {
     await waitFor(() => expect(
       screen.getByRole("region", { name: "Day grid" }).parentElement,
     ).toHaveClass("gap-6"));
+
+    expect(screen.getByTestId("daily-focus-banner").parentElement)
+      .toHaveClass("gap-1");
   });
 
   it("does not mount an editable practice before Calendar resolves it", () => {

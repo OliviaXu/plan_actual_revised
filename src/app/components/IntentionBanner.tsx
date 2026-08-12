@@ -7,25 +7,25 @@ const intentionBannerConfig = {
     sectionLabel: "Something hard today",
     formLabel: "Daily focus",
     label: "SOMETHING HARD TODAY",
-    placeholder: "struggling is how learning happens",
+    placeholder: "eat the frog",
     testId: "daily-focus-banner",
     commitName: "daily focus",
-    sectionClassName: "border-amber-300/70 bg-amber-100/70 text-amber-950",
+    sectionClassName: "text-amber-950",
     labelClassName: "text-amber-800",
     inputClassName: "border-amber-400 caret-amber-800 placeholder:text-amber-800/60 focus:border-amber-700",
-    buttonClassName: "text-amber-800 hover:bg-amber-200/70 hover:text-amber-950 focus-visible:ring-amber-800 disabled:opacity-40",
+    buttonClassName: "text-amber-800 hover:text-amber-950 focus-visible:ring-amber-800 disabled:opacity-40",
   },
   "weekly-practice": {
     sectionLabel: "Weekly practice",
     formLabel: "Weekly practice",
     label: "MY PRACTICE THIS WEEK",
-    placeholder: "practice",
+    placeholder: "let’s compound",
     testId: "weekly-practice-banner",
     commitName: "weekly practice",
-    sectionClassName: "border-rose-300/70 bg-rose-100/70 text-rose-950",
+    sectionClassName: "text-rose-950",
     labelClassName: "text-rose-800",
     inputClassName: "border-rose-400 placeholder:text-rose-800/60 focus:border-rose-700",
-    buttonClassName: "text-rose-800 hover:bg-rose-200/70 hover:text-rose-950 focus-visible:ring-rose-800 disabled:opacity-40",
+    buttonClassName: "text-rose-800 hover:text-rose-950 focus-visible:ring-rose-800 disabled:opacity-40",
   },
 } as const satisfies Record<IntentionKind, Record<string, string>>;
 
@@ -50,7 +50,7 @@ export function IntentionBanner({
   return (
     <section
       aria-label={config.sectionLabel}
-      className={`flex min-w-0 items-center gap-3 rounded-md border px-3 py-2 ${config.sectionClassName}`}
+      className={`flex min-w-0 items-center gap-3 px-3 py-2 ${config.sectionClassName}`}
       data-testid={config.testId}
     >
       <p className={`shrink-0 whitespace-nowrap text-[0.65rem] font-semibold tracking-[0.1em] ${config.labelClassName}`}>

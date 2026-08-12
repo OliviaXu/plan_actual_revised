@@ -9,14 +9,14 @@ describe("IntentionBanner", () => {
       kind: "daily-focus" as const,
       formName: "Daily focus",
       label: "SOMETHING HARD TODAY",
-      placeholder: "struggling is how learning happens",
+      placeholder: "eat the frog",
       testId: "daily-focus-banner",
     },
     {
       kind: "weekly-practice" as const,
       formName: "Weekly practice",
       label: "MY PRACTICE THIS WEEK",
-      placeholder: "practice",
+      placeholder: "let’s compound",
       testId: "weekly-practice-banner",
     },
   ])("renders and submits the $kind configuration", ({
@@ -63,19 +63,19 @@ describe("IntentionBanner", () => {
       kind: "daily-focus" as const,
       buttonName: "Commit daily focus",
       textClassName: "text-amber-800",
-      hoverClassName: "hover:bg-amber-200/70",
+      inputBorderClassName: "border-amber-400",
     },
     {
       kind: "weekly-practice" as const,
       buttonName: "Commit weekly practice",
       textClassName: "text-rose-800",
-      hoverClassName: "hover:bg-rose-200/70",
+      inputBorderClassName: "border-rose-400",
     },
-  ])("uses a flat, high-contrast action for $kind", ({
+  ])("uses a flat, color-coded treatment for $kind", ({
     kind,
     buttonName,
     textClassName,
-    hoverClassName,
+    inputBorderClassName,
   }) => {
     render(<IntentionBanner
       kind={kind}
@@ -88,8 +88,18 @@ describe("IntentionBanner", () => {
 
     const button = screen.getByRole("button", { name: buttonName });
     expect(button).not.toHaveClass("border", "bg-rose-200/70");
-    expect(button).toHaveClass(textClassName, hoverClassName);
+    expect(button).toHaveClass(textClassName);
     expect(button.querySelector("svg")).toHaveAttribute("stroke-width", "2.5");
+
+    const banner = screen.getByTestId(
+      kind === "daily-focus" ? "daily-focus-banner" : "weekly-practice-banner",
+    );
+    expect(banner).not.toHaveClass("border");
+    expect(banner).not.toHaveClass("border-b");
+    expect(banner).not.toHaveClass("bg-amber-100/70");
+    expect(banner).not.toHaveClass("bg-rose-100/70");
+    expect(banner).not.toHaveClass("rounded-md");
+    expect(screen.getByRole("textbox")).toHaveClass("border-b", inputBorderClassName);
   });
 
   it.each([

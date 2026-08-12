@@ -15,7 +15,7 @@ test("real Calendar daily focus can be recreated after manual deletion", async (
   await requireConnectedCalendar(page);
 
   try {
-    const input = page.getByPlaceholder("struggling is how learning happens");
+    const input = page.getByPlaceholder("eat the frog");
     if (await input.count() === 0) {
       throw new Error(
         "The dedicated profile already has a daily focus for today; remove it before running this smoke test.",

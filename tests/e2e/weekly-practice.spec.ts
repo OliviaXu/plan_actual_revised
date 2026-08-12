@@ -80,7 +80,7 @@ test("loads Monday only, creates practice, and reloads it", async () => {
   const extensionPath = await createExtension("empty");
   const { context, page } = await openExtension(extensionPath, "empty");
   try {
-    const input = page.getByPlaceholder("practice");
+    const input = page.getByPlaceholder("let’s compound");
     await input.fill("  Concise writing  ");
     await input.press("Enter");
     await expect(page.getByText("Concise writing")).toBeVisible();

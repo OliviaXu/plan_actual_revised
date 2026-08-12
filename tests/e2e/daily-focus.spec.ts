@@ -109,7 +109,7 @@ test("commits one daily focus, trusts creation, and reloads it from Calendar", a
 
   try {
     const input = page.getByPlaceholder(
-      "struggling is how learning happens",
+      "eat the frog",
     );
     await expect(input).toBeVisible();
     await input.fill("  Write the difficult proposal  ");
@@ -152,7 +152,7 @@ test("shows only the first canonical configured-color focus", async () => {
     ).toHaveCount(0);
     await expect(page.getByText("Ignored second focus")).toHaveCount(0);
     await expect(
-      page.getByPlaceholder("struggling is how learning happens"),
+      page.getByPlaceholder("eat the frog"),
     ).toHaveCount(0);
   } finally {
     await context.close();
@@ -166,7 +166,7 @@ test("reconciles a failed save and restores the ordinary form when absent", asyn
 
   try {
     const input = page.getByPlaceholder(
-      "struggling is how learning happens",
+      "eat the frog",
     );
     await input.fill("Ship the hard thing");
     await input.press("Enter");

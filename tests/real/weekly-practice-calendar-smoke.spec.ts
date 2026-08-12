@@ -15,7 +15,7 @@ test("real Calendar weekly practice can be recreated after manual deletion", asy
   await requireConnectedCalendar(page);
 
   try {
-    const input = page.getByPlaceholder("practice");
+    const input = page.getByPlaceholder("let’s compound");
     await expect(input).toBeVisible();
 
     await input.fill(firstSummary);

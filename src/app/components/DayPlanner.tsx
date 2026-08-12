@@ -93,7 +93,7 @@ export function DayPlanner({
     <div
       className="flex min-w-0 flex-col gap-6"
     >
-      <div className="flex min-w-0 flex-col gap-3">
+      <div className="flex min-w-0 flex-col gap-1">
         <IntentionBanner
           kind="daily-focus"
           draft={dailyFocus.draft}
