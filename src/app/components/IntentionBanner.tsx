@@ -13,7 +13,7 @@ const intentionBannerConfig = {
     sectionClassName: "border-amber-300/70 bg-amber-100/70 text-amber-950",
     labelClassName: "text-amber-800",
     inputClassName: "border-amber-400 caret-amber-800 placeholder:text-amber-800/60 focus:border-amber-700",
-    buttonClassName: "text-amber-700 hover:text-amber-950 focus-visible:ring-amber-700 disabled:opacity-40",
+    buttonClassName: "text-amber-800 hover:bg-amber-200/70 hover:text-amber-950 focus-visible:ring-amber-800 disabled:opacity-40",
   },
   "weekly-practice": {
     sectionLabel: "Weekly practice",
@@ -25,7 +25,7 @@ const intentionBannerConfig = {
     sectionClassName: "border-rose-300/70 bg-rose-100/70 text-rose-950",
     labelClassName: "text-rose-800",
     inputClassName: "border-rose-400 placeholder:text-rose-800/60 focus:border-rose-700",
-    buttonClassName: "border border-rose-400 bg-rose-200/70 disabled:opacity-50",
+    buttonClassName: "text-rose-800 hover:bg-rose-200/70 hover:text-rose-950 focus-visible:ring-rose-800 disabled:opacity-40",
   },
 } as const satisfies Record<IntentionKind, Record<string, string>>;
 
@@ -84,7 +84,7 @@ export function IntentionBanner({
             disabled={!normalizedDraft || isSaving}
             type="submit"
           >
-            <Check aria-hidden="true" className="h-4 w-4" />
+            <Check aria-hidden="true" className="h-4 w-4" strokeWidth={2.5} />
           </button>
         </form>
       )}

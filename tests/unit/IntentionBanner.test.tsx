@@ -61,6 +61,40 @@ describe("IntentionBanner", () => {
   it.each([
     {
       kind: "daily-focus" as const,
+      buttonName: "Commit daily focus",
+      textClassName: "text-amber-800",
+      hoverClassName: "hover:bg-amber-200/70",
+    },
+    {
+      kind: "weekly-practice" as const,
+      buttonName: "Commit weekly practice",
+      textClassName: "text-rose-800",
+      hoverClassName: "hover:bg-rose-200/70",
+    },
+  ])("uses a flat, high-contrast action for $kind", ({
+    kind,
+    buttonName,
+    textClassName,
+    hoverClassName,
+  }) => {
+    render(<IntentionBanner
+      kind={kind}
+      draft="Deliberate practice"
+      summary={undefined}
+      isSaving={false}
+      onDraftChange={vi.fn()}
+      onSubmit={vi.fn()}
+    />);
+
+    const button = screen.getByRole("button", { name: buttonName });
+    expect(button).not.toHaveClass("border", "bg-rose-200/70");
+    expect(button).toHaveClass(textClassName, hoverClassName);
+    expect(button.querySelector("svg")).toHaveAttribute("stroke-width", "2.5");
+  });
+
+  it.each([
+    {
+      kind: "daily-focus" as const,
       inputName: "Something hard today",
       pendingButtonName: "Committing daily focus",
     },
