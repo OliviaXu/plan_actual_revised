@@ -36,4 +36,29 @@ describe("extension manifest", () => {
 
     expect(extensionId).toBe("bfengchfabdjhbipmfdgbboffkccmlml");
   });
+
+  it("declares the frog artwork at every Chrome extension icon size", async () => {
+    const manifest = JSON.parse(
+      await readFile(path.resolve("public/manifest.json"), "utf8"),
+    ) as {
+      action?: { default_icon?: unknown };
+      icons?: unknown;
+    };
+    const frogIcons = {
+      "16": "icons/frog-16.png",
+      "32": "icons/frog-32.png",
+      "48": "icons/frog-48.png",
+      "128": "icons/frog-128.png",
+    };
+
+    expect(manifest.icons).toEqual(frogIcons);
+    expect(manifest.action?.default_icon).toEqual(frogIcons);
+
+    await Promise.all(
+      Object.values(frogIcons).map(async (iconPath) => {
+        const icon = await readFile(path.resolve("public", iconPath));
+        expect(icon.byteLength).toBeGreaterThan(0);
+      }),
+    );
+  });
 });
