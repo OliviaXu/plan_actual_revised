@@ -114,14 +114,29 @@ describe("DayGrid", () => {
     expect(onNewActual).toHaveBeenCalledOnce();
   });
 
-  it("keeps Actual header controls beside a flat column label", () => {
+  it("keeps Actual header controls beside a subtly tinted column label", () => {
     render(<DayGrid planEvents={[]} {...calendarDay} />);
 
     const actualHeader = screen.getByRole("heading", { name: "Actual" })
       .parentElement;
+    const header = screen.getByTestId("day-grid-header");
+    const addActual = screen.getByRole("button", { name: "Add Actual" });
+    const logSlack = screen.getByRole("button", { name: "Log Slack time" });
 
-    expect(actualHeader).toHaveClass("items-center", "gap-2", "bg-white");
-    expect(actualHeader).not.toHaveClass("justify-between");
+    expect(header).toHaveClass("bg-muted/60");
+    expect(actualHeader).toHaveClass("items-center", "justify-between");
+    expect(actualHeader).not.toHaveClass("gap-2");
+    expect(actualHeader).toHaveClass("h-10");
+    expect(screen.getByRole("heading", { name: "Plan" })).toHaveClass("h-10");
+    expect(screen.getByRole("heading", { name: "Revised" })).toHaveClass("h-10");
+    const actionGroup = addActual.parentElement;
+
+    expect(actionGroup).toHaveClass("gap-0");
+    expect(addActual).toHaveClass("rounded-full");
+    expect(addActual).not.toHaveClass("border", "border-border");
+    expect(logSlack).toHaveClass("rounded-full");
+    expect(logSlack).not.toHaveClass("border", "border-border");
+    expect(within(logSlack).getByTestId("slack-mark-icon")).toHaveClass("h-3", "w-3");
   });
 
   it("shows only Actual with a non-interactive Revised reveal rail", () => {

@@ -147,31 +147,31 @@ export function DayGrid({
         ref={scrollViewportRef}
       >
         <div
-          className="sticky top-0 z-20 grid border-b border-border bg-white"
+          className="sticky top-0 z-20 grid border-b border-border bg-muted/60"
           data-testid="day-grid-header"
           ref={gridHeaderRef}
           style={{ gridTemplateColumns }}
         >
           <div
-            className="border-r border-border px-3 py-1.5 text-xs font-medium uppercase text-muted-foreground"
+            className="flex h-10 items-center border-r border-border px-3 text-xs font-medium uppercase text-muted-foreground"
             data-testid="day-grid-header-axis"
           >
             Time
           </div>
           {showPlan ? (
-            <h2 className="day-grid-column-enter px-4 py-1.5 text-sm font-semibold">
+            <h2 className="day-grid-column-enter flex h-10 items-center px-4 text-sm font-semibold">
               Plan
             </h2>
           ) : null}
           {revealColumn === "plan" ? (
             <RevealRailHeader column="plan" />
           ) : null}
-          <div className="flex items-center gap-2 border-l border-border bg-white px-4 py-1.5">
+          <div className="flex h-10 items-center justify-between border-l border-border px-4">
             <h2 className="text-sm font-semibold">Actual</h2>
-            <div className="flex items-center gap-1.5">
+            <div className="flex items-center gap-0">
               <button
                 aria-label="Add Actual"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-white text-foreground transition-colors hover:bg-background focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
+                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
                 disabled={mutationsDisabled}
                 onClick={onNewActual}
                 type="button"
@@ -185,7 +185,7 @@ export function DayGrid({
             </div>
           </div>
           {showRevised ? (
-            <h2 className="day-grid-column-enter border-l border-border px-4 py-1.5 text-sm font-semibold">
+            <h2 className="day-grid-column-enter flex h-10 items-center border-l border-border px-4 text-sm font-semibold">
               Revised
             </h2>
           ) : null}

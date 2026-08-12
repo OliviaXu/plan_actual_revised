@@ -7,7 +7,7 @@ import {
 } from "./ui/popover";
 
 const iconButtonClassName =
-  "inline-flex h-7 w-7 items-center justify-center rounded-sm border border-border bg-white text-muted-foreground transition-colors hover:bg-background hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50";
+  "inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-white/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50";
 
 export function SlackIntentionPopover({
   disabled,
@@ -93,7 +93,7 @@ function SlackMarkIcon() {
   return (
     <svg
       aria-hidden="true"
-      className="h-4 w-4"
+      className="h-3 w-3"
       data-testid="slack-mark-icon"
       fill="currentColor"
       viewBox="0 0 24 24"
