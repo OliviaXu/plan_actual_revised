@@ -42,28 +42,23 @@ export function App({
         ? "flex w-full flex-col gap-3 px-2 py-3"
         : "mx-auto flex max-w-5xl flex-col gap-6 px-6 py-8"}
       >
-        <header className="flex items-center border-b border-border pb-5">
-          <div className="flex items-center gap-3">
-            <div className="flex h-10 w-10 items-center justify-center rounded-md bg-accent text-accent-foreground shadow-soft">
-              <CalendarDays aria-hidden="true" className="h-5 w-5" />
-            </div>
-            <div>
-              <p className="text-sm text-muted-foreground">
-                {currentDate.toLocaleDateString(undefined, {
-                  timeZone: calendarDay.timeZone,
-                  weekday: "long",
-                  month: "long",
-                  day: "numeric",
-                })}
-              </p>
-              <h1 className={sidePanel
-                ? "text-lg font-semibold tracking-normal"
-                : "text-2xl font-semibold tracking-normal"}
-              >
-                Plan / Actual / Revised
-              </h1>
-            </div>
-          </div>
+        <header
+          className="flex items-center gap-2 text-muted-foreground"
+          data-testid="app-date-header"
+        >
+          <CalendarDays
+            aria-hidden="true"
+            className="h-5 w-5 shrink-0"
+            data-testid="app-date-calendar-icon"
+          />
+          <h1 className={sidePanel ? "text-sm" : "text-base font-medium"}>
+            {currentDate.toLocaleDateString(undefined, {
+              timeZone: calendarDay.timeZone,
+              weekday: "short",
+              month: "long",
+              day: "numeric",
+            })}
+          </h1>
         </header>
 
         <CalendarSurfaceTransition transitionKey={calendarTransitionKey}>

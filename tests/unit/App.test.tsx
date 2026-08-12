@@ -111,6 +111,35 @@ afterEach(() => {
 });
 
 describe("App Plan loading", () => {
+  it("renders a compact abbreviated date header with a flat calendar icon", () => {
+    mockRuntime((message) => {
+      if (message.type === "calendar.listEvents") {
+        return new Promise(() => undefined);
+      }
+
+      return unexpectedMessage(message);
+    });
+
+    render(<App now={now} />);
+
+    const header = screen.getByTestId("app-date-header");
+    const calendarIcon = screen.getByTestId("app-date-calendar-icon");
+    expect(
+      within(header).getByRole("heading", {
+        level: 1,
+        name: "Wed, July 15",
+      }),
+    ).toBeVisible();
+    expect(
+      within(header).queryByRole("heading", {
+        name: "Plan / Actual / Revised",
+      }),
+    ).not.toBeInTheDocument();
+    expect(header).not.toHaveClass("border-b");
+    expect(calendarIcon).not.toHaveClass("bg-accent", "shadow-soft");
+    expect(within(header).queryByTestId("app-date-frog")).not.toBeInTheDocument();
+  });
+
   it("shows a flat, accessible check-in before cached auth resolves", async () => {
     let finishCalendarLoad: ((value: unknown) => void) | undefined;
     mockRuntime((message) => {

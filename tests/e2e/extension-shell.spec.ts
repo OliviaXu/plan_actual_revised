@@ -70,9 +70,16 @@ test("loads the production extension and renders its app shell", async () => {
   const { context, page } = await openExtension(path.resolve("dist"));
 
   try {
+    const dateHeader = page.getByTestId("app-date-header");
+    await expect(dateHeader).toContainText("Wed, July 15");
+    await expect(
+      page.getByRole("heading", { level: 1, name: "Wed, July 15" }),
+    ).toBeVisible();
+    await expect(page.getByTestId("app-date-calendar-icon")).toBeVisible();
+    await expect(page.getByTestId("app-date-frog")).toHaveCount(0);
     await expect(
       page.getByRole("heading", { name: "Plan / Actual / Revised" }),
-    ).toBeVisible();
+    ).toHaveCount(0);
   } finally {
     await context.close();
   }
