@@ -78,8 +78,8 @@ describe("saveDayActualsToCalendar workflow", () => {
     expect(result).toMatchObject({ saved: 1, matched: 0, failed: 0 });
     expect(result.record.actual[0]).toMatchObject({
       saveDisposition: "calendarSaved",
-      calendarEventId,
     });
+    expect(result.record.actual[0]).not.toHaveProperty("calendarEventId");
     expect(insertCalendarEvent).not.toHaveBeenCalled();
   });
 
@@ -99,7 +99,7 @@ describe("saveDayActualsToCalendar workflow", () => {
       .fn()
       .mockResolvedValueOnce({
         ok: true,
-        value: { eventId: "calendar-saved" },
+        value: undefined,
       })
       .mockResolvedValueOnce({
         ok: false,
@@ -141,7 +141,7 @@ describe("saveDayActualsToCalendar workflow", () => {
   ])("inserts an Actual when the Plan %s differs", async (_field, change) => {
     const insertCalendarEvent = vi.fn().mockResolvedValue({
       ok: true,
-      value: { eventId: "calendar-saved" },
+      value: undefined,
     });
 
     const result = await saveDayActualsToCalendar({
@@ -182,7 +182,7 @@ describe("saveDayActualsToCalendar workflow", () => {
       }),
       insertCalendarEvent: vi.fn().mockResolvedValue({
         ok: true,
-        value: { eventId: "calendar-saved" },
+        value: undefined,
       }),
       persistDayRecord,
     });
@@ -256,7 +256,7 @@ describe("saveDayActualsToCalendar workflow", () => {
     };
     const insertCalendarEvent = vi.fn().mockResolvedValue({
       ok: true,
-      value: { eventId: "calendar-slack-intention" },
+      value: undefined,
     });
 
     await saveDayActualsToCalendar({

@@ -62,6 +62,11 @@ Then run the live E2E suite in another terminal:
 npm run test:real
 ```
 
+The command builds `dist`, reloads the unpacked extension in the attached
+Chrome profile, and only then starts the tests. Focused commands such as
+`npm run test:real:focus` and `npm run test:real:practice` use the same refresh
+sequence.
+
 The isolated, Git-ignored profile lives at `.pw-profiles/calendar`; do not use a
 normal Chrome profile or open it in two Chrome processes. The default debugging
 endpoint is `127.0.0.1:9225`. Override it with `REAL_CHROME_PROFILE_DIR`,

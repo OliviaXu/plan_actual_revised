@@ -26,7 +26,7 @@ export type CalendarEventRange = {
 };
 
 export type CalendarInsertEvent = {
-  id: string;
+  id?: string;
   summary: string;
   start: { dateTime: string; timeZone: string } | { date: string };
   end: { dateTime: string; timeZone: string } | { date: string };

@@ -16,10 +16,12 @@
     "test:e2e": "npm run build && playwright test",
     "test:e2e:headed": "PW_HEADED=1 npm run test:e2e",
     "real:open": "npm run build && node scripts/bootstrap-real-chrome-profile.mjs",
-    "test:real": "npm run build && playwright test --config=playwright.real.config.ts",
-    "test:real:actual": "npm run build && playwright test --config=playwright.real.config.ts tests/real/actual-calendar-smoke.spec.ts",
-    "test:real:focus": "npm run build && playwright test --config=playwright.real.config.ts tests/real/daily-focus-calendar-smoke.spec.ts",
-    "test:real:slack": "npm run build && playwright test --config=playwright.real.config.ts tests/real/slack-intention-smoke.spec.ts",
+    "real:reload": "node scripts/reload-real-chrome-extension.mjs",
+    "test:real": "npm run build && npm run real:reload && playwright test --config=playwright.real.config.ts",
+    "test:real:actual": "npm run build && npm run real:reload && playwright test --config=playwright.real.config.ts tests/real/actual-calendar-smoke.spec.ts",
+    "test:real:focus": "npm run build && npm run real:reload && playwright test --config=playwright.real.config.ts tests/real/daily-focus-calendar-smoke.spec.ts",
+    "test:real:practice": "npm run build && npm run real:reload && playwright test --config=playwright.real.config.ts tests/real/weekly-practice-calendar-smoke.spec.ts",
+    "test:real:slack": "npm run build && npm run real:reload && playwright test --config=playwright.real.config.ts tests/real/slack-intention-smoke.spec.ts",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {

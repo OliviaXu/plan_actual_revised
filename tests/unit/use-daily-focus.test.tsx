@@ -23,7 +23,7 @@ describe("useDailyFocus", () => {
       if (message.type === "calendar.insertEvent") {
         return {
           ok: true,
-          value: { eventId: "parfocus20260715" },
+          value: undefined,
         };
       }
       throw new Error(`Unexpected ${message.type}`);

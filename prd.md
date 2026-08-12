@@ -299,8 +299,9 @@ Behavior:
 - Clicking the check button or pressing Enter creates an all-day private event for today.
 - On save success, switch to read-only display and show toast: `Daily focus saved to calendar`.
 - On save failure, keep the input editable and show a red toast with the error.
-- Show one canonical focus: prefer the extension event whose ID is derived from
-  today, otherwise show the first matching all-day event in Calendar order.
+- Show one canonical focus: the first matching all-day event in Calendar order.
+- Let Calendar assign a fresh event ID so a manually deleted focus can be
+  recreated.
 - A confirmed focus is read-only in the extension; edit it in Google Calendar.
 
 ### 8.2 Practice
@@ -315,6 +316,8 @@ Behavior:
 - If one exists, show a salmon-tinted banner with label `MY PRACTICE THIS WEEK` and its title.
 - If none exists, show an inline input with placeholder `practice` and a check button.
 - Clicking the check button or pressing Enter creates an all-day private event on that Monday.
+- Let Calendar assign a fresh event ID so a manually deleted practice can be
+  recreated.
 - Toast on save: `Weekly practice saved to calendar`.
 
 Critical behavior:

@@ -25,7 +25,7 @@ registerServiceWorker(createRuntimeMessageHandlers({
   }),
   insertPrimaryCalendarEvent: async (_token, event) => {
     await chrome.storage.local.set({ "test:lastInsert": event });
-    return { ok: true, value: { eventId: event.id } };
+    return { ok: true, value: undefined };
   },
 }, { now: () => new Date("2026-07-15T19:00:00.000Z") }));
 `,

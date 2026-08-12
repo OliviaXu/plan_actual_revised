@@ -31,7 +31,7 @@ type RuntimeMessageDependencies = Pick<
   insertPrimaryCalendarEvent: (
     token: string,
     event: CalendarInsertEvent,
-  ) => Promise<Result<{ eventId: string }>>;
+  ) => Promise<Result<void>>;
 };
 
 type CatchUpRunner = (

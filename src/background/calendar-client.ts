@@ -22,7 +22,7 @@ type CalendarClientDependencies = {
   insertPrimaryCalendarEvent: (
     token: string,
     event: CalendarInsertEvent,
-  ) => Promise<Result<{ eventId: string }>>;
+  ) => Promise<Result<void>>;
 };
 
 export type CurrentCalendarDayResult = Result<{

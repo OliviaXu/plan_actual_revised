@@ -19,7 +19,7 @@ export type CatchUpDependencies = {
   ) => Promise<Result<{ events: CalendarEvent[] }>>;
   insertCalendarEvent: (
     event: CalendarInsertEvent,
-  ) => Promise<Result<{ eventId: string }>>;
+  ) => Promise<Result<void>>;
   now: () => Date;
 };
 

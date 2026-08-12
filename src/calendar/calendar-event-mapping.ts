@@ -19,14 +19,6 @@ export function calendarEventIdForActual(blockId: string) {
   return `par${blockId.toLowerCase().replace(/-/g, "")}`;
 }
 
-export function calendarEventIdForDailyFocus(date: string) {
-  return `parfocus${date.replaceAll("-", "")}`;
-}
-
-export function calendarEventIdForWeeklyPractice(mondayDate: string) {
-  return `parpractice${mondayDate.replaceAll("-", "")}`;
-}
-
 export function isWeeklyPracticeVisible(date: string) {
   return DateTime.fromISO(date, { zone: "utc" }).weekday <= 5;
 }
@@ -48,7 +40,6 @@ export function mapWeeklyPracticeToCalendarEvent({
   weeklyLearningColorId?: string;
 }): CalendarInsertEvent {
   return {
-    id: calendarEventIdForWeeklyPractice(mondayDate),
     summary,
     start: { date: mondayDate },
     end: {
@@ -71,9 +62,7 @@ export function findWeeklyPracticeCalendarEvent(
   const mondayEvents = events.filter(
     (event) => event.kind === "allDay" && event.startDate === mondayDate,
   );
-  return mondayEvents.find(
-    (event) => event.id === calendarEventIdForWeeklyPractice(mondayDate),
-  ) ?? mondayEvents.find((event) => event.colorId === weeklyLearningColorId);
+  return mondayEvents.find((event) => event.colorId === weeklyLearningColorId);
 }
 
 export function mapDailyFocusToCalendarEvent({
@@ -90,7 +79,6 @@ export function mapDailyFocusToCalendarEvent({
   end: { date: string };
 } {
   return {
-    id: calendarEventIdForDailyFocus(date),
     summary,
     start: { date },
     end: {
@@ -114,8 +102,6 @@ export function findDailyFocusCalendarEvent(
     (event) => event.kind === "allDay" && event.startDate === date,
   );
   return allDayEvents.find(
-    (event) => event.id === calendarEventIdForDailyFocus(date),
-  ) ?? allDayEvents.find(
     (event) => event.colorId === dailyFocusColorId,
   );
 }

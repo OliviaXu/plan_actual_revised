@@ -1,32 +1,28 @@
-import { expect, test } from "@playwright/test";
+import { expect, test, type Page } from "@playwright/test";
 
 import {
   connectToRealExtension,
   requireConnectedCalendar,
 } from "./real-browser";
 
-test("real Calendar daily focus can be recreated after manual deletion", async () => {
+test("real Calendar weekly practice can be recreated after manual deletion", async () => {
   const { context, extensionId } = await connectToRealExtension();
   const page = await context.newPage();
   const runId = Date.now();
-  const firstSummary = `[PAR real focus smoke ${runId} first]`;
-  const replacementSummary = `[PAR real focus smoke ${runId} replacement]`;
+  const firstSummary = `[PAR real practice smoke ${runId} first]`;
+  const replacementSummary = `[PAR real practice smoke ${runId} replacement]`;
   await page.goto(`chrome-extension://${extensionId}/index.html`);
   await requireConnectedCalendar(page);
 
   try {
-    const input = page.getByPlaceholder("struggling is how learning happens");
-    if (await input.count() === 0) {
-      throw new Error(
-        "The dedicated profile already has a daily focus for today; remove it before running this smoke test.",
-      );
-    }
+    const input = page.getByPlaceholder("practice");
+    await expect(input).toBeVisible();
 
     await input.fill(firstSummary);
     await input.press("Enter");
     await expect(page.getByText(firstSummary)).toBeVisible();
-    await expect(page.getByTestId("daily-focus-toast")).toHaveText(
-      "Daily focus saved to calendar",
+    await expect(page.getByTestId("weekly-practice-toast")).toHaveText(
+      "Weekly practice saved to calendar",
     );
 
     await deleteCalendarEventBySummary(page, firstSummary);
@@ -45,10 +41,7 @@ test("real Calendar daily focus can be recreated after manual deletion", async (
   }
 });
 
-async function deleteCalendarEventBySummary(
-  page: import("@playwright/test").Page,
-  summary: string,
-) {
+async function deleteCalendarEventBySummary(page: Page, summary: string) {
   await page.evaluate(async (testSummary) => {
     const { token } = await chrome.identity.getAuthToken({ interactive: false });
     if (!token) return;

@@ -67,7 +67,7 @@ function installServiceWorker(overrides: Record<string, unknown> = {}) {
     })),
     insertCalendarEvent: vi.fn(async () => ({
       ok: true as const,
-      value: { eventId: "calendar-actual-id" },
+      value: undefined,
     })),
     runCatchUp: vi.fn(async () => ({
       ok: true as const,

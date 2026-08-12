@@ -102,7 +102,7 @@ describe("App operation toasts", () => {
                 message: "Response lost.",
               },
             }
-          : { ok: true, value: { eventId: "calendar-actual-id" } };
+          : { ok: true, value: undefined };
       }
       throw new Error(`Unexpected message: ${message.type}`);
     });

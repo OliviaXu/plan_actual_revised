@@ -2,26 +2,18 @@ import { describe, expect, it } from "vitest";
 
 import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import {
-  calendarEventIdForDailyFocus,
   mapDailyFocusToCalendarEvent,
   findDailyFocusCalendarEvent,
 } from "../../src/calendar/calendar-event-mapping";
 
 describe("Daily focus Calendar mapping", () => {
-  it("derives one Calendar-compatible event ID per date", () => {
-    expect(calendarEventIdForDailyFocus("2026-07-15")).toBe(
-      "parfocus20260715",
-    );
-  });
-
-  it("maps the committed focus to a private, free all-day event", () => {
+  it("lets Calendar assign a fresh ID to a committed focus", () => {
     expect(
       mapDailyFocusToCalendarEvent({
         date: "2026-07-15",
         summary: "Write the difficult proposal",
       }),
     ).toEqual({
-      id: "parfocus20260715",
       summary: "Write the difficult proposal",
       start: { date: "2026-07-15" },
       end: { date: "2026-07-16" },
@@ -42,7 +34,7 @@ describe("Daily focus Calendar mapping", () => {
     ).toMatchObject({ colorId: "9" });
   });
 
-  it("prefers the extension-owned daily event over configured-color matches", () => {
+  it("uses the first configured-color all-day event as the canonical focus", () => {
     const events: CalendarEvent[] = [
       {
         kind: "allDay",
@@ -63,7 +55,7 @@ describe("Daily focus Calendar mapping", () => {
     ];
 
     expect(findDailyFocusCalendarEvent(events, "2026-07-15"))
-      .toMatchObject({ id: "parfocus20260715", summary: "Extension focus" });
+      .toMatchObject({ id: "manual-focus", summary: "Manual focus" });
   });
 
   it("uses only the first configured-color all-day event as fallback", () => {

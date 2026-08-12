@@ -57,14 +57,14 @@ registerServiceWorker(createRuntimeMessageHandlers({
     }
     events = [{
       kind: "allDay",
-      id: event.id,
+      id: "calendar-generated-focus",
       summary: event.summary,
       description: null,
       colorId: event.colorId ?? null,
       startDate: event.start.date,
       endDate: event.end.date,
     }];
-    return { ok: true, value: { eventId: event.id } };
+    return { ok: true, value: undefined };
   },
   listDayRecords: async () => ({ records: [], invalidKeys: [] }),
   saveDayRecord: async () => undefined,
@@ -121,7 +121,6 @@ test("commits one daily focus, trusts creation, and reloads it from Calendar", a
     );
     await expect(input).toHaveCount(0);
     expect(await readStorage(page, "test:lastFocusInsert")).toEqual({
-      id: "parfocus20260715",
       summary: "Write the difficult proposal",
       start: { date: "2026-07-15" },
       end: { date: "2026-07-16" },

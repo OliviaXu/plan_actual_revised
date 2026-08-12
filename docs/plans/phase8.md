@@ -9,9 +9,8 @@ local day and treats Google Calendar as the canonical persisted record.
 ## Calendar Model
 
 The focus read path uses the successful current-day Calendar response. It
-selects one all-day event by preferring the stable extension ID
-`parfocusYYYYMMDD`, then falling back to the first event with the configured
-daily-focus color. Additional color matches are not rendered.
+selects the first all-day event with the configured daily-focus color.
+Additional color matches are not rendered.
 
 New focuses use the trimmed intention as their summary, today as the inclusive
 start, tomorrow as the exclusive end, and the configured focus color. They are
@@ -21,7 +20,9 @@ reminders. Calendar descriptions are ignored.
 ## Commit and Reconciliation
 
 A confirmed 2xx insert locks the submitted focus immediately without another
-Calendar read. The banner becomes read-only and shows the transient feedback
+Calendar read. Calendar assigns each new focus a fresh event ID, so a focus
+that was manually deleted in Calendar can be recreated. The banner becomes
+read-only and shows the transient feedback
 `Daily focus saved to calendar`.
 
 Any failed insert triggers one fresh current-day read:
@@ -32,8 +33,8 @@ Any failed insert triggers one fresh current-day read:
   remains visible.
 
 There is no separate retry control or retry mode. A later form submission is a
-normal insert using the same per-day ID. This makes ambiguous writes
-duplicate-safe while avoiding a read after proven creation.
+normal insert. Ambiguous writes reconcile by date and configured color before
+the form becomes retryable.
 
 ## User Interface
 
@@ -55,8 +56,8 @@ form accessibility, immediate 2xx locking, and reconciliation behavior.
 The deterministic Playwright tracer proves empty creation and reload, singular
 selection from duplicate color matches, and failed-save reconciliation followed
 by an ordinary resubmission. The opt-in real smoke uses a dedicated authenticated
-profile, creates a clearly prefixed focus, verifies it after reload, and removes
-only that event during cleanup.
+profile and proves a clearly prefixed focus can be deleted and recreated before
+cleaning up its replacement.
 
 ## Working Agreement
 

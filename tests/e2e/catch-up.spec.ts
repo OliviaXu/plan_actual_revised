@@ -85,7 +85,7 @@ registerServiceWorker(createRuntimeMessageHandlers({
       (${JSON.stringify(scenario)} === "expired" && event.summary.includes("expired"));
     return shouldFail
       ? { ok: false, error: { code: "CALENDAR_EVENT_INSERT_FAILED", message: "Mock insert failed." } }
-      : { ok: true, value: { eventId: event.id } };
+      : { ok: true, value: undefined };
   },
   listDayRecords,
   saveDayRecord,

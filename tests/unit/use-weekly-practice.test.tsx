@@ -8,7 +8,7 @@ afterEach(() => vi.unstubAllGlobals());
 describe("useWeeklyPractice", () => {
   it("locks after creation and uses focus-aligned feedback", async () => {
     const sendMessage = vi.fn(async () => ({
-      ok: true, value: { eventId: "parpractice20260713" },
+      ok: true, value: undefined,
     }));
     vi.stubGlobal("chrome", { runtime: { sendMessage } });
     const onFeedback = vi.fn();

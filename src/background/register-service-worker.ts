@@ -19,7 +19,7 @@ type ServiceWorkerHandlers = {
   ) => Promise<Result<{ events: CalendarEvent[] }>>;
   insertCalendarEvent: (
     event: CalendarInsertEvent,
-  ) => Promise<Result<{ eventId: string }>>;
+  ) => Promise<Result<void>>;
   runCatchUp: (
     todayDate: string,
   ) => Promise<Result<CatchUpRunResult>>;

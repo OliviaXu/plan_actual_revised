@@ -20,7 +20,7 @@ export async function insertPrimaryCalendarEvent(
   token: string,
   event: CalendarInsertEvent,
   fetchCalendar: typeof fetch = fetch,
-): Promise<Result<{ eventId: string }>> {
+): Promise<Result<void>> {
   try {
     const response = await fetchCalendar(
       "https://www.googleapis.com/calendar/v3/calendars/primary/events",
@@ -35,7 +35,7 @@ export async function insertPrimaryCalendarEvent(
     );
 
     if (response.ok) {
-      return { ok: true, value: { eventId: event.id } };
+      return { ok: true, value: undefined };
     }
 
     const body: unknown = await response.json().catch(() => null);

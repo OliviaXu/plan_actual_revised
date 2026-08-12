@@ -1,9 +1,6 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import type {
-  CalendarEvent,
-  CalendarInsertEvent,
-} from "../../src/calendar/calendar-event";
+import type { CalendarEvent } from "../../src/calendar/calendar-event";
 import type { ActualEvent } from "../../src/domain/day-event";
 import type { DayRecord } from "../../src/domain/day-record";
 import {
@@ -60,9 +57,9 @@ function dependencies(records: DayRecord[]) {
   }));
   const insertCalendarEvent = vi.fn<
     CatchUpDependencies["insertCalendarEvent"]
-  >(async (event: CalendarInsertEvent) => ({
+  >(async () => ({
     ok: true,
-    value: { eventId: event.id },
+    value: undefined,
   }));
   return {
     listDayRecords,
@@ -213,7 +210,7 @@ describe("runCatchUp", () => {
           }
         : {
             ok: true as const,
-            value: { eventId: event.id },
+            value: undefined,
           },
     );
 

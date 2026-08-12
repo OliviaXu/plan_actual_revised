@@ -28,7 +28,7 @@ describe("Actual to Calendar event mapping", () => {
     );
   });
 
-  it("inserts the complete event payload and returns the proven event ID", async () => {
+  it("inserts the complete event payload and reports success without an ID", async () => {
     const fetchCalendar = vi.fn(
       async (_input: RequestInfo | URL, _init?: RequestInit) =>
         Response.json({ id: "par123e4567e89b12d3a456426614174000" }),
@@ -38,7 +38,7 @@ describe("Actual to Calendar event mapping", () => {
       insertPrimaryCalendarEvent("token", mapActualToCalendarEvent(input), fetchCalendar),
     ).resolves.toEqual({
       ok: true,
-      value: { eventId: "par123e4567e89b12d3a456426614174000" },
+      value: undefined,
     });
 
     const [url, init] = fetchCalendar.mock.calls[0];
@@ -138,7 +138,23 @@ describe("Actual to Calendar event mapping", () => {
       ),
     ).resolves.toEqual({
       ok: true,
-      value: { eventId: "par123e4567e89b12d3a456426614174000" },
+      value: undefined,
+    });
+  });
+
+  it("does not require Calendar's generated ID when the insert did not provide one", async () => {
+    const eventWithoutId = mapActualToCalendarEvent(input);
+    delete eventWithoutId.id;
+
+    await expect(
+      insertPrimaryCalendarEvent(
+        "token",
+        eventWithoutId,
+        vi.fn(async () => new Response(null, { status: 200 })),
+      ),
+    ).resolves.toEqual({
+      ok: true,
+      value: undefined,
     });
   });
 });

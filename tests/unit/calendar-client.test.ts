@@ -30,7 +30,7 @@ function installCalendarOperations(
     })),
     insertPrimaryCalendarEvent: vi.fn(async () => ({
       ok: true as const,
-      value: { eventId: "calendar-actual-id" },
+      value: undefined,
     })),
     ...overrides,
   };
@@ -334,7 +334,7 @@ describe("createCalendarClient", () => {
 
     await expect(operations.insertEvent(insertEvent)).resolves.toEqual({
       ok: true,
-      value: { eventId: "calendar-actual-id" },
+      value: undefined,
     });
     expect(dependencies.insertPrimaryCalendarEvent).toHaveBeenCalledWith(
       "token-123",

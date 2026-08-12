@@ -14,9 +14,10 @@ Saturday and Sunday hide the banner and make no practice read. This keeps the
 query narrow and lets Plan and daily focus remain usable when Monday cannot be
 loaded.
 
-The canonical practice prefers `parpracticeYYYYMMDD`, then the first Monday
-all-day event with the configured weekly color. New practices are private,
-transparent, one-day Monday events with default reminders disabled.
+The canonical practice is the first Monday all-day event with the configured
+weekly color. New practices are private, transparent, one-day Monday events
+with default reminders disabled, and Calendar assigns each a fresh event ID so
+a manually deleted practice can be recreated.
 
 ## Commit and Reconciliation
 
@@ -42,8 +43,8 @@ selection, exact Calendar payloads, single-day reads, form behavior, creation,
 and reconciliation. Deterministic Playwright coverage proves midweek creation
 and reload, isolated Monday failure and retry, and weekend absence.
 
-The authenticated real Calendar smoke is deferred while the existing real
-smoke environment is being restored.
+The authenticated real Calendar smoke proves a practice can be created,
+manually deleted, recreated, reloaded, and cleaned up.
 
 ## Working Agreement
 

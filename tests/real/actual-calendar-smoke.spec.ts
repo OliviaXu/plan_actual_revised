@@ -13,17 +13,24 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
   await page.goto(`chrome-extension://${extensionId}/index.html`);
   await requireConnectedCalendar(page);
 
-  const testData = await page.evaluate(({ blockId }) => {
+  const testData = await page.evaluate(async ({ blockId }) => {
     const now = new Date();
-    const date = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, "0")}-${String(now.getDate()).padStart(2, "0")}`;
+    const calendarResponse = await chrome.runtime.sendMessage({
+      type: "calendar.listEvents",
+    });
+    if (!calendarResponse.ok) {
+      throw new Error("Unable to load the canonical Calendar day.");
+    }
+    const { date, timeZone } = calendarResponse.value;
     const key = `dayRecord:${date}`;
-    return chrome.storage.local.get(key).then((stored) => ({
+    const stored = await chrome.storage.local.get(key);
+    return {
       key,
       original: stored[key],
       record: {
         schemaVersion: 1,
         date,
-        timezone: Intl.DateTimeFormat().resolvedOptions().timeZone,
+        timezone: timeZone,
         actual: [{
           id: blockId,
           summary: `[PAR real smoke ${date}]`,
@@ -34,7 +41,7 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
         }],
         updatedAt: now.toISOString(),
       },
-    }));
+    };
   }, { blockId });
 
   try {

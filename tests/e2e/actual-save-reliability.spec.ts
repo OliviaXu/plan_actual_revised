@@ -56,7 +56,7 @@ registerServiceWorker(createRuntimeMessageHandlers({
       ambiguousReturned = true;
       return { ok: false, error: { code: "CALENDAR_EVENT_INSERT_FAILED", message: "Response lost." } };
     }
-    return { ok: true, value: { eventId: event.id } };
+    return { ok: true, value: undefined };
   },
 }, { now: () => new Date("2026-07-15T19:00:00.000Z") }));
 `,

@@ -29,7 +29,7 @@ type SaveDayActualsInput = {
   listCalendarEvents: () => Promise<Result<{ events: CalendarEvent[] }>>;
   insertCalendarEvent: (
     event: CalendarInsertEvent,
-  ) => Promise<Result<{ eventId: string }>>;
+  ) => Promise<Result<void>>;
 };
 
 export async function saveDayActualsToCalendar({
@@ -104,7 +104,6 @@ export async function saveDayActualsToCalendar({
         actual.id,
         {
           saveDisposition: "calendarSaved",
-          calendarEventId: existingCalendarActual.id,
           lastSaveAttemptAt: attemptedAt,
           lastSaveError: undefined,
         },
@@ -142,7 +141,6 @@ export async function saveDayActualsToCalendar({
           actual.id,
           {
             saveDisposition: "calendarSaved",
-            calendarEventId: insertResponse.value.eventId,
             lastSaveAttemptAt: attemptedAt,
             lastSaveError: undefined,
           },

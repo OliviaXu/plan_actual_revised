@@ -20,7 +20,7 @@ type RuntimeMessageMap = {
   };
   "calendar.insertEvent": {
     request: { type: "calendar.insertEvent"; event: CalendarInsertEvent };
-    response: Result<{ eventId: string }>;
+    response: Result<void>;
   };
   "catchUp.run": {
     request: { type: "catchUp.run"; todayDate: string };

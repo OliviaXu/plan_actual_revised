@@ -45,10 +45,10 @@ registerServiceWorker(createRuntimeMessageHandlers({
   insertPrimaryCalendarEvent: async (_token, event) => {
     await chrome.storage.local.set({ "test:lastPracticeInsert": event });
     mondayEvents = [{
-      kind: "allDay", id: event.id, summary: event.summary,
+      kind: "allDay", id: "calendar-generated-practice", summary: event.summary,
       colorId: event.colorId ?? null, startDate: event.start.date, endDate: event.end.date,
     }];
-    return { ok: true, value: { eventId: event.id } };
+    return { ok: true, value: undefined };
   },
   listDayRecords: async () => ({ records: [], invalidKeys: [] }),
   saveDayRecord: async () => undefined,
@@ -90,7 +90,6 @@ test("loads Monday only, creates practice, and reloads it", async () => {
     expect(await page.evaluate(async () =>
       (await chrome.storage.local.get("test:lastPracticeInsert"))["test:lastPracticeInsert"],
     )).toEqual({
-      id: "parpractice20260713",
       summary: "Concise writing",
       start: { date: "2026-07-13" },
       end: { date: "2026-07-14" },

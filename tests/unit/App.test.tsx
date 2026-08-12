@@ -879,7 +879,7 @@ describe("App Actual persistence", () => {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "calendar.insertEvent") {
-        return { ok: true, value: { eventId: "calendar-actual-id" } };
+        return { ok: true, value: undefined };
       }
       return unexpectedMessage(message);
     });
@@ -1689,7 +1689,7 @@ describe("App Actual Calendar saving", () => {
         return { ok: true, value: { events: [], date: "2026-07-15", timeZone: "America/Los_Angeles" } };
       }
       if (message.type === "calendar.insertEvent") {
-        return { ok: true, value: { eventId: "calendar-actual-id" } };
+        return { ok: true, value: undefined };
       }
       return unexpectedMessage(message);
     });
@@ -1705,7 +1705,6 @@ describe("App Actual Calendar saving", () => {
     expect(stored["dayRecord:2026-07-15"]).toMatchObject({
       actual: [{
         saveDisposition: "calendarSaved",
-        calendarEventId: "calendar-actual-id",
         lastSaveError: undefined,
       }],
     });
