@@ -92,7 +92,7 @@ export function EventEditor({
           Update this local {columnLabel} block.
         </DialogDescription>
 
-        <form className="space-y-4" noValidate onSubmit={submitDraft}>
+        <form noValidate onSubmit={submitDraft}>
           <input
             aria-label="Title"
             aria-invalid={titleError ? true : undefined}
@@ -104,10 +104,10 @@ export function EventEditor({
             value={title}
           />
           {titleError ? (
-            <p className="-mt-3 text-xs text-destructive">{titleError}</p>
+            <p className="mt-1 text-xs text-destructive">{titleError}</p>
           ) : null}
 
-          <div className="grid grid-cols-[5rem_1fr] gap-4">
+          <div className="mt-8 grid grid-cols-[5rem_1fr] gap-4">
             <div>
               <label
                 className="block text-sm font-medium"
@@ -168,7 +168,7 @@ export function EventEditor({
           </div>
 
           <div
-            className={`flex items-center pt-1 ${
+            className={`mt-3 flex items-center ${
               mode === "edit" ? "justify-between" : "justify-end"
             }`}
           >
