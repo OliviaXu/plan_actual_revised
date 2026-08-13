@@ -19,19 +19,32 @@ PopoverTrigger.displayName = PopoverPrimitive.Trigger.displayName;
 
 export const PopoverContent = forwardRef<
   ElementRef<typeof PopoverPrimitive.Content>,
-  ComponentPropsWithoutRef<typeof PopoverPrimitive.Content>
->(({ className, sideOffset = 6, ...props }, ref) => (
-  <PopoverPrimitive.Portal>
-    <PopoverPrimitive.Content
-      className={
-        className
-          ? `z-30 rounded-md border border-border bg-white outline-none ${className}`
-          : "z-30 rounded-md border border-border bg-white outline-none"
-      }
-      ref={ref}
-      sideOffset={sideOffset}
-      {...props}
-    />
-  </PopoverPrimitive.Portal>
+  ComponentPropsWithoutRef<typeof PopoverPrimitive.Content> & {
+    backdrop?: boolean;
+  }
+>(({ backdrop = false, className, sideOffset = 6, ...props }, ref) => (
+  <>
+    {backdrop ? (
+      <PopoverPrimitive.Portal>
+        <div
+          aria-hidden="true"
+          className="fixed inset-0 z-20 bg-white/40 backdrop-blur-[1px]"
+          data-testid="popover-backdrop"
+        />
+      </PopoverPrimitive.Portal>
+    ) : null}
+    <PopoverPrimitive.Portal>
+      <PopoverPrimitive.Content
+        className={
+          className
+            ? `z-30 rounded-md border border-border bg-white outline-none ${className}`
+            : "z-30 rounded-md border border-border bg-white outline-none"
+        }
+        ref={ref}
+        sideOffset={sideOffset}
+        {...props}
+      />
+    </PopoverPrimitive.Portal>
+  </>
 ));
 PopoverContent.displayName = PopoverPrimitive.Content.displayName;

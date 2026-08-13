@@ -52,6 +52,7 @@ export function SlackIntentionPopover({
       <PopoverContent
         align="end"
         aria-label="Log Slack time"
+        backdrop
         className="w-64 translate-x-2 -translate-y-2.5 p-4"
         onOpenAutoFocus={(event) => {
           event.preventDefault();

@@ -1168,7 +1168,10 @@ describe("App new Actual dialog", () => {
       target: { value: "Discarded title" },
     });
 
-    fireEvent.click(screen.getByTestId("dialog-overlay"));
+    const overlay = screen.getByTestId("dialog-overlay");
+    expect(overlay).toHaveClass("bg-white/40", "backdrop-blur-[1px]");
+    expect(overlay).not.toHaveClass("bg-black/35");
+    fireEvent.click(overlay);
 
     await waitFor(() =>
       expect(
@@ -1506,6 +1509,10 @@ describe("App Slack intention", () => {
       "p-4",
       "translate-x-2",
       "-translate-y-2.5",
+    );
+    expect(screen.getByTestId("popover-backdrop")).toHaveClass(
+      "bg-white/40",
+      "backdrop-blur-[1px]",
     );
     expect(within(popover).getByText("What are you up to?")).toBeVisible();
     const intention = within(popover).getByPlaceholderText(

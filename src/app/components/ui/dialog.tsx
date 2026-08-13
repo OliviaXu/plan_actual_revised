@@ -34,7 +34,7 @@ export const DialogContent = forwardRef<
 >(({ className, onBackdropClick, ...props }, ref) => (
   <DialogPrimitive.Portal>
     <DialogPrimitive.Overlay
-      className="fixed inset-0 z-40 bg-black/35"
+      className="fixed inset-0 z-40 bg-white/40 backdrop-blur-[1px]"
       data-testid="dialog-overlay"
       onClick={onBackdropClick}
     />
