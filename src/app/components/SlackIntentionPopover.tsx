@@ -5,10 +5,7 @@ import {
   PopoverContent,
   PopoverTrigger,
 } from "./ui/popover";
-import { Button } from "./ui/button";
-
-const iconButtonClassName =
-  "inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-muted-foreground transition-colors hover:bg-white/70 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50";
+import { Button, IconButton } from "./ui/button";
 
 export function SlackIntentionPopover({
   disabled,
@@ -40,14 +37,13 @@ export function SlackIntentionPopover({
   return (
     <Popover onOpenChange={updateOpen} open={open}>
       <PopoverTrigger asChild>
-        <button
+        <IconButton
           aria-label="Log Slack time"
-          className={iconButtonClassName}
           disabled={disabled}
-          type="button"
+          tone="muted"
         >
           <SlackMarkIcon />
-        </button>
+        </IconButton>
       </PopoverTrigger>
       <PopoverContent
         align="end"

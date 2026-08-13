@@ -173,13 +173,13 @@ export function EventEditor({
             }`}
           >
             {mode === "edit" ? (
-              <button
-                className="h-9 rounded-md px-2 text-sm font-medium text-destructive hover:bg-destructive/5"
+              <Button
                 onClick={onDelete}
                 type="button"
+                variant="destructive"
               >
                 Delete
-              </button>
+              </Button>
             ) : null}
             <Button type="submit">Save</Button>
           </div>

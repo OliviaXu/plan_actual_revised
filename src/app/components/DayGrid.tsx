@@ -23,6 +23,7 @@ import { PlanEventBlock } from "./DayGridEventBlock";
 import { DayGridTimeAxis } from "./DayGridTimeAxis";
 import { EditableEventColumn } from "./EditableEventColumn";
 import { SlackIntentionPopover } from "./SlackIntentionPopover";
+import { IconButton } from "./ui/button";
 import type { DayGridLayoutMode } from "../hooks/use-responsive-day-grid-layout-mode";
 import type { CalendarDay } from "../hooks/use-calendar-plan";
 import {
@@ -169,15 +170,13 @@ export function DayGrid({
           <div className="flex h-10 items-center justify-between border-l border-border px-4">
             <h2 className="text-sm font-semibold">Actual</h2>
             <div className="flex items-center gap-0">
-              <button
+              <IconButton
                 aria-label="Add Actual"
-                className="inline-flex h-7 w-7 items-center justify-center rounded-full bg-transparent text-foreground transition-colors hover:bg-white/70 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary disabled:pointer-events-none disabled:opacity-50"
                 disabled={mutationsDisabled}
                 onClick={onNewActual}
-                type="button"
               >
                 <Plus aria-hidden="true" className="h-4 w-4" />
-              </button>
+              </IconButton>
               <SlackIntentionPopover
                 disabled={mutationsDisabled}
                 onSubmit={(intention) => onStartSlack?.(intention)}

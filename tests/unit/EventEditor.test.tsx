@@ -57,4 +57,29 @@ describe("EventEditor", () => {
       screen.queryByRole("button", { name: "Delete" }),
     ).not.toBeInTheDocument();
   });
+
+  it("uses the destructive button treatment in edit mode", () => {
+    render(
+      <EventEditor
+        column="actual"
+        event={{
+          id: "existing-actual",
+          summary: "Review",
+          startMinutes: 720,
+          durationMinutes: 30,
+          colorId: "",
+        }}
+        mode="edit"
+        onDelete={vi.fn()}
+        onDismiss={vi.fn()}
+        onSave={vi.fn()}
+        paletteColorIds={[]}
+      />,
+    );
+
+    expect(screen.getByRole("button", { name: "Delete" })).toHaveClass(
+      "text-destructive",
+      "hover:bg-destructive/5",
+    );
+  });
 });

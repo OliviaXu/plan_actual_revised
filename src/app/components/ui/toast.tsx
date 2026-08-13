@@ -1,6 +1,8 @@
 import { CircleAlert, X } from "lucide-react";
 import { useEffect } from "react";
 
+import { Button } from "./button";
+
 export type ToastAction = {
   label: string;
   pending: boolean;
@@ -49,15 +51,16 @@ export function Toast({
       <div className="min-w-0 flex-1">
         <p>{message}</p>
         {action ? (
-          <button
+          <Button
             aria-busy={action.pending || undefined}
-            className="mt-2 inline-flex items-center rounded-sm bg-transparent p-0 text-sm font-medium text-foreground underline decoration-1 underline-offset-4 hover:decoration-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2 disabled:cursor-default disabled:text-muted-foreground disabled:no-underline"
+            className="mt-2"
             disabled={action.pending}
             onClick={action.onClick}
             type="button"
+            variant="link"
           >
             {action.pending ? action.pendingLabel : action.label}
-          </button>
+          </Button>
         ) : null}
       </div>
       <button
