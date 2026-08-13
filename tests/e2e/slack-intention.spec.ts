@@ -103,7 +103,9 @@ test("Slack intention flow validates, launches from the click, persists, and sav
     await logSlack.click();
     const submitSlack = page.getByRole("button", { name: "Open Slack" });
     await expect(submitSlack).toBeDisabled();
-    await expect(submitSlack).toHaveClass(/disabled:opacity-50/);
+    await expect(submitSlack).toHaveClass(/disabled:bg-muted/);
+    await expect(submitSlack).toHaveClass(/disabled:text-muted-foreground/);
+    await expect(submitSlack).toHaveClass(/disabled:opacity-100/);
     await page.getByPlaceholder("attention is devotion :)").fill("   ");
     await expect(submitSlack).toBeDisabled();
     expect(await readStorage(page, "dayRecord:2026-07-15")).toBeUndefined();
@@ -158,7 +160,7 @@ test("Slack intention flow validates, launches from the click, persists, and sav
       "Check release channel",
     );
     await page
-      .getByRole("button", { name: "Save Actual to calendar" })
+      .getByRole("button", { name: "Save to Calendar" })
       .click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText(
       "Saved 1 Actual",

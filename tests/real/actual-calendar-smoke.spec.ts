@@ -47,12 +47,12 @@ test("real Calendar Actual insert is duplicate-safe and carries private metadata
   try {
     await page.evaluate(({ key, record }) => chrome.storage.local.set({ [key]: record }), testData);
     await page.reload();
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
 
     await page.evaluate(({ key, record }) => chrome.storage.local.set({ [key]: record }), testData);
     await page.reload();
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
 
     const event = await page.evaluate(async (eventId) => {

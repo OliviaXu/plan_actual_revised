@@ -91,10 +91,10 @@ test("an exact Plan match is classified once and never inserted", async () => {
   try {
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toHaveText("1 Actual matched Plan.");
     await page.reload();
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toHaveText("Nothing new to save.");
     expect(await readStorage(page, "test:insertAttemptCount")).toBeUndefined();
   } finally {
@@ -112,7 +112,7 @@ test("a Calendar-saved Actual becomes a new insert after a meaningful edit", asy
     const originalActualId = await page
       .getByTestId("actual-block")
       .getAttribute("data-actual-id");
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
       summary: "[Actual] Untitled",
@@ -153,7 +153,7 @@ test("a Calendar-saved Actual becomes a new insert after a meaningful edit", asy
       ],
     });
 
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
     expect(await readStorage(page, "test:lastInsert")).toMatchObject({
       id: `par${editedActualId?.toLowerCase().replaceAll("-", "")}`,
@@ -177,7 +177,7 @@ test("an ambiguous insert reconciles on retry without another insert", async () 
   try {
     await page.getByRole("button", { name: "Add Actual" }).click();
     await page.getByRole("button", { name: "Save", exact: true }).click();
-    await page.getByRole("button", { name: "Save Actual to calendar" }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("1 Actual couldn’t be saved");
     await page.getByRole("button", { name: "Retry save" }).click();
     await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");

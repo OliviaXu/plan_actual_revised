@@ -110,7 +110,7 @@ describe("App operation toasts", () => {
 
     render(<App now={now} />);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Save Actual to calendar" }),
+      await screen.findByRole("button", { name: "Save to Calendar" }),
     );
 
     const failedToast = await screen.findByTestId("calendar-save-toast");

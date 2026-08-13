@@ -928,7 +928,7 @@ describe("App Actual persistence", () => {
     ));
     expect(screen.getByTestId("actual-block")).toHaveTextContent("Untitled");
     const save = screen.getByRole("button", {
-      name: "Save Actual to calendar",
+      name: "Save to Calendar",
     });
     expect(save).toBeEnabled();
     fireEvent.click(save);
@@ -966,7 +966,7 @@ describe("App Actual persistence", () => {
       "true",
     );
     const save = screen.getByRole("button", {
-      name: "Save Actual to calendar",
+      name: "Save to Calendar",
     });
     expect(save).toBeEnabled();
 
@@ -1478,7 +1478,11 @@ describe("App Slack intention", () => {
     });
 
     expect(submit).toBeDisabled();
-    expect(submit).toHaveClass("disabled:opacity-50");
+    expect(submit).toHaveClass(
+      "disabled:bg-muted",
+      "disabled:text-muted-foreground",
+      "disabled:opacity-100",
+    );
     fireEvent.change(intention, { target: { value: "   " } });
     expect(submit).toBeDisabled();
     fireEvent.change(intention, { target: { value: "Check release channel" } });
@@ -1523,10 +1527,10 @@ describe("App Slack intention", () => {
     expect(intention).not.toHaveClass("rounded-sm");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
-    ).toHaveClass("h-8", "bg-primary", "text-primary-foreground");
+    ).toHaveClass("h-8", "bg-button-primary", "text-primary-foreground");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
-    ).not.toHaveClass("bg-muted");
+    ).not.toHaveClass("bg-primary", "bg-muted");
     expect(
       within(popover).getByRole("button", { name: "Open Slack" }),
     ).not.toHaveClass("w-full");
@@ -1677,7 +1681,7 @@ describe("App Actual Calendar saving", () => {
     expect(resize).toBeEnabled();
     expect(planBlock).toHaveAttribute("draggable", "true");
     fireEvent.click(
-      screen.getByRole("button", { name: "Save Actual to calendar" }),
+      screen.getByRole("button", { name: "Save to Calendar" }),
     );
 
     expect(add).toBeDisabled();
@@ -1711,7 +1715,7 @@ describe("App Actual Calendar saving", () => {
     seedUnsavedActual(stored);
 
     render(<App now={now} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Save Actual to calendar" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save to Calendar" }));
 
     expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
       "1 Actual matched Plan.",
@@ -1723,7 +1727,7 @@ describe("App Actual Calendar saving", () => {
       expect.objectContaining({ type: "calendar.insertEvent" }),
     );
 
-    fireEvent.click(screen.getByRole("button", { name: "Save Actual to calendar" }));
+    fireEvent.click(screen.getByRole("button", { name: "Save to Calendar" }));
     expect(handler.mock.calls.filter(([message]) => message.type === "calendar.insertEvent")).toHaveLength(0);
   });
 
@@ -1741,7 +1745,7 @@ describe("App Actual Calendar saving", () => {
     seedUnsavedActual(stored);
 
     render(<App now={now} />);
-    fireEvent.click(await screen.findByRole("button", { name: "Save Actual to calendar" }));
+    fireEvent.click(await screen.findByRole("button", { name: "Save to Calendar" }));
 
     expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
       "Saved 1 Actual to Calendar.",
@@ -1778,7 +1782,7 @@ describe("App Actual Calendar saving", () => {
     seedUnsavedActual(stored);
 
     render(<App now={now} />);
-    const save = await screen.findByRole("button", { name: "Save Actual to calendar" });
+    const save = await screen.findByRole("button", { name: "Save to Calendar" });
     fireEvent.click(save);
 
     expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
@@ -1811,7 +1815,7 @@ describe("App Actual Calendar saving", () => {
 
     render(<App now={now} />);
     fireEvent.click(
-      await screen.findByRole("button", { name: "Save Actual to calendar" }),
+      await screen.findByRole("button", { name: "Save to Calendar" }),
     );
 
     expect(await screen.findByTestId("calendar-save-toast")).toHaveTextContent(
@@ -1865,7 +1869,7 @@ describe("App Revised persistence", () => {
 
     expect(await screen.findByText("Original Revised")).toBeVisible();
     expect(
-      screen.queryByRole("button", { name: "Save Actual to calendar" }),
+      screen.queryByRole("button", { name: "Save to Calendar" }),
     ).not.toBeInTheDocument();
 
     fireEvent.click(

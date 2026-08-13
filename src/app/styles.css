@@ -8,6 +8,7 @@
   --color-muted-foreground: hsl(var(--muted-foreground));
   --color-primary: hsl(var(--primary));
   --color-primary-foreground: hsl(var(--primary-foreground));
+  --color-button-primary: hsl(var(--button-primary));
   --color-destructive: hsl(var(--destructive));
   --color-accent: hsl(var(--accent));
   --color-accent-foreground: hsl(var(--accent-foreground));
@@ -26,6 +27,7 @@
     --muted-foreground: 220 10% 42%;
     --primary: 220 18% 18%;
     --primary-foreground: 42 45% 96%;
+    --button-primary: 30 10% 28%;
     --destructive: 2 68% 44%;
     --accent: 39 85% 86%;
     --accent-foreground: 220 18% 18%;

@@ -133,8 +133,8 @@ export function DayPlanner({
             type="button"
           >
             {calendarSave.isSavingActualsToCalendar
-              ? "Saving Actual"
-              : "Save Actual to calendar"}
+              ? "Saving…"
+              : "Save to Calendar"}
           </Button>
         </footer>
       ) : null}
