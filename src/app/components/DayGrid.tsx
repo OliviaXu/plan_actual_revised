@@ -148,7 +148,7 @@ export function DayGrid({
         ref={scrollViewportRef}
       >
         <div
-          className="sticky top-0 z-20 grid border-b border-border bg-muted/60"
+          className="sticky top-0 z-20 grid border-b border-border bg-muted"
           data-testid="day-grid-header"
           ref={gridHeaderRef}
           style={{ gridTemplateColumns }}

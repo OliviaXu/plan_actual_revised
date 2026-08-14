@@ -49,6 +49,11 @@ test("tracks current time without taking over the sticky viewport", async () => 
     const viewport = page.getByTestId("plan-scroll-viewport");
     const header = page.getByTestId("day-grid-header");
     const indicator = page.getByTestId("plan-now-indicator");
+    await expect
+      .poll(() =>
+        header.evaluate((element) => getComputedStyle(element).backgroundColor),
+      )
+      .toMatch(/^rgb\(/);
     await expect(indicator).toHaveCSS("top", "420px");
     await expect(indicator).toContainText("12:00 PM");
 

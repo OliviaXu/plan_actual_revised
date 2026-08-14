@@ -123,7 +123,8 @@ describe("DayGrid", () => {
     const addActual = screen.getByRole("button", { name: "Add Actual" });
     const logSlack = screen.getByRole("button", { name: "Log Slack time" });
 
-    expect(header).toHaveClass("bg-muted/60");
+    expect(header).toHaveClass("bg-muted");
+    expect(header).not.toHaveClass("bg-muted/60");
     expect(actualHeader).toHaveClass("items-center", "justify-between");
     expect(actualHeader).not.toHaveClass("gap-2");
     expect(actualHeader).toHaveClass("h-10");
