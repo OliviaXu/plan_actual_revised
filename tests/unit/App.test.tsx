@@ -1617,6 +1617,9 @@ describe("App Slack intention", () => {
         launchSlack={vi.fn()}
       />,
     );
+    fireEvent.click(await screen.findByRole("button", {
+      name: "Snooze 15 minutes",
+    }));
     const logSlack = await screen.findByRole("button", {
       name: "Log Slack time",
     });

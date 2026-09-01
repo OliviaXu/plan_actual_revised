@@ -1,6 +1,7 @@
 import { act, renderHook, waitFor } from "@testing-library/react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
+import { defaultSettings } from "../../src/config/settings";
 import { useDailyReflection } from "../../src/app/hooks/use-daily-reflection";
 
 const now = () => new Date("2026-07-15T16:00:00-07:00");
@@ -33,6 +34,7 @@ function installChrome(
 }
 
 afterEach(() => {
+  vi.useRealTimers();
   vi.unstubAllGlobals();
   vi.restoreAllMocks();
 });
@@ -192,6 +194,146 @@ describe("useDailyReflection", () => {
     await act(() => result.current.openManualReflection());
     expect(result.current.session).toBeNull();
     expect(result.current.isOpen).toBe(false);
+  });
+
+  it("automatically creates and opens a reflection on the current weekday at 4:30 PM", async () => {
+    const { stored } = installChrome();
+    const { result } = renderHook(() => useDailyReflection({
+      calendarDate: "2026-07-15",
+      calendarTimeZone: "America/Los_Angeles",
+      dailyFocusSummary: "Write the difficult proposal",
+      weeklyPracticeSummary: "Ask one better question",
+      reflectionExists: false,
+      now: () => new Date("2026-07-15T16:30:00-07:00"),
+      onCompleted: vi.fn(),
+      onFeedback: vi.fn(),
+    }));
+
+    await waitFor(() => expect(result.current.isOpen).toBe(true));
+    expect(result.current.session).toMatchObject({
+      date: "2026-07-15",
+      focusSummary: "Write the difficult proposal",
+      snoozedUntil: null,
+    });
+    expect(stored.reflectionSession).toMatchObject({ date: "2026-07-15" });
+  });
+
+  it("uses the configured reflection time for automatic eligibility", async () => {
+    const originalReflectionTimeMinutes = defaultSettings.reflectionTimeMinutes;
+    defaultSettings.reflectionTimeMinutes = 17 * 60;
+    try {
+      installChrome();
+      const { result } = renderHook(() => useDailyReflection({
+        calendarDate: "2026-07-15",
+        calendarTimeZone: "America/Los_Angeles",
+        dailyFocusSummary: null,
+        weeklyPracticeSummary: null,
+        reflectionExists: false,
+        now: () => new Date("2026-07-15T16:30:00-07:00"),
+        onCompleted: vi.fn(),
+        onFeedback: vi.fn(),
+      }));
+
+      await waitFor(() => expect(result.current.loadStatus).toBe("loaded"));
+      expect(result.current.session).toBeNull();
+      expect(result.current.isOpen).toBe(false);
+    } finally {
+      defaultSettings.reflectionTimeMinutes = originalReflectionTimeMinutes;
+    }
+  });
+
+  it("does not automatically create a session before 4:30 PM, on weekends, or for stale dates", async () => {
+    const scenarios = [
+      {
+        calendarDate: "2026-07-15",
+        currentNow: "2026-07-15T16:29:00-07:00",
+      },
+      {
+        calendarDate: "2026-07-18",
+        currentNow: "2026-07-18T17:00:00-07:00",
+      },
+      {
+        calendarDate: "2026-07-15",
+        currentNow: "2026-07-16T17:00:00-07:00",
+      },
+    ];
+
+    for (const scenario of scenarios) {
+      installChrome();
+      const { result, unmount } = renderHook(() => useDailyReflection({
+        calendarDate: scenario.calendarDate,
+        calendarTimeZone: "America/Los_Angeles",
+        dailyFocusSummary: null,
+        weeklyPracticeSummary: null,
+        reflectionExists: false,
+        now: () => new Date(scenario.currentNow),
+        onCompleted: vi.fn(),
+        onFeedback: vi.fn(),
+      }));
+      await waitFor(() => expect(result.current.loadStatus).toBe("loaded"));
+      expect(result.current.session).toBeNull();
+      expect(result.current.isOpen).toBe(false);
+      unmount();
+    }
+  });
+
+  it("rechecks once per minute and opens when the cutoff is reached", async () => {
+    vi.useFakeTimers();
+    installChrome();
+    let currentNow = new Date("2026-07-15T16:29:00-07:00");
+    const { result } = renderHook(() => useDailyReflection({
+      calendarDate: "2026-07-15",
+      calendarTimeZone: "America/Los_Angeles",
+      dailyFocusSummary: null,
+      weeklyPracticeSummary: null,
+      reflectionExists: false,
+      now: () => currentNow,
+      onCompleted: vi.fn(),
+      onFeedback: vi.fn(),
+    }));
+    await act(async () => {
+      await Promise.resolve();
+      await Promise.resolve();
+    });
+    expect(result.current.loadStatus).toBe("loaded");
+    expect(result.current.isOpen).toBe(false);
+
+    currentNow = new Date("2026-07-15T16:30:00-07:00");
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(60_000);
+    });
+
+    expect(result.current.isOpen).toBe(true);
+    expect(result.current.session).toMatchObject({ date: "2026-07-15" });
+  });
+
+  it("resurfaces an existing session when its snooze has expired", async () => {
+    const { stored } = installChrome();
+    stored.reflectionSession = {
+      schemaVersion: 1,
+      date: "2026-07-14",
+      focusSummary: "Write the difficult proposal",
+      weeklyPracticeSummary: null,
+      outcome: "done",
+      detail: "Moved it forward.",
+      weeklyPracticeReflection: "",
+      nextExperiment: "",
+      nextFrog: "",
+      snoozedUntil: "2026-07-15T22:59:00.000Z",
+    };
+    const currentNow = new Date("2026-07-15T16:00:00-07:00");
+    const { result } = renderHook(() => useDailyReflection({
+      calendarDate: "2026-07-15",
+      calendarTimeZone: "America/Los_Angeles",
+      dailyFocusSummary: null,
+      weeklyPracticeSummary: null,
+      reflectionExists: false,
+      now: () => currentNow,
+      onCompleted: vi.fn(),
+      onFeedback: vi.fn(),
+    }));
+    await waitFor(() => expect(result.current.loadStatus).toBe("loaded"));
+    await waitFor(() => expect(result.current.isOpen).toBe(true));
   });
 
   it("clears a successfully saved session and reports completion", async () => {

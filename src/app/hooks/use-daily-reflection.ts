@@ -5,6 +5,7 @@ import {
   findReflectionCalendarEvent,
   mapReflectionToCalendarEvent,
 } from "../../calendar/reflection-calendar-event-mapping";
+import { defaultSettings } from "../../config/settings";
 import type { ReflectionSession } from "../../domain/reflection-session";
 import {
   clearReflectionSession,
@@ -91,25 +92,51 @@ export function useDailyReflection({
     };
   }, [calendarDate, enabled, reflectionExists, onFeedback]);
 
+  useEffect(() => {
+    if (!enabled || loadStatus !== "loaded") return;
+
+    const checkForReflection = () => {
+      if (session) {
+        if (!session.snoozedUntil || Date.parse(session.snoozedUntil) <= now().getTime()) {
+          setIsOpen(true);
+        }
+        return;
+      }
+      if (!isAutomaticReflectionEligible({
+        calendarDate,
+        calendarTimeZone,
+        now: now(),
+        reflectionExists,
+      })) return;
+
+      const nextSession = createReflectionSession();
+      setSession(nextSession);
+      setIsOpen(true);
+      void persist(nextSession);
+    };
+
+    checkForReflection();
+    const intervalId = window.setInterval(checkForReflection, 60_000);
+    return () => window.clearInterval(intervalId);
+  }, [
+    calendarDate,
+    calendarTimeZone,
+    dailyFocusSummary,
+    enabled,
+    loadStatus,
+    now,
+    reflectionExists,
+    session,
+    weeklyPracticeSummary,
+  ]);
+
   async function openManualReflection() {
     if (session) {
       setIsOpen(true);
       return;
     }
     if (!canShowManualTrigger) return;
-    const focusSummary = normalizedSummary(dailyFocusSummary);
-    const nextSession: ReflectionSession = {
-      schemaVersion: 1,
-      date: calendarDate,
-      focusSummary,
-      weeklyPracticeSummary: normalizedSummary(weeklyPracticeSummary),
-      ...(focusSummary ? {} : { outcome: "notSet" as const }),
-      detail: "",
-      weeklyPracticeReflection: "",
-      nextExperiment: "",
-      nextFrog: "",
-      snoozedUntil: null,
-    };
+    const nextSession = createReflectionSession();
     setSession(nextSession);
     setIsOpen(true);
     await persist(nextSession);
@@ -197,6 +224,22 @@ export function useDailyReflection({
     return currentMutation;
   }
 
+  function createReflectionSession(): ReflectionSession {
+    const focusSummary = normalizedSummary(dailyFocusSummary);
+    return {
+      schemaVersion: 1,
+      date: calendarDate,
+      focusSummary,
+      weeklyPracticeSummary: normalizedSummary(weeklyPracticeSummary),
+      ...(focusSummary ? {} : { outcome: "notSet" as const }),
+      detail: "",
+      weeklyPracticeReflection: "",
+      nextExperiment: "",
+      nextFrog: "",
+      snoozedUntil: null,
+    };
+  }
+
   return {
     canShowManualTrigger,
     isOpen,
@@ -212,4 +255,23 @@ export function useDailyReflection({
 
 function normalizedSummary(summary: string | null | undefined) {
   return summary?.trim() || null;
+}
+
+function isAutomaticReflectionEligible({
+  calendarDate,
+  calendarTimeZone,
+  now,
+  reflectionExists,
+}: {
+  calendarDate: string;
+  calendarTimeZone: string;
+  now: Date;
+  reflectionExists: boolean;
+}) {
+  const zonedNow = getZonedTime(now, calendarTimeZone);
+  const weekday = DateTime.fromISO(calendarDate, { zone: "utc" }).weekday;
+  return !reflectionExists &&
+    calendarDate === zonedNow.date &&
+    weekday <= 5 &&
+    zonedNow.minutesSinceMidnight >= defaultSettings.reflectionTimeMinutes;
 }
