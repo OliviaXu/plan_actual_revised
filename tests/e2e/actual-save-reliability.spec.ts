@@ -188,3 +188,29 @@ test("an ambiguous insert reconciles on retry without another insert", async () 
     await fs.rm(extensionPath, { recursive: true, force: true });
   }
 });
+
+test("retry saves an Actual edited after an ambiguous insert failure", async () => {
+  const extensionPath = await createExtension("ambiguous");
+  const { context, page } = await openExtension(extensionPath);
+  try {
+    await page.getByRole("button", { name: "Add Actual" }).click();
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+    await page.getByRole("button", { name: "Save to Calendar" }).click();
+    await expect(page.getByTestId("calendar-save-toast")).toContainText("1 Actual couldn’t be saved");
+
+    await page.getByTestId("actual-block").click();
+    await page.getByRole("textbox", { name: "Title" }).fill("Edited Actual");
+    await page.getByRole("button", { name: "Save", exact: true }).click();
+
+    await page.getByRole("button", { name: "Retry save" }).click();
+    await expect(page.getByTestId("calendar-save-toast")).toContainText("Saved 1 Actual");
+    expect(await readStorage(page, "test:lastInsert")).toMatchObject({
+      summary: "[Actual] Edited Actual",
+    });
+    expect(await readStorage(page, "test:insertAttemptCount")).toBe(2);
+    expect(await readStorage(page, "test:uniqueInsertCount")).toBe(2);
+  } finally {
+    await context.close();
+    await fs.rm(extensionPath, { recursive: true, force: true });
+  }
+});

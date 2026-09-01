@@ -46,6 +46,7 @@ describe("useCalendarPlan", () => {
     expect(result.current.calendarState).toEqual({
       status: "connected",
       dailyFocusSummary: undefined,
+      dailyReflectionExists: false,
       weeklyPracticeState: { status: "loaded", summary: undefined },
       planEvents: [
         {

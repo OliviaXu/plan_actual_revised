@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 
 import type { DayRecord } from "../../domain/day-record";
 import type { CatchUpRunResult } from "../../shared/catch-up-run-result";
@@ -35,6 +35,9 @@ export function useSaveActualsToCalendar({
 }): ActualsToCalendarSaveResult {
   const [isSavingActualsToCalendar, setIsSavingActualsToCalendar] =
     useState(false);
+  const saveActualsToCalendarRef = useRef<() => Promise<void>>(
+    async () => undefined,
+  );
 
   useEffect(() => {
     if (dayRecordLoadStatus !== "loaded") return;
@@ -62,10 +65,42 @@ export function useSaveActualsToCalendar({
         persistDayRecord,
         ...runtimeCalendarEventClient,
       });
-      onFeedback(getCalendarSaveToastContent(result));
+      const feedback = getCalendarSaveToastContent(result);
+      onFeedback(
+        feedback.tone === "warning"
+          ? withRetryAction(feedback)
+          : feedback,
+      );
     } finally {
       setIsSavingActualsToCalendar(false);
     }
+  }
+
+  saveActualsToCalendarRef.current = saveActualsToCalendar;
+
+  function withRetryAction(feedback: DayPlannerToastContent) {
+    function retry() {
+      onFeedback({
+        ...feedback,
+        action: {
+          label: "Retry save",
+          pending: true,
+          pendingLabel: "Retrying…",
+          onClick: retry,
+        },
+      });
+      void saveActualsToCalendarRef.current();
+    }
+
+    return {
+      ...feedback,
+      action: {
+        label: "Retry save",
+        pending: false,
+        pendingLabel: "Retrying…",
+        onClick: retry,
+      },
+    };
   }
 
   return { isSavingActualsToCalendar, saveActualsToCalendar };

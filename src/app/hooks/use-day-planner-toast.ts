@@ -10,10 +10,19 @@ export type DayPlannerToastContent = {
     | "catch-up"
     | "slack-launch"
     | "daily-focus"
-    | "weekly-practice";
+    | "weekly-practice"
+    | "daily-reflection";
   message: string;
   tone: "plain" | "warning";
   durationMs?: number;
+  action?: DayPlannerToastAction;
+};
+
+export type DayPlannerToastAction = {
+  label: string;
+  pending: boolean;
+  pendingLabel: string;
+  onClick: () => void;
 };
 
 export type DayPlannerToast = DayPlannerToastContent & { id: number };

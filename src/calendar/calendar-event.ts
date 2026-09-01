@@ -15,9 +15,11 @@ export type AllDayCalendarEvent = {
   kind: "allDay";
   id: string;
   summary: string | null;
+  description?: string | null;
   colorId: string | null;
   startDate: string;
   endDate: string;
+  isReflection?: boolean;
 };
 
 export type CalendarEventRange = {
@@ -28,6 +30,7 @@ export type CalendarEventRange = {
 export type CalendarInsertEvent = {
   id?: string;
   summary: string;
+  description?: string;
   start: { dateTime: string; timeZone: string } | { date: string };
   end: { dateTime: string; timeZone: string } | { date: string };
   colorId?: string;

@@ -11,6 +11,7 @@ describe("defaultSettings", () => {
       snapMinutes: 5,
       hiddenPlanColorIds: ["2", "10"],
       actualPaletteColorIds: ["11", "6", "1"],
+      reflectionTimeMinutes: 16 * 60 + 30,
     });
   });
 });

@@ -2,9 +2,12 @@ import { CalendarDays, CircleAlert } from "lucide-react";
 
 import { CalendarSurfaceTransition } from "./components/CalendarSurfaceTransition";
 import { Button } from "./components/ui/button";
+import { Toast } from "./components/ui/toast";
+import { DayIntentions } from "./components/DayIntentions";
 import { DayPlanner } from "./components/DayPlanner";
 import { useCalendarPlan } from "./hooks/use-calendar-plan";
 import type { AppSurface } from "./hooks/use-responsive-day-grid-layout-mode";
+import { useDayPlannerToast } from "./hooks/use-day-planner-toast";
 
 const readSystemTime = () => new Date();
 const reloadAppPage = () => window.location.reload();
@@ -23,8 +26,12 @@ export function App({
   appSurface = "standalone",
 }: AppProps) {
   const sidePanel = appSurface === "side-panel";
-  const { calendarState, calendarDay, connectCalendar } =
-    useCalendarPlan(now);
+  const {
+    calendarState,
+    calendarDay,
+    connectCalendar,
+  } = useCalendarPlan(now);
+  const toast = useDayPlannerToast();
   const currentDate = now();
   const isCalendarCheckingIn =
     calendarState.status === "loading" ||
@@ -133,18 +140,40 @@ export function App({
               </div>
             </section>
           ) : (
-            <DayPlanner
-              calendarDay={calendarDay}
-              launchSlack={launchSlack}
-              now={now}
-              planEvents={calendarState.planEvents}
-              dailyFocusSummary={calendarState.dailyFocusSummary}
-              weeklyPracticeState={calendarState.weeklyPracticeState}
-              appSurface={appSurface}
-            />
+            <div className="flex min-w-0 flex-col gap-6">
+              <DayIntentions
+                appSurface={appSurface}
+                calendarDay={calendarDay}
+                dailyFocusSummary={calendarState.dailyFocusSummary}
+                dailyReflectionExists={calendarState.dailyReflectionExists}
+                now={now}
+                onFeedback={toast.show}
+                weeklyPracticeState={calendarState.weeklyPracticeState}
+              />
+              <DayPlanner
+                appSurface={appSurface}
+                calendarDay={calendarDay}
+                launchSlack={launchSlack}
+                now={now}
+                onFeedback={toast.show}
+                planEvents={calendarState.planEvents}
+              />
+            </div>
           )}
         </CalendarSurfaceTransition>
       </section>
+      {toast.current ? (
+        <Toast
+          action={toast.current.action}
+          durationMs={toast.current.durationMs}
+          key={toast.current.id}
+          message={toast.current.message}
+          onDismiss={toast.clear}
+          onDurationEnd={toast.clear}
+          testId={`${toast.current.source}-toast`}
+          tone={toast.current.tone}
+        />
+      ) : null}
     </main>
   );
 }

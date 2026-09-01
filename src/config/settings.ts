@@ -10,6 +10,7 @@ export type AppSettings = {
   defaultActualColorId: string;
   slackColorId: string;
   slackDefaultDurationMinutes: number;
+  reflectionTimeMinutes: number;
   actualPaletteColorIds: string[];
   actualEventPrefix: string;
   slackEventPrefix: string;
@@ -27,6 +28,7 @@ export const defaultSettings: AppSettings = {
   defaultActualColorId: "8",
   slackColorId: "1",
   slackDefaultDurationMinutes: 15,
+  reflectionTimeMinutes: 16 * 60 + 30,
   actualPaletteColorIds: ["11", "6", "1"],
   actualEventPrefix: "[Actual]",
   slackEventPrefix: "[s]",

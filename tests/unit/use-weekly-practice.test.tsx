@@ -17,7 +17,7 @@ describe("useWeeklyPractice", () => {
         date: "2026-07-15",
         timeZone: "America/Los_Angeles",
       },
-      initialSummary: undefined,
+      loadedSummary: undefined,
       onFeedback,
     }));
 
@@ -46,7 +46,7 @@ describe("useWeeklyPractice", () => {
         date: "2026-07-15",
         timeZone: "America/Los_Angeles",
       },
-      initialSummary: undefined,
+      loadedSummary: undefined,
       onFeedback: vi.fn(),
     }));
     act(() => result.current.setDraft("Draft"));
@@ -58,5 +58,24 @@ describe("useWeeklyPractice", () => {
       date: "2026-07-13",
       timeZone: "America/Los_Angeles",
     });
+  });
+
+  it("adopts the asynchronously loaded summary for the current week", () => {
+    const calendarDay = {
+      date: "2026-07-15",
+      timeZone: "America/Los_Angeles",
+    };
+    const { result, rerender } = renderHook(
+      ({ loadedSummary }) => useWeeklyPractice({
+        calendarDay,
+        loadedSummary,
+        onFeedback: vi.fn(),
+      }),
+      { initialProps: { loadedSummary: undefined as string | undefined } },
+    );
+
+    rerender({ loadedSummary: "Ask one better question" });
+
+    expect(result.current.summary).toBe("Ask one better question");
   });
 });

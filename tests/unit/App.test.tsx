@@ -580,9 +580,10 @@ describe("App catch-up", () => {
       }
       return unexpectedMessage(message);
     });
-    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(
-      new Error("read failed"),
-    );
+    vi.mocked(chrome.storage.local.get).mockImplementation(async (key) => {
+      if (key === "dayRecord:2026-07-15") throw new Error("read failed");
+      return {};
+    });
 
     render(<App now={now} />);
     await waitFor(() => expect(consoleError).toHaveBeenCalledWith(
@@ -981,9 +982,12 @@ describe("App Actual persistence", () => {
       }
       return unexpectedMessage(message);
     });
-    vi.mocked(chrome.storage.local.get).mockRejectedValueOnce(
-      new Error("profile storage unavailable"),
-    );
+    vi.mocked(chrome.storage.local.get).mockImplementation(async (key) => {
+      if (key === "dayRecord:2026-07-15") {
+        throw new Error("profile storage unavailable");
+      }
+      return {};
+    });
 
     render(<App now={now} />);
 
@@ -1940,11 +1944,12 @@ describe("App Plan copy dragging", () => {
       }
       return unexpectedMessage(message);
     });
-    vi.mocked(chrome.storage.local.get).mockImplementationOnce(
-      () =>
-        new Promise((resolve) => {
-          finishRead = resolve;
-        }),
+    vi.mocked(chrome.storage.local.get).mockImplementation(
+      (key) => key === "dayRecord:2026-07-15"
+        ? new Promise((resolve) => {
+            finishRead = resolve;
+          })
+        : Promise.resolve({}),
     );
 
     render(<App now={now} />);

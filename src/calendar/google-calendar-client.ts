@@ -186,6 +186,8 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
       : null;
   const isExtensionActual =
     privateProperties?.planActualRevisedActual === "true";
+  const isReflection =
+    privateProperties?.planActualRevisedReflection === "true";
 
   if (
     start &&
@@ -218,9 +220,12 @@ function normalizeCalendarEvent(value: unknown): CalendarEvent[] {
         kind: "allDay",
         id: value.id,
         summary,
+        description:
+          typeof value.description === "string" ? value.description : null,
         colorId,
         startDate: start.date,
         endDate: end.date,
+        ...(isReflection ? { isReflection } : {}),
       },
     ];
   }

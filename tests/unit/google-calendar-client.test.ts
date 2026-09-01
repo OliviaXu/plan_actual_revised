@@ -106,6 +106,7 @@ describe("listPrimaryCalendarEvents", () => {
             kind: "allDay",
             id: "all-day",
             summary: "Focus",
+            description: "Practice the difficult part",
             colorId: null,
             startDate: "2026-07-15",
             endDate: "2026-07-16",
@@ -115,8 +116,6 @@ describe("listPrimaryCalendarEvents", () => {
     });
 
     if (!result.ok) throw new Error("Expected Calendar events to load.");
-    expect(result.value.events[1]).not.toHaveProperty("description");
-
     expect(fetchCalendar).toHaveBeenCalledWith(
       expect.stringMatching(
         /^https:\/\/www\.googleapis\.com\/calendar\/v3\/calendars\/primary\/events\?/,

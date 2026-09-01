@@ -8,6 +8,7 @@ import {
   isWeeklyPracticeVisible,
   mapCalendarEventsToPlanEvents,
 } from "../../calendar/calendar-event-mapping";
+import { findReflectionCalendarEvent } from "../../calendar/reflection-calendar-event-mapping";
 import type { PlanEvent } from "../../domain/day-event";
 import { defaultSettings } from "../../config/settings";
 import { getZonedTime } from "../../shared/zoned-time";
@@ -22,6 +23,7 @@ export type CalendarState =
       status: "connected";
       planEvents: PlanEvent[];
       dailyFocusSummary: string | null | undefined;
+      dailyReflectionExists: boolean;
       weeklyPracticeState?: WeeklyPracticeState;
     }
   | { status: "error"; message: string };
@@ -102,7 +104,11 @@ export function useCalendarPlan(now: () => Date) {
     }
   }
 
-  return { calendarState, calendarDay, connectCalendar };
+  return {
+    calendarState,
+    calendarDay,
+    connectCalendar,
+  };
 }
 
 async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
@@ -128,6 +134,10 @@ async function requestCalendarPlan(): Promise<CalendarPlanLoadResult> {
           response.value.events,
           response.value.date,
         )?.summary,
+        dailyReflectionExists: Boolean(findReflectionCalendarEvent(
+          response.value.events,
+          response.value.date,
+        )),
         ...(isMonday
           ? {
               weeklyPracticeState: {

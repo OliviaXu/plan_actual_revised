@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import {
   findWeeklyPracticeCalendarEvent,
@@ -18,18 +18,23 @@ export type WeeklyPracticeState =
 
 export function useWeeklyPractice({
   calendarDay,
-  initialSummary,
+  loadedSummary,
   onFeedback,
 }: {
   calendarDay: CalendarDay;
-  initialSummary: string | null | undefined;
+  loadedSummary: string | null | undefined;
   onFeedback: (feedback: DayPlannerToastContent) => void;
 }) {
   const mondayDate = getWeeklyPracticeMonday(calendarDay.date);
   const [weeklyPracticeSummary, setWeeklyPracticeSummary] =
-    useState<string | null | undefined>(initialSummary);
+    useState<string | null | undefined>(loadedSummary);
   const [draft, setDraft] = useState("");
   const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    setWeeklyPracticeSummary(loadedSummary);
+    setDraft("");
+  }, [mondayDate, loadedSummary]);
 
   async function submitWeeklyPractice() {
     const summary = draft.trim();

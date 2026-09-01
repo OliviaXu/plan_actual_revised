@@ -1,14 +1,8 @@
 import { CircleAlert, X } from "lucide-react";
 import { useEffect } from "react";
 
+import type { DayPlannerToastAction } from "../../hooks/use-day-planner-toast";
 import { Button } from "./button";
-
-export type ToastAction = {
-  label: string;
-  pending: boolean;
-  pendingLabel: string;
-  onClick: () => void;
-};
 
 export function Toast({
   action,
@@ -19,7 +13,7 @@ export function Toast({
   testId,
   tone,
 }: {
-  action?: ToastAction;
+  action?: DayPlannerToastAction;
   durationMs?: number;
   message: string;
   onDismiss: () => void;

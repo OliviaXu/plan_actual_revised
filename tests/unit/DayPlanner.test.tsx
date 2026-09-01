@@ -1,7 +1,23 @@
 import { cleanup, render, screen, waitFor } from "@testing-library/react";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { DayPlanner } from "../../src/app/components/DayPlanner";
+
+const dayPlannerPropsWithoutFeedback: Omit<
+  ComponentProps<typeof DayPlanner>,
+  "onFeedback"
+> = {
+  calendarDay: { date: "2026-07-15", timeZone: "America/Los_Angeles" },
+  launchSlack: vi.fn(),
+  now: () => new Date("2026-07-15T12:00:00-07:00"),
+  planEvents: [],
+};
+
+// @ts-expect-error DayPlanner operations must report feedback to its owner.
+const invalidDayPlannerProps: ComponentProps<typeof DayPlanner> =
+  dayPlannerPropsWithoutFeedback;
+void invalidDayPlannerProps;
 
 afterEach(() => {
   cleanup();
@@ -34,6 +50,7 @@ describe("DayPlanner", () => {
         }}
         launchSlack={vi.fn()}
         now={() => new Date("2026-07-15T12:00:00-07:00")}
+        onFeedback={vi.fn()}
         planEvents={[]}
       />,
     );
@@ -43,7 +60,7 @@ describe("DayPlanner", () => {
     ).toBeVisible();
   });
 
-  it("keeps Focus and Practice compact while preserving space before the day grid", async () => {
+  it("renders the day grid without owning daily intentions", async () => {
     vi.stubGlobal("chrome", {
       runtime: {
         sendMessage: vi.fn(async () => ({
@@ -68,8 +85,8 @@ describe("DayPlanner", () => {
         }}
         launchSlack={vi.fn()}
         now={() => new Date("2026-07-15T12:00:00-07:00")}
+        onFeedback={vi.fn()}
         planEvents={[]}
-        weeklyPracticeState={{ status: "loaded", summary: undefined }}
       />,
     );
 
@@ -77,11 +94,13 @@ describe("DayPlanner", () => {
       screen.getByRole("region", { name: "Day grid" }).parentElement,
     ).toHaveClass("gap-6"));
 
-    expect(screen.getByTestId("daily-focus-banner").parentElement)
-      .toHaveClass("gap-1");
+    expect(screen.queryByTestId("daily-focus-banner"))
+      .not.toBeInTheDocument();
+    expect(screen.queryByTestId("weekly-practice-banner"))
+      .not.toBeInTheDocument();
   });
 
-  it("does not mount an editable practice before Calendar resolves it", () => {
+  it("does not expose daily intentions in its standalone contract", () => {
     vi.stubGlobal("chrome", {
       runtime: { sendMessage: vi.fn() },
       storage: {
@@ -100,6 +119,7 @@ describe("DayPlanner", () => {
         }}
         launchSlack={vi.fn()}
         now={() => new Date("2026-07-15T12:00:00-07:00")}
+        onFeedback={vi.fn()}
         planEvents={[]}
       />,
     );
